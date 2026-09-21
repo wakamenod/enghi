@@ -1,98 +1,98 @@
-# A short introduction to GTD
+# Introduction to GTD
 
-GTD (Getting Things Done), described by David Allen, rests on a single premise: **your mind is for having ideas, not for holding them.**
+GTD (Getting Things Done), created by David Allen, rests on a single premise: **your mind is for having ideas, not holding them.**
 
-Remembering "I need to reply to that email" fifteen times a day is your mind trying to act as a filing cabinet, and it is bad at it. The cost is paid in attention. So you get everything out of your head and into a system you trust. Only when your mind is satisfied that nothing will be lost can it stop rehearsing and start thinking.
+Remembering "I need to reply to that email" dozens of times a day drains your mental energy because your brain is straining to remember it. GTD solves this by getting everything that has your attention **out of your head and into a trusted system**. Once your mind trusts that nothing will slip through the cracks, it stops trying to remember and lets you focus on what's right in front of you. That is the goal of GTD.
 
-The work happens in five stages. The order matters, so read them in order.
+The workflow has five distinct stages. The order matters, so don't skip ahead.
 
-## 1. Capture — get it all out {#capture}
+## 1. Capture — Get It All Out {#capture}
 
-Write down everything that has your attention, without judging it. Work and personal, large and trivial, all mixed together. Do not ask "is this important?" or "how would I do this?" at this stage. **Thinking stops the flow, and the flow is the point.**
+Write down everything on your mind without judgment—work or personal, big or small. Don't ask "Is this important?" or "How will I do this?" yet. **Analyzing stops your momentum, and you will never finish writing.**
 
-The first time, set aside real time — an hour or two — and empty your head completely. "Replace the tires." "Birthday present." "That handover document." Fragments are fine; they only need to remind you later.
+For your first pass, do a complete mind sweep. Set aside one to two hours to capture everything you can think of: "replace tires," "birthday gift," "handover notes." Rough fragments are fine as long as you understand them later.
 
-After that, you just drop things in as they occur to you. **Everything here is unprocessed.** Putting something in commits you to nothing.
+From then on, simply drop thoughts into your Inbox the moment they occur to you. **Items here are unprocessed**; capturing them commits you to nothing yet.
 
-## 2. Clarify — decide what it is {#clarify}
+## 2. Clarify — Decide What It Means {#clarify}
 
-Take the items one at a time, **from the top, every one of them.** If you scan the list and pick the easy ones, the hard ones stay forever.
+Process items from your Inbox one at a time, **from the top down**. Never cherry-pick the easy ones, or the hard ones will linger forever.
 
-The first question is: **does this require an action?**
+The first question is: **"Is it actionable?"**
 
-If it does not, there are three destinations:
+If **no**, choose one of three destinations:
 
-- **Trash** — it no longer matters.
-- **Reference** — not an action, but information worth keeping: an article to read, a procedure, a contact.
-- **Someday** — you are not committing to it, but you do not want to lose it.
+- **Trash** — It's no longer relevant or needed.
+- **Reference** — Not actionable, but useful information to keep (articles, procedures, contacts).
+- **Someday/Maybe** — Not doing it now, but you want to keep the option open.
 
-If it does require action, the next question is: **does the outcome take more than one action?**
+If **yes**, the next question is: **"Can the desired outcome be reached in a single action?"**
 
-If it does, it is a **project** (below). And you decide the single **next action** for it.
+If it takes two or more steps, it is a **Project** (see below). Decide on the single **Next Action** to move it forward.
 
-If one action finishes it, ask whether it takes **less than two minutes**.
+If one action finishes it, ask: **"Can you do it in less than two minutes?"**
 
-- **Under two minutes** — do it now. Tracking it costs more than doing it.
-- **Not yours to do** — delegate it, and **record who you asked and what for.** That is your waiting list. The work left your hands; following up did not.
-- **Only possible on a certain day** — attach it to that date. It does not need to be visible before then.
-- **Anything else** — it goes on your next-actions list.
+- **Under two minutes** — Do it immediately. Tracking it takes more effort than doing it.
+- **Not for you to do** — Delegate it and **record who you asked and what they owe you**. This goes on your **Waiting For** list. You've handed off the execution, but you're still responsible for following up.
+- **Specific to a date** — Schedule it on your calendar. You don't need to see it until that day.
+- **Anything else** — Add it to your **Next Actions** list.
 
-The thing that matters most here: **a next action is written as one physical, visible activity.** "The tax thing" is not an action. "Call Tanaka at the accountant's office and ask which documents are needed" is. Vaguely written items rot on the list, forcing you to re-think them every time you look. **If you cut corners here, nothing downstream works.**
+The crucial rule here: **write every Next Action as a physical, visible activity.** "Tax return" is not an action. "Call accountant Tanaka to ask for the required documents" is. Vaguely worded items rot on your list, forcing you to rethink them every time you see them. **If you cut corners during Clarify, the rest of the system collapses.**
 
-## 3. Organize — put things where they belong {#organize}
+## 3. Organize — Put Everything in Its Place {#organize}
 
-Results of clarifying go into separate places. Keeping them out of one undifferentiated list is the whole point.
+Sort clarified items into separate lists. Never mix different types together.
 
 ### Projects {#project}
 
-In GTD, a project is **any desired outcome that takes more than one action step and can be finished within a year.** That is much smaller than what your company calls a project — "fix the bicycle" qualifies.
+In GTD, a project is **any desired outcome requiring more than one action step that can be completed within a year**. This is much smaller than a typical corporate "project"—even "Fix the bicycle" qualifies.
 
-Give each project an **outcome**: one sentence describing what "done" looks like. Not "Office move" but "We have moved into the new office and work has resumed." If you cannot write the outcome, you usually do not yet know what you want. Once it is written, the next action becomes far easier to name.
+Define each project by its **outcome**: a single sentence describing what "done" looks like. Not "Office move," but "Moved into the new office and daily operations have resumed." If you can't describe the outcome, you don't yet know what you want. Once the finish line is clear, picking the Next Action becomes surprisingly easy.
 
-The project list is not something you work from. **It is an inventory you check so that nothing quietly stalls.** What you work from is always the next action.
+The Projects list is not a to-do list. **It is an inventory to ensure nothing falls through the cracks.** You always execute from your Next Actions list, never directly from Projects.
 
 ### Contexts {#context}
 
-The tool or place an action requires: `@phone`, `@home`, `@errands`, `@email`.
+A context is the tool, location, or person required to take action: `@phone`, `@home`, `@errands`, `@email`.
 
-This is practical, not taxonomic. On a train, seeing actions that can only be done at home is noise. **A context list shows only what is possible where you are.**
+This is practical, not decorative. When you're on a train, seeing tasks you can only do at home is pure noise. **Contexts filter your view so you only see what is possible where you are right now.**
 
-### Areas of responsibility {#area}
+### Areas of Responsibility {#area}
 
-Standards you maintain rather than finish: Finances, Health, Hiring. Projects end; areas do not.
+These are **ongoing domains to maintain rather than finish**, such as Finances, Health, or Team Hiring. Projects end; areas of responsibility do not.
 
-An area is not a list of actions. It is a heading you use during the weekly review to ask: "Health — nothing is moving here at all. Is that all right?"
+This is not an action list, but a checklist for reflection. Use them during your Weekly Review to ask: "Nothing is moving forward on my health right now—is that acceptable?"
 
-## 4. Review — keep the system worth trusting {#review}
+## 4. Review — Keep the System Trustworthy {#review}
 
-**This is the one habit you cannot skip.** Once a week, spend about an hour going through everything.
+**This is the single non-negotiable habit in GTD.** Once a week, spend about an hour reviewing your entire system.
 
-Why it is required: your mind only trusts the system while it knows the system is current. It will not trust a list you have not opened in two weeks. And a mind that does not trust the system starts remembering things again, which undoes all of it.
+Why is this essential? Your mind only trusts your system **when it knows it's up to date**. It won't trust a list you haven't opened in two weeks. A distrustful mind starts hoarding reminders again, defeating the purpose of writing things down.
 
-What you do:
+The Weekly Review checklist:
 
-- Empty your in-basket (clarify everything in it)
-- Empty your head again
-- Read the next-actions list from the top; clear out what is done or no longer meaningful
-- Look back at last week and ahead at what is coming
-- Review what you are waiting on, and chase what has gone quiet
-- **Go through the projects one by one and check that each has a next action**
-- **Go through someday/maybe and see whether anything should become active**
+- Empty your Inbox (clarify all unprocessed items)
+- Do another mind sweep to clear your head
+- Read through your Next Actions list; remove completed or obsolete items
+- Look back at the past week and review upcoming calendar commitments
+- Check your Waiting For list and follow up on pending items
+- **Review every Project to ensure each has at least one active Next Action**
+- **Review Someday/Maybe to see if anything should be activated**
 
-The last two matter most. **A project with no next action stops without anyone noticing.** And a someday list that is never reviewed is just a bin.
+The last two are the most critical. **A project with no Next Action stalls silently without anyone noticing.** And without regular reviews, Someday/Maybe just becomes a dumping ground.
 
-## 5. Engage — choose what to do {#engage}
+## 5. Engage — Choose What to Do {#engage}
 
-In the moment, narrow by four criteria: **context** (where you are, what you have), **time available**, **energy available**, and only then **priority**.
+At any given moment, choose what to do using four criteria in order: **Context** (where you are and what tools you have), **Time available**, **Energy available**, and finally **Priority**.
 
-Priority coming last looks wrong but is simply honest. With five minutes free, you cannot do the most important thing you own — you can only do the most important of the things that fit in five minutes.
+Placing priority last may seem surprising, but it reflects reality. When you have only five minutes free, you can't work on the most important thing on your master list—you can only choose the most important thing you can complete in five minutes.
 
-## Where people go wrong {#pitfalls}
+## Common Pitfalls {#pitfalls}
 
-**Non-actions creep onto the next-actions list.** When entries like "the Smith thing" appear, you have to re-decide what to do each time you look, and soon you stop looking.
+**Letting non-actions sneak onto your Next Actions list.** Entries like "the Smith project" are a red flag. Every time you see them, you have to rethink what they mean, and eventually you will stop checking the list altogether.
 
-**The in-basket becomes storage.** If things go in and are never clarified, it turns into a pile you avoid. Some days you will not empty it; once a week you must.
+**Treating your Inbox like storage.** If you capture things without clarifying them, your Inbox turns into a dreaded pile of deferred work. You don't have to clear it every single day, but you must empty it at least once a week.
 
-**Skipping the weekly review.** Nearly every story of GTD "not sticking" is this. Do everything else sloppily if you must, but keep the review.
+**Skipping the Weekly Review.** Almost every failed attempt at GTD traces back to this. Even if you do everything else poorly, never skip the Weekly Review.
 
-**Building an elaborate structure up front.** Add contexts and areas when you actually feel the need to filter. Categories nobody uses are pure overhead.
+**Overbuilding categories up front.** Only add Contexts and Areas of Responsibility as you actually need them. Unused categories are pure friction.

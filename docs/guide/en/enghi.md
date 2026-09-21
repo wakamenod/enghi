@@ -1,161 +1,163 @@
 # Using enghi
 
-enghi is a personal wiki and a GTD system in one, running locally. Everything lives in a SQLite file on your own machine and nothing leaves it.
+enghi is a local-only app that combines a personal wiki with GTD. All your data lives in a local SQLite database on your machine and never leaves it.
 
-The GTD vocabulary is explained in [the introduction](/guide/gtd); read that first if the terms are unfamiliar. This page is about **what to do on each screen.**
+GTD terminology is explained in [the introduction](/guide/gtd)—read that first if the terms are unfamiliar. This guide covers **how to navigate and use enghi's screens.**
 
-## Where to start {#start}
+## Where to Start {#start}
 
-There is only one first step. **Open the GTD screen and type in everything that is on your mind.** No sorting, no deciding. One line per item.
+There is only one first step: **open the GTD view and dump everything on your mind.** Don't organize or evaluate anything yet—just capture one item per line, as many as you can think of.
 
-The capture box is on every screen: press `c` and it opens wherever you are.
+The capture field is available on every screen. Press `c` on your keyboard to open quick capture without leaving your current view.
 
-Thirty items, fifty items, it does not matter. What you end up with is your **Inbox**, and the next job is to work through it one item at a time.
+Capture 30 items or 50—it doesn't matter. What you end up with is your **Inbox**. Next, clarify it one item at a time.
 
-## Inbox — the unprocessed pile {#inbox}
+## Inbox — The Unprocessed Pile {#inbox}
 
-Everything you capture lands here. Nothing in it has been decided yet.
+Everything you capture lands here first. Nothing here has been decided yet.
 
-Click an item to open the **clarify screen**. Work from the top, one at a time.
+Click an item to open the **clarify screen**. Process items one by one from the top.
 
-Emptying the Inbox is the goal, but not every day. Once a week, during the Weekly Review, it must be emptied.
+Emptying the Inbox is the goal, but you don't need to do it every day. Just make sure to clear it once a week during your Weekly Review.
 
-## The clarify screen — action or reference {#clarify-screen}
+## The Clarify Screen — Action or Reference {#clarify-screen}
 
-Opening an Inbox item gives you two panels side by side: treat this as an **action**, or as **reference material**.
+Opening an Inbox item reveals two panels side by side. Use this screen to decide whether the item is an **action** or **reference material**.
 
-**As an action** — the left panel.
+**To treat it as an action** — use the left panel:
 
-- Rewrite the **action** as one physical activity starting with a verb. Not "expenses" but "Scan the receipts and send them to accounting."
-- Pick a **state** (see the table below).
-- **Project / context / area** are optional. Leave them empty if nothing fits.
-- **Scheduled date** means "I do not want to see this until then." **Deadline** is for dates that genuinely cannot move. They are not the same field. Putting a vague deadline on everything makes deadlines meaningless.
+- Rewrite the **action** as a single physical activity starting with a verb. Not "expenses", but "Scan receipts and send them to accounting."
+- Choose a **state** (see the table below).
+- **Project / Context / Area** are optional. Leave them empty if none apply.
+- Use **Scheduled Date** for items you don't want to see until that date arrives. Use **Deadline** only for hard, immovable due dates. They are fundamentally different—assigning arbitrary deadlines strips them of their urgency.
 
-**As reference** — the right panel. Give it a title and body, press create, and it **becomes a wiki article** while the original item is marked as filed. That is a third destination, neither done nor dropped. The new article and the item stay linked.
+**To treat it as reference** — use the right panel:
 
-**If it is neither an action nor reference**, delete it. Throwing things away is a legitimate result of clarifying, not a failure.
+Enter a title and body, then click "Create Article". The item **becomes a wiki article**, and the original item is preserved as "filed". This is a third destination—neither completed nor discarded. The new article and the original item remain linked.
 
-### Choosing a state {#states}
+**If it is neither an action nor reference**, click "Delete" at the bottom to discard it. Trashing items is not a failure; it is a valid outcome of clarifying.
 
-These are the values in the state selector. **This distinction is the core of enghi**, so come back to this table whenever you are unsure.
+### Choosing a State {#states}
 
-| State | Meaning | Where it appears |
+These are the available states on the clarify screen. **This distinction is the core of enghi**, so return to this table whenever you are unsure.
+
+| State | Meaning | Where It Appears |
 |---|---|---|
-| `inbox` | Unprocessed; not yet decided | Inbox |
-| `next` | A single action you can do now | Next Actions |
-| `later` | A subsequent action in a project; not its turn yet | Project detail only |
-| `waiting` | Delegated; you are waiting on someone | Waiting For |
-| `scheduled` | Not to be started before a given date | Scheduled; joins Next Actions when the date arrives |
-| `someday` | Someday / maybe | Someday / Maybe |
-| `filed` | Reference, not an action; turned into an article | (not on any list) |
-| `done` | Completed | (not on any list) |
-| `dropped` | Discarded | (not on any list) |
+| `inbox` | Unprocessed; not yet clarified | Inbox |
+| `next` | A single action you can do right now | Next Actions |
+| `later` | A subsequent action in a project; not its turn yet | Project details only |
+| `waiting` | Delegated; waiting on someone else | Waiting For |
+| `scheduled` | Deferred until a specific date | Scheduled; joins Next Actions when the date arrives |
+| `someday` | Someday/Maybe | Someday/Maybe |
+| `filed` | Reference material; converted into an article | (Hidden from task lists) |
+| `done` | Completed | (Hidden from task lists) |
+| `dropped` | Discarded | (Hidden from task lists) |
 
-**`later` and `someday` are different.** `later` means "committed, but not next"; `someday` means "not committed." The first waits inside a project; the second gets asked "still no?" at every review.
+**`later` and `someday` are different.** `later` means "committed, but not yet next," waiting in line inside a project. `someday` means "not committed." The former waits inside its project; the latter asks you "still not doing this?" at every review.
 
-## Next Actions — the list you work from {#next}
+## Next Actions — The Active List {#next}
 
-**This is the screen you will open most.** It holds only actions you can physically do right now. Scheduled items whose date has arrived appear here automatically — you never have to change their state by hand.
+**This is the screen you will use most.** It holds only actions you can physically perform right now. `scheduled` tasks automatically appear here once their scheduled date arrives (no need to change their state manually).
 
-Filter by context at the top. Pick `@phone` and you see only what you can do on the phone.
+Filter by context at the top. Select `@phone`, for example, to see only tasks you can do over the phone.
 
-**If this screen starts filling with items like "the Smith thing," your clarifying has gone slack.** Open the item and rewrite it as the next physical activity.
+**If this screen fills with vague items like "Smith issue", your clarifying is slipping.** Open the item and rewrite it as the next concrete, physical action.
 
-## Waiting For — what others owe you {#waiting}
+## Waiting For — Waiting on Others {#waiting}
 
-Everything you delegated, each row showing **how many days since you handed it over.**
+This list tracks everything you have delegated. Each row shows **how many days have passed since delegation.**
 
-It is out of your hands but not off your mind. During the Weekly Review, read down the list and chase anything that has gone quiet. The day count is there for exactly that.
+The work is out of your hands, but following up remains your responsibility. Scan this list during your Weekly Review and follow up on anything that has stalled. The day counter helps you spot overdue items.
 
-## Scheduled (Tickler) — hidden until the day {#scheduled}
+## Scheduled (Tickler) — Hidden Until Needed {#scheduled}
 
-Items with a scheduled date. **They do not appear in Next Actions until that date arrives.**
+This screen lists tasks with a scheduled date. **They stay out of Next Actions until that date arrives.**
 
-Put "think about this next month" here and it stops occupying you until then. Being able to forget it is the benefit.
+Putting "think about this next month" here keeps it out of sight until then. The benefit is being able to safely forget about it in the meantime.
 
-## Someday / Maybe — not now {#someday}
+## Someday/Maybe — Not Doing Now {#someday}
 
-Things you might do, but are not doing now.
+A parking lot for things you might do, but aren't doing now.
 
-**Review this list every week.** A someday list nobody reads is a bin. Read weekly, it becomes the place you can safely park anything you are unsure about.
+**Always review this list during your Weekly Review.** An unreviewed Someday list is just a trash bin. Knowing you review it weekly gives you the confidence to park uncertain ideas here.
 
 ## Projects {#projects}
 
-Outcomes that take more than one action. See [the projects section of the introduction](/guide/gtd#project).
+A project is any desired outcome requiring two or more actions. For details, see [the project section in the GTD introduction](/guide/gtd#project).
 
-- **Title** is a short label ("Office move").
-- **Outcome** is one sentence describing done ("We have moved into the new office and work has resumed"). It is optional, but **writing it makes the next action obvious.** Projects without one are flagged during the Weekly Review.
-- **Project Support Material** links one wiki article to the project, for notes and research. Any other related article can be linked simply by writing `[[Article name]]` in the text.
+- **Title**: A short identifier ("Office move").
+- **Outcome**: A single sentence describing what done looks like ("Moved into new office and operations have resumed"). This is optional, but **defining it makes your next actions obvious.** Projects without an outcome are flagged during your Weekly Review.
+- **Project Support Material**: Links a single wiki article to the project for notes and research. Link any additional articles by typing `[[Article name]]` in the text.
 
-### Stalled project detection {#stalled}
+### Stalled Project Detection {#stalled}
 
-**This is the most valuable thing enghi does for you without being asked.**
+**This is the most valuable automated feature enghi provides.**
 
-Any active project with no `next`, `waiting` or `scheduled` task is reported as stalled, on the dashboard and in the Weekly Review.
+Any active project without a `next`, `waiting`, or `scheduled` task is flagged as stalled on both the dashboard and Weekly Review.
 
-A stopped project stops silently; that is what makes it dangerous. When a name shows up here, decide one action you can take. If you cannot, that is the signal to move it to someday or to rewrite the outcome.
+Inactive projects stop silently; that is what makes them dangerous. When a project appears here, define one next action you can take. If you can't, either demote it to Someday or redefine its desired outcome.
 
-### Review date {#review-on}
+### Review Date {#review-on}
 
-A project moved to someday can be given a **review date**. When that day arrives, it surfaces on the dashboard and in the Weekly Review as a someday item due for reconsideration.
+You can assign a **review date** to projects moved to Someday. When that date arrives, the project surfaces on the dashboard and in the Weekly Review as a Someday item due for reconsideration.
 
-This is what makes someday usable. Because you have decided when it comes back, you can let it sink.
+This is what makes Someday truly usable: knowing when an idea will resurface lets you safely shelve it.
 
-## Areas {#areas}
+## Areas — Areas of Responsibility {#areas}
 
-Standards you maintain and never finish: Finances, Health, Hiring.
+Areas are ongoing standards you maintain rather than finish (e.g., "Finances", "Health", "Hiring").
 
-Attaching projects and single actions to an area shows you **what is currently moving in that part of your life.** An action too small to deserve a project can be attached directly to an area, skipping projects entirely.
+Linking projects and single actions to an Area shows you **everything currently in motion within that sphere of your life.** Single actions too small for a project can link directly to an Area, bypassing projects entirely.
 
-An area can also hold one wiki article as its notes.
+You can also attach a single wiki article to an Area for reference notes.
 
 ## Contexts {#contexts}
 
-Add them on the right side of the GTD screen. `@phone`, `@home`, `@errands`, `@email` are enough to begin with.
+Add contexts on the right side of the GTD screen. Starting with a few basics like `@phone`, `@home`, `@errands`, and `@email` is plenty.
 
-**Do not create many up front.** Adding one when you actually want to filter works far better.
+**Don't create too many upfront.** It works much better to add contexts only when you find yourself wanting to filter by them.
 
-## Weekly Review — one hour a week {#review-screen}
+## Weekly Review — One Hour a Week {#review-screen}
 
-**This screen is the reason enghi exists.** Once a week, set aside about an hour and work down the checklist.
+**This screen is the reason enghi exists.** Once a week, set aside about an hour and work through the checklist from top to bottom.
 
-It is deliberately not a wizard. **Everything you need in order to decide is on the same page:** stalled projects, someday items due for review, the Inbox, what you finished last week, the next two weeks of dates and deadlines, waiting-for items with days elapsed, and your recurring series. You can process all of it without navigating away.
+It is intentionally not a wizard. **All the data you need to make decisions sits on a single screen:** stalled projects, Someday items due for review, your Inbox, completed items from last week, upcoming dates and deadlines for the next two weeks, Waiting For elapsed days, and recurring task series. You can process everything in place without navigating away.
 
-Clicking a checklist item jumps to the matching data. When you are finished, write down what you noticed and complete the review; it is recorded.
+Clicking a checklist item jumps straight to its relevant data. When you finish, note any observations and click "Complete Review" to log the session.
 
-**Even in a week with no time, do these two: review the project list, and review someday/maybe.** Cut everything else and the system still survives.
+**Even in a rushed week, always do these two: review your project list, and review Someday/Maybe.** Drop everything else if you must, but keep these two, and the system survives.
 
-## Recurring tasks {#recurrence}
+## Recurring Tasks {#recurrence}
 
-Put a rule in the "recurrence" field and **the next single occurrence is created when you complete the task.** Occurrences are never generated ahead of time, so the list cannot fill up with recurring items you never did.
+Enter a pattern in the recurrence field on the clarify screen, and **completing the task automatically generates its next occurrence.** Tasks are never generated ahead of time in bulk, so your list will never fill up with uncompleted recurring tasks.
 
-| Rule | Meaning | Good for |
+| Rule | Meaning | Example / Best for |
 |---|---|---|
-| `+1w` | One week after the previous **scheduled date** | Fixed cadence |
-| `.+2w` | Two weeks after the **completion date** | Washing the sheets — counted from when you did it |
-| `++1w` | Add the interval until the date is in the future | Catching up something long neglected |
-| `weekly:tue,fri` | Every Tuesday and Friday | Taking the bins out |
-| `monthly:25` | The 25th of each month | Expenses |
+| `+1w` | One week after the previous **scheduled date** | Fixed calendar cadence |
+| `.+2w` | Two weeks after the **completion date** | Washing sheets (cadence starts from when done) |
+| `++1w` | Advances the scheduled date until it is in the future | Catching up on long-neglected tasks |
+| `weekly:tue,fri` | Every Tuesday and Friday | Taking out the trash |
+| `monthly:25` | The 25th of each month | Expense reports |
 | `monthly:last` | Last day of the month | |
 | `yearly:04-01` | Every April 1st | |
 
-**The difference between `+1w` and `.+2w` is the one that matters in practice.** Fixed days use the former; "two weeks after I last did it" uses the latter.
+**The distinction between `+1w` and `.+2w` matters most in practice.** Use the former for fixed calendar days and the latter when the countdown should start from whenever you actually finished the task.
 
-The generated occurrence always carries a scheduled date, so it stays out of Next Actions until that day.
+Each new occurrence is created with a **scheduled date**, so it stays out of Next Actions until that day arrives.
 
-"Skip this one" is on the clarify screen, as is "end the series." The Weekly Review lists every recurring series, so you can **retire the ones that are only running out of inertia.**
+To skip a single occurrence, select "Skip this instance" on the clarify screen. To stop the recurrence entirely, select "End recurring series". The Weekly Review lists all recurring series so you can **prune routines that are running only on inertia.**
 
-## How this relates to the wiki {#wiki}
+## Wiki Integration {#wiki}
 
-GTD and the wiki are independent. **The wiki works fully without using GTD at all**, and the reverse is equally true.
+GTD and the wiki are independent. **The wiki works fully without touching GTD**, and vice versa.
 
-They touch in exactly three places:
+They connect in only three places:
 
-- Filing an Inbox item **as reference** creates a wiki article
-- Projects and areas can each hold **one article**
-- Writing `[[Article name]]` in any article creates a link (the target need not exist yet)
+- Filing an Inbox item **as reference** turns it into a wiki article
+- Projects and Areas can each hold **one dedicated article**
+- Writing `[[Article name]]` in any article creates a link (even if the target doesn't exist yet)
 
-## Keyboard {#keys}
+## Keyboard Shortcuts {#keys}
 
 | Key | Action |
 |---|---|
@@ -172,19 +174,19 @@ They touch in exactly three places:
 
 ## Terminology {#glossary}
 
-How the words in the GTD books map onto enghi's screens.
+How terms in GTD literature map to screens and concepts in enghi.
 
-| GTD | enghi |
+| GTD Term | enghi Interface |
 |---|---|
 | Inbox / In-basket | Inbox |
 | Next Actions | Next Actions |
 | Waiting For | Waiting For |
 | Calendar / Tickler | Scheduled |
-| Someday/Maybe | Someday / Maybe |
+| Someday/Maybe | Someday/Maybe |
 | Projects | Projects |
 | Project Outcome | Outcome |
-| Project Support Material | Project Support Material (a wiki article) |
+| Project Support Material | Project Support Material (wiki article) |
 | Contexts | Contexts |
 | Areas of Responsibility | Areas |
-| Reference Material | Filed as reference → a wiki article |
+| Reference Material | Filed as reference → wiki article |
 | Weekly Review | Weekly Review |
