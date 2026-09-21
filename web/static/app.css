@@ -251,6 +251,16 @@ h1 + .meta { margin-top: calc(-1 * var(--sp-1)); }
 
 .prose { max-width: var(--measure); font-size: 16px; line-height: var(--lh-prose); }
 .prose p { text-wrap: pretty; }
+/* **切れ目の無い長い文字列は折り返す。** 日本語はどこでも折り返せるので
+   これまで表面化していなかったが、URL や長い識別子を1つ貼るだけで
+   画面の外へはみ出して横スクロールが出る。 */
+.prose, ul.rows li, .meta, .empty, .notice { overflow-wrap: break-word; }
+/* 表は折り返せないので、表だけを横にスクロールさせる。
+   ページ全体が横に流れるより、表の中で動かせた方が読める。 */
+.prose table { display: block; overflow-x: auto; max-width: 100%; width: max-content; }
+/* 中のセルは折り返させない。折り返すと表が容器の幅に潰れて、
+   1列1文字のような読めない形になる(スクロールさせたいのは表の方)。 */
+.prose th, .prose td { white-space: nowrap; }
 .prose h1 { font-size: var(--fs-7); margin-top: var(--sp-6); }
 .prose h2 {
   font-size: var(--fs-6); border-bottom: 1px solid var(--border);
