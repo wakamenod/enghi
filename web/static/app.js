@@ -64,6 +64,12 @@ function t(key, arg) {
         try { hereDecoded = decodeURIComponent(here); } catch (e) { /* 壊れた URL */ }
         if ((here === '/wiki/' + msg.slug || hereDecoded === '/wiki/' + msg.slug) &&
             !document.querySelector('textarea')) {
+          // Emacs で編集しながら見ている場合、読み直しのたびに先頭へ戻ると使えない。
+          // 読む位置を持ち越す(復帰は下の restoreScroll)。
+          try {
+            sessionStorage.setItem('enghi:scroll:' + here,
+                                   JSON.stringify({ y: window.scrollY, t: Date.now() }));
+          } catch (e) { /* private mode などでは諦める */ }
           window.location.reload();
         }
       }
@@ -103,6 +109,25 @@ function t(key, arg) {
   });
 
   connect();
+})();
+
+// ---------------------------------------------------------------- 読む位置の持ち越し
+//
+// 上の updated が仕掛けた読み直しのときだけ、直前のスクロール位置に戻す。
+// 普通の遷移や再読込を巻き込まないよう、印は一度使ったら消し、古いものは捨てる。
+
+(function () {
+  var key = 'enghi:scroll:' + window.location.pathname;
+  var raw;
+  try {
+    raw = sessionStorage.getItem(key);
+    if (raw) { sessionStorage.removeItem(key); }
+  } catch (e) { return; }
+  if (!raw) return;
+  var saved;
+  try { saved = JSON.parse(raw); } catch (e) { return; }
+  if (!saved || Date.now() - saved.t > 10000) return;   // 10 秒より古い印は使わない
+  window.scrollTo(0, saved.y);
 })();
 
 // ---------------------------------------------------------------- キーボード操作
