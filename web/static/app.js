@@ -183,6 +183,47 @@
   });
 })();
 
+// ---------------------------------------------------------------- テーマの切り替え
+//
+// auto(OS の設定に従う) → light → dark → auto の順に回す。
+// 選択は localStorage に持つ。auto のときは属性を外して CSS の
+// prefers-color-scheme に任せる。
+
+(function () {
+  var KEY = "enghi-theme";
+  var ORDER = ["auto", "light", "dark"];
+  var LABEL = { auto: "OS の設定に従う", light: "明るい", dark: "暗い" };
+
+  function current() {
+    try {
+      var t = localStorage.getItem(KEY);
+      return (t === "light" || t === "dark") ? t : "auto";
+    } catch (e) { return "auto"; }
+  }
+
+  function apply(theme) {
+    if (theme === "auto") {
+      delete document.documentElement.dataset.theme;
+    } else {
+      document.documentElement.dataset.theme = theme;
+    }
+    try {
+      if (theme === "auto") localStorage.removeItem(KEY);
+      else localStorage.setItem(KEY, theme);
+    } catch (e) {}
+    var btn = document.getElementById("theme-toggle");
+    if (btn) btn.title = "テーマ: " + LABEL[theme];
+  }
+
+  var btn = document.getElementById("theme-toggle");
+  if (btn) {
+    apply(current());
+    btn.addEventListener("click", function () {
+      apply(ORDER[(ORDER.indexOf(current()) + 1) % ORDER.length]);
+    });
+  }
+})();
+
 // ---------------------------------------------------------------- クイックキャプチャ
 //
 // DESIGN 6: c … どこからでも Inbox へ1行追加するモーダル。

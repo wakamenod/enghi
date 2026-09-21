@@ -4,15 +4,23 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{.Title}} — enghi</title>
+<script>
+// 描画前にテーマを当てる(後から当てると一瞬もとの配色が見える)
+(function () {
+  try {
+    var t = localStorage.getItem("enghi-theme");
+    if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+  } catch (e) {}
+})();
+</script>
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/htmx.min.js" defer></script>
 </head>
 <body>
 <header class="top">
   <div class="inner">
-    <a class="brand" href="/">enghi</a>
+    <a class="brand{{if eq .Nav "dashboard"}} on{{end}}" href="/">enghi</a>
     <nav class="main">
-      <a href="/"      class="{{if eq .Nav "dashboard"}}on{{end}}">ダッシュボード</a>
       <a href="/wiki"  class="{{if eq .Nav "wiki"}}on{{end}}">記事</a>
       <a href="/tags"  class="{{if eq .Nav "tags"}}on{{end}}">タグ</a>
       <a href="/gtd"   class="{{if eq .Nav "gtd"}}on{{end}}">GTD</a>
@@ -25,6 +33,8 @@
       </form>
       <div class="suggest" id="suggest"></div>
     </div>
+    <button type="button" id="theme-toggle" class="theme-toggle"
+            title="テーマを切り替える" aria-label="テーマを切り替える"></button>
   </div>
 </header>
 <main class="wrap">

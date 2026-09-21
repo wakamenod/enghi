@@ -18,52 +18,60 @@
       {{range $d.GTD.Contexts}} · <a href="/gtd/next?context={{.Name}}">{{.Name}} {{.Count}}</a>{{end}}
     </div>
 
-    <div class="cols" style="margin-top:14px">
+    <div class="cols" style="margin-top:18px">
       <div>
-        <h2>今日</h2>
-        {{if $d.GTD.Today}}
-        <ul class="rows">
-          {{range $d.GTD.Today}}
-          <li><a href="/gtd/clarify/{{.ID}}">{{.Title}}</a>
-              {{if .DeadlineOn}}<span class="tag" style="color:var(--warn)">締切 {{.DeadlineOn}}</span>{{end}}
-              {{if .ContextName}}<span class="tag">{{.ContextName}}</span>{{end}}
-              <span class="when">{{.State}}</span></li>
-          {{end}}
-        </ul>
-        {{else}}<div class="empty">今日やるものはありません</div>{{end}}
+        <div class="col-block">
+          <div class="subhead">今日</div>
+          {{if $d.GTD.Today}}
+          <ul class="rows">
+            {{range $d.GTD.Today}}
+            <li><a href="/gtd/clarify/{{.ID}}">{{.Title}}</a>
+                {{if .DeadlineOn}}<span class="tag" style="color:var(--warn)">締切 {{.DeadlineOn}}</span>{{end}}
+                {{if .ContextName}}<span class="tag">{{.ContextName}}</span>{{end}}
+                <span class="when">{{.State}}</span></li>
+            {{end}}
+          </ul>
+          {{else}}<div class="empty">今日やるものはありません</div>{{end}}
+        </div>
 
         {{if $d.GTD.WaitingOverdue}}
-        <h2 style="margin-top:24px">待ちが長いもの</h2>
-        <ul class="rows">
-          {{range $d.GTD.WaitingOverdue}}
-          <li><a href="/gtd/clarify/{{.ID}}">{{.Title}}</a>
-              <span class="tag">{{.WaitingFor}}</span>
-              <span class="when">{{.WaitingDays}} 日</span></li>
-          {{end}}
-        </ul>
+        <div class="col-block">
+          <div class="subhead">待ちが長いもの</div>
+          <ul class="rows">
+            {{range $d.GTD.WaitingOverdue}}
+            <li><a href="/gtd/clarify/{{.ID}}">{{.Title}}</a>
+                <span class="tag">{{.WaitingFor}}</span>
+                <span class="when">{{.WaitingDays}} 日</span></li>
+            {{end}}
+          </ul>
+        </div>
         {{end}}
       </div>
 
       <div>
-        <h2>停滞プロジェクト</h2>
-        {{if $d.GTD.StalledProjects}}
-        <ul class="rows">
-          {{range $d.GTD.StalledProjects}}
-          <li><a href="/gtd/project/{{.ID}}">{{.Title}}</a>
-              <span class="when">未処理 {{.OpenTasks}}</span></li>
-          {{end}}
-        </ul>
-        <div class="meta">Next Action が1つも無いアクティブなプロジェクト。</div>
-        {{else}}<div class="empty">ありません</div>{{end}}
+        <div class="col-block">
+          <div class="subhead">停滞プロジェクト</div>
+          {{if $d.GTD.StalledProjects}}
+          <ul class="rows">
+            {{range $d.GTD.StalledProjects}}
+            <li><a href="/gtd/project/{{.ID}}">{{.Title}}</a>
+                <span class="when">未処理 {{.OpenTasks}}</span></li>
+            {{end}}
+          </ul>
+          <div class="meta">Next Action が1つも無いアクティブなプロジェクト。</div>
+          {{else}}<div class="empty">ありません</div>{{end}}
+        </div>
 
         {{if $d.GTD.SomedayDueReview}}
-        <h2 style="margin-top:24px">再検討の時期が来た Someday</h2>
-        <ul class="rows">
-          {{range $d.GTD.SomedayDueReview}}
-          <li><a href="/gtd/project/{{.ID}}">{{.Title}}</a>
-              <span class="when">{{.ReviewOn}}</span></li>
-          {{end}}
-        </ul>
+        <div class="col-block">
+          <div class="subhead">再検討の時期が来た Someday</div>
+          <ul class="rows">
+            {{range $d.GTD.SomedayDueReview}}
+            <li><a href="/gtd/project/{{.ID}}">{{.Title}}</a>
+                <span class="when">{{.ReviewOn}}</span></li>
+            {{end}}
+          </ul>
+        </div>
         {{end}}
       </div>
     </div>
@@ -73,50 +81,56 @@
 </section>
 
 {{/* 下段 — Wiki */}}
-<div class="cols">
-  <section class="panel">
-    <h2>最近更新した記事</h2>
-    {{if $d.Wiki.RecentUpdate}}
-      <ul class="rows">
-      {{range $d.Wiki.RecentUpdate}}
-        <li>
-          <a href="/wiki/{{.Slug}}">{{.Title}}</a>
-          {{range .Tags}}<a class="tag" href="/tags/{{.}}">{{.}}</a>{{end}}
-          <span class="when">{{shortTime .UpdatedAt}}</span>
-        </li>
-      {{end}}
-      </ul>
-    {{else}}
-      <div class="empty">まだ記事がありません。<a href="/wiki/new">最初の1件を書く</a></div>
-    {{end}}
-  </section>
+<section class="panel">
+  <h2>記事</h2>
+  <div class="cols">
+    <div>
+      <div class="col-block">
+        <div class="subhead">最近更新したもの</div>
+        {{if $d.Wiki.RecentUpdate}}
+          <ul class="rows">
+          {{range $d.Wiki.RecentUpdate}}
+            <li>
+              <a href="/wiki/{{.Slug}}">{{.Title}}</a>
+              {{range .Tags}}<a class="tag" href="/tags/{{.}}">{{.}}</a>{{end}}
+              <span class="when">{{shortTime .UpdatedAt}}</span>
+            </li>
+          {{end}}
+          </ul>
+        {{else}}
+          <div class="empty">まだ記事がありません。<a href="/wiki/new">最初の1件を書く</a></div>
+        {{end}}
+      </div>
+    </div>
 
-  <section class="panel">
-    <h2>最近作成した記事</h2>
-    {{if $d.Wiki.RecentCreate}}
-      <ul class="rows">
-      {{range $d.Wiki.RecentCreate}}
-        <li><a href="/wiki/{{.Slug}}">{{.Title}}</a>
-            <span class="when">{{shortTime .CreatedAt}}</span></li>
-      {{end}}
-      </ul>
-    {{else}}
-      <div class="empty">—</div>
-    {{end}}
+    <div>
+      <div class="col-block">
+        <div class="subhead">最近作ったもの</div>
+        {{if $d.Wiki.RecentCreate}}
+          <ul class="rows">
+          {{range $d.Wiki.RecentCreate}}
+            <li><a href="/wiki/{{.Slug}}">{{.Title}}</a>
+                <span class="when">{{shortTime .CreatedAt}}</span></li>
+          {{end}}
+          </ul>
+        {{else}}<div class="empty">—</div>{{end}}
+      </div>
 
-    <h2 style="margin-top:28px">未解決リンク</h2>
-    {{if $d.Wiki.Unresolved}}
-      <ul class="rows">
-      {{range $d.Wiki.Unresolved}}
-        <li><a href="/wiki/new?title={{.Title}}">{{.Title}}</a>
-            <span class="when">{{.Count}}件から参照</span></li>
-      {{end}}
-      </ul>
-    {{else}}
-      <div class="empty">—</div>
-    {{end}}
-  </section>
-</div>
+      <div class="col-block">
+        <div class="subhead">未解決リンク</div>
+        {{if $d.Wiki.Unresolved}}
+          <ul class="rows">
+          {{range $d.Wiki.Unresolved}}
+            <li><a href="/wiki/new?title={{.Title}}">{{.Title}}</a>
+                <span class="when">{{.Count}}件から参照</span></li>
+          {{end}}
+          </ul>
+          <div class="meta">参照されているが、まだ書かれていない記事。</div>
+        {{else}}<div class="empty">—</div>{{end}}
+      </div>
+    </div>
+  </div>
+</section>
 
 <section class="panel">
   <h2>全体</h2>

@@ -26,22 +26,40 @@
   --radius: 3px;
 }
 
+/* OS の設定に従う。ただし data-theme で明示されていれば、そちらを優先する */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg:        #16171a;
-    --bg-sunken: #121316;
-    --bg-raised: #1d1f23;
-    --border:    #2c2f34;
-    --border-strong: #3d4147;
+  :root:not([data-theme="light"]) {
+  --bg:        #16171a;
+  --bg-sunken: #121316;
+  --bg-raised: #1d1f23;
+  --border:    #2c2f34;
+  --border-strong: #3d4147;
 
-    --fg:        #d6d3cd;
-    --fg-muted:  #918d86;
-    --fg-faint:  #6a665f;
+  --fg:        #d6d3cd;
+  --fg-muted:  #918d86;
+  --fg-faint:  #6a665f;
 
-    --accent:    #8fa88c;
-    --accent-fg: #16171a;
-    --warn:      #b8956a;
+  --accent:    #8fa88c;
+  --accent-fg: #16171a;
+  --warn:      #b8956a;
   }
+}
+
+/* ヘッダーのボタンで明示的に切り替えたとき */
+:root[data-theme="dark"] {
+  --bg:        #16171a;
+  --bg-sunken: #121316;
+  --bg-raised: #1d1f23;
+  --border:    #2c2f34;
+  --border-strong: #3d4147;
+
+  --fg:        #d6d3cd;
+  --fg-muted:  #918d86;
+  --fg-faint:  #6a665f;
+
+  --accent:    #8fa88c;
+  --accent-fg: #16171a;
+  --warn:      #b8956a;
 }
 
 * { box-sizing: border-box; }
@@ -111,6 +129,13 @@ h2 { font-size: 16px; font-weight: 600; margin: 32px 0 8px; }
 h3 { font-size: 14px; font-weight: 600; margin: 24px 0 6px; }
 
 .meta { color: var(--fg-faint); font-size: 12px; font-family: var(--mono); }
+/* 既定の青リンクは配色から浮くので、本文と同じ階調に寄せる */
+.meta a, .empty a {
+  color: var(--fg-muted); text-decoration: none;
+  border-bottom: 1px solid var(--border-strong);
+}
+.meta a:hover, .empty a:hover { color: var(--fg); border-bottom-color: var(--accent); }
+.meta a strong { font-weight: 600; color: var(--fg); }
 
 .prose { max-width: var(--measure); }
 .prose h1 { font-size: 20px; margin-top: 32px; }
@@ -167,14 +192,43 @@ li.cur { background: var(--bg-sunken); box-shadow: -8px 0 0 var(--bg-sunken), 8p
 
 /* ---- グリッド ---- */
 
-.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
-@media (max-width: 720px) { .cols { grid-template-columns: 1fr; } }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 36px; }
+.cols > * + * { padding-left: 36px; border-left: 1px solid var(--border); margin-left: -36px; }
+@media (max-width: 720px) {
+  .cols { grid-template-columns: 1fr; gap: 28px 0; }
+  .cols > * + * { padding-left: 0; border-left: none; margin-left: 0; padding-top: 24px;
+                  border-top: 1px solid var(--border); }
+}
 
-section.panel { margin-top: 28px; }
-section.panel > h2 {
-  margin: 0 0 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em;
+/* ---- セクション ----
+   見出しだけだと切れ目が読み取りにくいので、上に罫線を1本引き、
+   見出しの左に短いアクセントを置く。塗りや影は使わない。 */
+
+section.panel {
+  margin-top: 36px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+section.panel:first-of-type { border-top: none; padding-top: 0; }
+
+section.panel > h2, .panel-title {
+  margin: 0 0 12px;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--fg-muted);
+  display: flex; align-items: center; gap: 8px;
+}
+section.panel > h2::before, .panel-title::before {
+  content: ""; width: 14px; height: 2px; background: var(--accent);
+  flex: none; opacity: 0.7;
+}
+
+/* 節の中の小見出し(cols の中など)。罫線は引かず、字送りだけで階層を示す */
+.subhead {
+  margin: 0 0 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
   text-transform: uppercase; color: var(--fg-faint);
 }
+.subhead + ul.rows { margin-top: 0; }
+.col-block + .col-block { margin-top: 28px; }
 
 .empty {
   color: var(--fg-faint); font-size: 13px; padding: 10px 0;
@@ -238,3 +292,18 @@ button.danger { color: var(--warn); }
 .modal-label { font-size: 12px; color: var(--fg-muted); margin-bottom: 8px; }
 .modal input { font-size: 15px; }
 .modal-hint { font-size: 11px; color: var(--fg-faint); margin-top: 8px; font-family: var(--mono); }
+
+
+/* ---- テーマ切り替え ---- */
+
+.theme-toggle {
+  flex: none; width: 28px; height: 28px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--bg-sunken); color: var(--fg-muted);
+  font-size: 13px; line-height: 1; cursor: pointer;
+}
+.theme-toggle:hover { color: var(--fg); border-color: var(--border-strong); }
+.theme-toggle::after { content: "◐"; }              /* OS の設定に従う */
+:root[data-theme="light"] .theme-toggle::after { content: "☀"; }
+:root[data-theme="dark"]  .theme-toggle::after { content: "☾"; }
