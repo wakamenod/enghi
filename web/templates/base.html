@@ -13,9 +13,9 @@
   } catch (e) {}
 })();
 </script>
-<link rel="preload" href="/static/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/static/app.css">
-<script src="/static/htmx.min.js" defer></script>
+<link rel="preload" href="{{asset "/static/fonts/inter-latin-wght-normal.woff2"}}" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="{{asset "/static/app.css"}}">
+<script src="{{asset "/static/htmx.min.js"}}" defer></script>
 </head>
 <body data-strings='{{.Strings}}'>
 {{/* アイコンは1か所に定義して <use> で参照する。外部 SVG ファイルへの <use href>
@@ -65,7 +65,7 @@
 
 {{define "foot"}}
 </main>
-<script src="/static/app.js" defer></script>
+<script src="{{asset "/static/app.js"}}" defer></script>
 </body>
 </html>
 {{end}}

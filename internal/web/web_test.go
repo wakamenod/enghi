@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -413,5 +414,44 @@ func TestTitlesAPI(t *testing.T) {
 	}
 	if res.Titles[0].Title != "Emacs" || res.Titles[0].Slug != "emacs" {
 		t.Fatalf("候補: %+v", res.Titles[0])
+	}
+}
+
+// 静的ファイルは内容のハッシュを ETag と ?v= に載せる。
+// embed.FS の ModTime はゼロで Last-Modified が効かないため、これが無いと
+// 「CSS を直したのに画面が変わらない」が起きる(static.go)。
+func TestStaticAssetsAreFingerprinted(t *testing.T) {
+	h := newServer(t)
+
+	// テンプレートは ?v= 付きの URL を出すこと
+	w := do(h, req("GET", "/wiki", ""))
+	body := w.Body.String()
+	m := regexp.MustCompile(`/static/app\.css\?v=([a-f0-9]{8})`).FindStringSubmatch(body)
+	if m == nil {
+		t.Fatalf("テンプレートに ?v= 付きの app.css が無い")
+	}
+
+	w = do(h, req("GET", "/static/app.css?v="+m[1], ""))
+	if w.Code != http.StatusOK {
+		t.Fatalf("app.css → %d", w.Code)
+	}
+	etag := w.Header().Get("ETag")
+	if etag == "" {
+		t.Fatal("ETag が無い")
+	}
+	if cc := w.Header().Get("Cache-Control"); !strings.Contains(cc, "immutable") {
+		t.Fatalf("Cache-Control = %q", cc)
+	}
+
+	// 同じ ETag で問い合わせたら 304
+	r := req("GET", "/static/app.css?v="+m[1], "")
+	r.Header.Set("If-None-Match", etag)
+	if w := do(h, r); w.Code != http.StatusNotModified {
+		t.Fatalf("If-None-Match → %d, want 304", w.Code)
+	}
+
+	// 同梱したフォントも配れること(オフラインで動く前提)
+	if w := do(h, req("GET", "/static/fonts/inter-latin-wght-normal.woff2", "")); w.Code != http.StatusOK {
+		t.Fatalf("フォント → %d", w.Code)
 	}
 }

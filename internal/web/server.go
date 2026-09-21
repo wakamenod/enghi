@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"io/fs"
 	"net/http"
 	"strings"
 	"time"
@@ -77,6 +76,8 @@ func parseTemplates(lang i18n.Lang) (*template.Template, error) {
 		"lang":      func() string { return string(lang) },
 		"langs":     func() []i18n.Lang { return i18n.All },
 		"langName":  func(l i18n.Lang) string { return i18n.Name[l] },
+		// asset は静的ファイルの URL に内容のハッシュを付ける(static.go)
+		"asset": assetURL,
 	}
 	return template.New("").Funcs(funcs).ParseFS(enghi.TemplatesFS, "web/templates/*.html")
 }
@@ -185,12 +186,8 @@ func (s *Server) routes() {
 	m.HandleFunc("GET /api/review", s.apiReview)
 	m.HandleFunc("GET /api/series", s.apiSeries)
 
-	// ---- 静的ファイル
-	static, err := fs.Sub(enghi.StaticFS, "web/static")
-	if err != nil {
-		panic(err)
-	}
-	m.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(static))))
+	// ---- 静的ファイル(内容のハッシュで ETag と ?v= を付ける。static.go)
+	m.HandleFunc("GET /static/", serveStatic)
 }
 
 // ---------------------------------------------------------------- 共通
