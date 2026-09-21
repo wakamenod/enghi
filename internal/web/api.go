@@ -229,3 +229,16 @@ func (s *Server) apiNotFound(w http.ResponseWriter, err error) {
 	}
 	writeErr(w, http.StatusInternalServerError, "query_failed", err.Error())
 }
+
+// apiTitles は GET /api/titles?q=&limit=
+// [[...]] の補完候補。**タイトルと別名だけを引く**(本文は見ない)。
+// 候補に出たものは必ず [[ ]] で解決されることを保証したいため(DESIGN 2.5)。
+func (s *Server) apiTitles(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	titles, err := s.pages.SuggestTitles(ctxOf(r), q.Get("q"), atoiDefault(q.Get("limit"), 10))
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "query_failed", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"titles": titles})
+}

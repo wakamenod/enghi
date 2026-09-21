@@ -141,6 +141,7 @@ func (s *Server) routes() {
 
 	// ---- API(JSON。Emacs 層が依存するため独立に成立させる。DESIGN 4.2)
 	m.HandleFunc("GET /api/search", s.apiSearch)
+	m.HandleFunc("GET /api/titles", s.apiTitles) // [[...]] の補完候補
 	m.HandleFunc("GET /api/pages", s.apiListPages)
 	m.HandleFunc("POST /api/pages", s.apiCreatePage)
 	m.HandleFunc("GET /api/pages/{slug}", s.apiGetPage)
@@ -269,6 +270,7 @@ func jsStrings(lang i18n.Lang) string {
 		"theme.auto", "theme.light", "theme.dark", "theme.toggle", "gtd.capture_short",
 		"capture.title", "capture.hint", "capture.added", "capture.failed",
 		"capture.uploading", "capture.upload_failed",
+		"wikilink.alias", "wikilink.create", "wikilink.hint",
 	}
 	m := make(map[string]string, len(keys))
 	for _, k := range keys {

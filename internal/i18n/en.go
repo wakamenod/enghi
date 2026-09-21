@@ -283,5 +283,10 @@ func init() {
 		"capture.failed":        "Failed to add",
 		"capture.uploading":     "Uploading…",
 		"capture.upload_failed": "Upload failed: %s",
+
+		// ---- [[...]] completion (used from JS)
+		"wikilink.alias":  "alias → %s",
+		"wikilink.create": "Insert as a new page: %s",
+		"wikilink.hint":   "↑↓ to select · Enter/Tab to insert · Esc to close",
 	})
 }

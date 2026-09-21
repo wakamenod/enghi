@@ -410,3 +410,165 @@ function openCapture() {
       .then(function (html) { pane.innerHTML = html; pane.style.display = 'block'; });
   });
 })();
+
+// ---------------------------------------------------------------- [[...]] の補完
+//
+// 編集中に `[[` を打つと、タイトルと別名の一覧がキャレットの位置に出る。
+// タイトルを覚えていなくてもリンクが張れること。打ち間違いで静かに未解決リンクに
+// 落ちるのを防ぐのが主目的なので、**候補は必ず解決されるものだけ**を出す
+// (サーバ側で page_titles だけを引いている)。
+//
+// 候補が無いときは、入力中の文字列をそのまま挿入する行だけを出す。
+// 未解決リンクは「これから書く記事」を示す正当な使い方なので、塞がない(DESIGN 2.1)。
+
+(function () {
+  var ta = document.querySelector('textarea[name=body]');
+  if (!ta) return;
+
+  var box = null;     // 候補の入れ物
+  var items = [];     // 候補(最後の1件は「そのまま挿入」のことがある)
+  var sel = 0;        // 選択位置
+  var open = 0;       // 本文中の `[[` の開始位置
+  var timer = null;
+  var seq = 0;        // 応答の追い越し対策。打鍵が速いと古い応答が後から届く
+
+  // キャレットの画面位置。textarea には位置を取る API が無いので、
+  // 同じ体裁の隠し要素に同じ文字を流し込んで測る。
+  function caretXY(pos) {
+    var cs = getComputedStyle(ta);
+    var m = document.createElement('div');
+    ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'letterSpacing', 'lineHeight',
+     'textTransform', 'wordSpacing', 'paddingTop', 'paddingRight', 'paddingBottom',
+     'paddingLeft', 'borderTopWidth', 'borderRightWidth', 'borderBottomWidth',
+     'borderLeftWidth', 'boxSizing', 'tabSize'].forEach(function (k) { m.style[k] = cs[k]; });
+    m.style.position = 'absolute';
+    m.style.visibility = 'hidden';
+    m.style.whiteSpace = 'pre-wrap';
+    m.style.wordWrap = 'break-word';
+    m.style.width = ta.clientWidth + 'px';
+    m.textContent = ta.value.slice(0, pos);
+    var mark = document.createElement('span');
+    mark.textContent = '​';
+    m.appendChild(mark);
+    document.body.appendChild(m);
+    var r = ta.getBoundingClientRect();
+    var xy = {
+      x: r.left + window.scrollX + mark.offsetLeft - ta.scrollLeft,
+      y: r.top + window.scrollY + mark.offsetTop - ta.scrollTop,
+      h: parseFloat(cs.lineHeight) || 20,
+    };
+    document.body.removeChild(m);
+    return xy;
+  }
+
+  // キャレット直前の `[[` を探す。閉じ括弧・改行・`|` を跨いだら補完しない
+  // (`|` の後はラベルであってタイトルではない)。
+  function context() {
+    var pos = ta.selectionStart;
+    if (pos !== ta.selectionEnd) return null;
+    var head = ta.value.slice(0, pos);
+    var i = head.lastIndexOf('[[');
+    if (i < 0) return null;
+    var q = head.slice(i + 2);
+    if (/[\[\]|\n]/.test(q)) return null;
+    return { start: i, q: q };
+  }
+
+  function close() {
+    if (box) { box.remove(); box = null; }
+    items = [];
+  }
+
+  function render() {
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'wl-suggest';
+      document.body.appendChild(box);
+    }
+    box.innerHTML = '';
+    items.forEach(function (it, i) {
+      var row = document.createElement('div');
+      row.className = 'wl-item' + (i === sel ? ' on' : '');
+      var name = document.createElement('span');
+      name.className = 'wl-title';
+      name.textContent = it.create ? t('wikilink.create', it.title) : it.title;
+      row.appendChild(name);
+      if (it.is_alias) {
+        var note = document.createElement('span');
+        note.className = 'wl-note';
+        note.textContent = t('wikilink.alias', it.canonical);
+        row.appendChild(note);
+      }
+      row.addEventListener('mousedown', function (ev) { ev.preventDefault(); pick(i); });
+      box.appendChild(row);
+    });
+    var hint = document.createElement('div');
+    hint.className = 'wl-hint';
+    hint.textContent = t('wikilink.hint');
+    box.appendChild(hint);
+
+    var xy = caretXY(ta.selectionStart);
+    box.style.left = Math.min(xy.x, window.scrollX + document.documentElement.clientWidth - box.offsetWidth - 8) + 'px';
+    box.style.top = (xy.y + xy.h) + 'px';
+  }
+
+  function pick(i) {
+    var it = items[i];
+    if (!it) return;
+    var ctx = context();
+    if (!ctx) { close(); return; }
+    var insert = '[[' + it.title + ']]';
+    var pos = ta.selectionStart;
+    ta.value = ta.value.slice(0, ctx.start) + insert + ta.value.slice(pos);
+    ta.selectionStart = ta.selectionEnd = ctx.start + insert.length;
+    close();
+    ta.focus();
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  function refresh() {
+    var ctx = context();
+    if (!ctx) { close(); return; }
+    open = ctx.start;
+    var my = ++seq;
+    fetch('/api/titles?limit=8&q=' + encodeURIComponent(ctx.q))
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (my !== seq) return;          // 追い越された応答は捨てる
+        var now = context();
+        if (!now || now.start !== open) { close(); return; }
+        items = (res.titles || []).map(function (v) { return v; });
+        // 完全一致が既にあるなら「そのまま挿入」は出さない(同じ行が二重に並ぶ)
+        var exact = items.some(function (v) {
+          return v.title.toLowerCase() === now.q.trim().toLowerCase();
+        });
+        if (now.q.trim() && !exact) items.push({ title: now.q.trim(), create: true });
+        if (!items.length) { close(); return; }
+        sel = 0;
+        render();
+      })
+      .catch(close);
+  }
+
+  function schedule() {
+    clearTimeout(timer);
+    timer = setTimeout(refresh, 100);   // 検索窓と同じ間隔
+  }
+
+  ta.addEventListener('input', schedule);
+  ta.addEventListener('click', schedule);
+  ta.addEventListener('blur', function () { setTimeout(close, 100); });
+
+  ta.addEventListener('keydown', function (ev) {
+    if (!box || !items.length) return;
+    if (ev.key === 'ArrowDown' || (ev.ctrlKey && ev.key === 'n')) {
+      sel = (sel + 1) % items.length; render(); ev.preventDefault();
+    } else if (ev.key === 'ArrowUp' || (ev.ctrlKey && ev.key === 'p')) {
+      sel = (sel - 1 + items.length) % items.length; render(); ev.preventDefault();
+    } else if (ev.key === 'Enter' || ev.key === 'Tab') {
+      pick(sel); ev.preventDefault();
+    } else if (ev.key === 'Escape') {
+      close(); ev.preventDefault(); ev.stopPropagation();   // クイックキャプチャに渡さない
+    }
+  });
+})();

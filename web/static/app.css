@@ -321,3 +321,24 @@ button.danger { color: var(--warn); }
   padding: 4px 7px; line-height: 1;
 }
 .lang-switch a:hover { color: var(--fg); border-color: var(--border-strong); }
+
+/* [[...]] の補完。キャレットの位置に出すので body 直下に絶対配置する。
+   体裁は検索窓の .suggest に合わせる */
+.wl-suggest {
+  position: absolute; z-index: 60; min-width: 220px; max-width: 420px;
+  background: var(--bg-raised); border: 1px solid var(--border-strong);
+  border-radius: var(--radius); box-shadow: 0 6px 20px rgba(0,0,0,0.10);
+  max-height: 50vh; overflow-y: auto;
+}
+.wl-item {
+  display: flex; gap: 10px; align-items: baseline; cursor: pointer;
+  padding: 6px 11px; font-size: 13px; border-bottom: 1px solid var(--border);
+}
+.wl-item:last-of-type { border-bottom: none; }
+.wl-item.on { background: var(--bg-sunken); }
+.wl-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wl-note { margin-left: auto; white-space: nowrap; font-size: 12px; color: var(--fg-muted); }
+.wl-hint {
+  padding: 5px 11px; border-top: 1px solid var(--border);
+  font-size: 11px; color: var(--fg-faint);
+}

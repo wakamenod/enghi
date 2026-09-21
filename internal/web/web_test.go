@@ -390,3 +390,28 @@ func TestWikilinkRendering(t *testing.T) {
 		t.Error("[[Title|Label]] の Label が出ていない")
 	}
 }
+
+// GET /api/titles は [[...]] の補完候補を返す。本文は見ない。
+func TestTitlesAPI(t *testing.T) {
+	h := newServer(t)
+	do(h, req("POST", "/api/pages", `{"title":"Emacs","body":"本文"}`))
+	do(h, req("POST", "/api/pages", `{"title":"別の記事","body":"Emacs のことを書いた本文"}`))
+
+	w := do(h, req("GET", "/api/titles?q=emacs", ""))
+	if w.Code != http.StatusOK {
+		t.Fatalf("titles → %d: %s", w.Code, w.Body.String())
+	}
+	var res struct {
+		Titles []struct {
+			Title, Slug, Canonical string
+			IsAlias                bool `json:"is_alias"`
+		}
+	}
+	json.Unmarshal(w.Body.Bytes(), &res)
+	if len(res.Titles) != 1 {
+		t.Fatalf("本文ヒットは候補に入れない: %+v", res.Titles)
+	}
+	if res.Titles[0].Title != "Emacs" || res.Titles[0].Slug != "emacs" {
+		t.Fatalf("候補: %+v", res.Titles[0])
+	}
+}

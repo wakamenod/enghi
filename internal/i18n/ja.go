@@ -283,5 +283,10 @@ func init() {
 		"capture.failed":        "追加できませんでした",
 		"capture.uploading":     "アップロード中…",
 		"capture.upload_failed": "アップロードに失敗しました: %s",
+
+		// ---- [[...]] の補完(JS 側)
+		"wikilink.alias":  "別名 → %s",
+		"wikilink.create": "新しいページとして挿入: %s",
+		"wikilink.hint":   "↑↓ 選択 · Enter/Tab 挿入 · Esc 閉じる",
 	})
 }
