@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+
+	filestore "github.com/wakamenod/enghi/internal/files"
 )
 
 // secure は DESIGN 4.4 の3層をすべて適用する。
@@ -66,6 +68,12 @@ func (s *Server) needsJSONContentType(r *http.Request) bool {
 		return false
 	}
 	if r.Method == http.MethodPost {
+		// ファイルのアップロードは生のバイト列を受け取る。
+		// 許すのは files.MediaTypeAllowed に載っている種別だけで、
+		// これらは CORS の simple request にならないため preflight を避けられない。
+		if r.URL.Path == "/api/files" && filestore.MediaTypeAllowed(mediaType(r.Header.Get("Content-Type"))) {
+			return false
+		}
 		return true // simple request になりうるのは POST。常に強制する
 	}
 	// PUT / PATCH / DELETE は本文を伴うときだけ検査する

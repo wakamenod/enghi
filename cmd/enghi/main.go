@@ -24,6 +24,7 @@ import (
 
 	"github.com/wakamenod/enghi/internal/config"
 	"github.com/wakamenod/enghi/internal/export"
+	filestore "github.com/wakamenod/enghi/internal/files"
 	"github.com/wakamenod/enghi/internal/store"
 	"github.com/wakamenod/enghi/internal/web"
 )
@@ -48,6 +49,8 @@ func main() {
 		err = cmdDoctor(args)
 	case "backup":
 		err = cmdBackup(args)
+	case "files":
+		err = cmdFiles(args)
 	case "install-agent":
 		err = cmdInstallAgent(args)
 	case "help", "-h", "--help":
@@ -69,13 +72,14 @@ func usage() {
   enghi export [--dir D] Markdown に全件エクスポート
   enghi doctor           整合性検査
   enghi backup [--dir D] DB のバックアップを取る
+  enghi files [--prune]  画像などの一覧。--prune で未参照のものを消す
   enghi install-agent    launchd の plist を書き出す
 
 設定: `+config.Path()+`
 `)
 }
 
-// openDB は設定を読み、DB を開き、起動時の整合性検査を行う。
+// openDB は設定を読み、DB を開く。
 func openDB(configPath string) (config.Config, *store.DB, error) {
 	cfg, err := config.Load(configPath)
 	if err != nil {
@@ -88,6 +92,20 @@ func openDB(configPath string) (config.Config, *store.DB, error) {
 	return cfg, db, nil
 }
 
+// openAll は本体 DB とファイル保管庫の両方を開く。
+func openAll(configPath string) (config.Config, *store.DB, *filestore.Store, error) {
+	cfg, db, err := openDB(configPath)
+	if err != nil {
+		return cfg, nil, nil, err
+	}
+	fs, err := filestore.Open(cfg.FilesDBPath)
+	if err != nil {
+		db.Close()
+		return cfg, nil, nil, err
+	}
+	return cfg, db, fs, nil
+}
+
 func cmdServe(args []string) error {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
 	configPath := fs.String("config", "", "設定ファイルのパス")
@@ -96,11 +114,12 @@ func cmdServe(args []string) error {
 		return err
 	}
 
-	cfg, db, err := openDB(*configPath)
+	cfg, db, blobs, err := openAll(*configPath)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
+	defer blobs.Close()
 	if *port != 0 {
 		cfg.Port = *port
 	}
@@ -120,7 +139,7 @@ func cmdServe(args []string) error {
 		}
 	}
 
-	srv, err := web.New(cfg, db)
+	srv, err := web.New(cfg, db, blobs)
 	if err != nil {
 		return err
 	}
@@ -131,13 +150,17 @@ func cmdServe(args []string) error {
 	backupCtx, stopBackup := context.WithCancel(context.Background())
 	defer stopBackup()
 	if cfg.BackupOn() {
-		go store.BackupDaemon(backupCtx, db, cfg.BackupDir, cfg.BackupKeep,
+		go store.BackupDaemon(backupCtx, db, blobs, cfg.BackupDir, cfg.BackupKeep,
 			func(b *store.Backup, err error) {
 				if err != nil {
 					log.Printf("警告: バックアップに失敗した: %v", err)
 					return
 				}
-				log.Printf("バックアップを取った: %s (%.1f MB)", b.Path, float64(b.Bytes)/(1<<20))
+				msg := fmt.Sprintf("バックアップを取った: %s (%.1f MB)", b.Path, float64(b.Bytes)/(1<<20))
+				if b.FilesPath != "" && !b.FilesSkip {
+					msg += fmt.Sprintf(" / 画像 %.1f MB", float64(b.FilesBytes)/(1<<20))
+				}
+				log.Print(msg)
 			})
 	}
 
@@ -192,21 +215,23 @@ func cmdExport(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	cfg, db, err := openDB(*configPath)
+	cfg, db, blobs, err := openAll(*configPath)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
+	defer blobs.Close()
 
 	out := cfg.ExportDir
 	if *dir != "" {
 		out = *dir
 	}
-	res, err := export.Run(context.Background(), db, out)
+	res, err := export.Run(context.Background(), db, blobs, out)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%s に %d 件の記事を含む %d ファイルを書き出した\n", res.Dir, res.Pages, res.Files)
+	fmt.Printf("%s に記事 %d 件、画像 %d 件、あわせて %d ファイルを書き出した\n",
+		res.Dir, res.Pages, res.Images, res.Files)
 	return nil
 }
 
@@ -220,11 +245,12 @@ func cmdBackup(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	cfg, db, err := openDB(*configPath)
+	cfg, db, blobs, err := openAll(*configPath)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
+	defer blobs.Close()
 
 	out := cfg.BackupDir
 	if *dir != "" {
@@ -251,14 +277,72 @@ func cmdBackup(args []string) error {
 		return nil
 	}
 
-	b, err := store.RunBackup(context.Background(), db, out, n)
+	b, err := store.RunBackup(context.Background(), db, blobs, out, n)
 	if err != nil {
 		return err
 	}
 	fmt.Printf("%s (%.1f MB)\n", b.Path, float64(b.Bytes)/(1<<20))
+	if b.FilesPath != "" {
+		if b.FilesSkip {
+			fmt.Printf("%s は前回から変わっていないので取り直していない\n", b.FilesPath)
+		} else {
+			fmt.Printf("%s (%.1f MB)\n", b.FilesPath, float64(b.FilesBytes)/(1<<20))
+		}
+	}
 	if b.Removed > 0 {
 		fmt.Printf("古いバックアップを %d 件消した(%d 世代を残す)\n", b.Removed, n)
 	}
+	return nil
+}
+
+func cmdFiles(args []string) error {
+	fs := flag.NewFlagSet("files", flag.ExitOnError)
+	configPath := fs.String("config", "", "設定ファイルのパス")
+	prune := fs.Bool("prune", false, "どこからも参照されていないファイルを消す")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	_, db, blobs, err := openAll(*configPath)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	defer blobs.Close()
+	ctx := context.Background()
+
+	count, bytes, err := blobs.Stats(ctx)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%d 件 / %.1f MB (%s)\n", count, float64(bytes)/(1<<20), blobs.Path)
+
+	unused, err := blobs.Unused(ctx, db.DB)
+	if err != nil {
+		return err
+	}
+	missing, err := blobs.Missing(ctx, db.DB)
+	if err != nil {
+		return err
+	}
+	if len(missing) > 0 {
+		fmt.Printf("本文から参照されているが実体が無いもの: %d 件\n", len(missing))
+		for _, h := range missing {
+			fmt.Printf("  %s\n", h)
+		}
+	}
+	if len(unused) == 0 {
+		fmt.Println("未参照のファイルは無い")
+		return nil
+	}
+	if !*prune {
+		fmt.Printf("どこからも参照されていないもの: %d 件(--prune で消す)\n", len(unused))
+		return nil
+	}
+	n, freed, err := blobs.Prune(ctx, db.DB)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%d 件消した(%.1f MB)\n", n, float64(freed)/(1<<20))
 	return nil
 }
 

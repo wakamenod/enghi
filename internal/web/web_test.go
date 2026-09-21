@@ -15,6 +15,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 	"github.com/wakamenod/enghi/internal/config"
+	filestore "github.com/wakamenod/enghi/internal/files"
 	"github.com/wakamenod/enghi/internal/store"
 	"github.com/wakamenod/enghi/internal/web"
 )
@@ -30,7 +31,13 @@ func newServer(t *testing.T) http.Handler {
 
 	cfg := config.Default()
 	cfg.ExportDir = filepath.Join(dir, "export")
-	srv, err := web.New(cfg, db)
+	cfg.BackupDir = filepath.Join(dir, "backup")
+	blobs, err := filestore.Open(filepath.Join(dir, "files.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { blobs.Close() })
+	srv, err := web.New(cfg, db, blobs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +207,12 @@ func TestFocusChannelDeliversNavigate(t *testing.T) {
 	}
 	defer db.Close()
 	cfg := config.Default()
-	srv, err := web.New(cfg, db)
+	blobs, err := filestore.Open(filepath.Join(dir, "files.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer blobs.Close()
+	srv, err := web.New(cfg, db, blobs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -265,7 +277,12 @@ func TestWebSocketRejectsCrossOrigin(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	srv, err := web.New(config.Default(), db)
+	blobs, err := filestore.Open(filepath.Join(dir, "files.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer blobs.Close()
+	srv, err := web.New(config.Default(), db, blobs)
 	if err != nil {
 		t.Fatal(err)
 	}

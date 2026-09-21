@@ -11,7 +11,8 @@
   <label for="tags">タグ(カンマ区切り)</label>
   <input type="text" id="tags" name="tags" value="{{$d.TagText}}">
 
-  <label for="body">本文 — Markdown。<code>[[タイトル]]</code> で他の記事へリンクできる(存在しなくてよい)</label>
+  <label for="body">本文 — Markdown。<code>[[タイトル]]</code> で他の記事へリンクできる(存在しなくてよい)。
+    画像は貼り付け(<span class="kbd">⌘V</span>)かドラッグで入る</label>
   <textarea id="body" name="body" spellcheck="false">{{$d.Page.Body}}</textarea>
 
   <div class="actions">

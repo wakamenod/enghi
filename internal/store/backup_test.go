@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/wakamenod/enghi/internal/files"
 	"github.com/wakamenod/enghi/internal/store"
 )
 
@@ -35,7 +36,7 @@ func TestBackupContainsCommittedData(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	b, err := store.RunBackup(ctx, db, dir, 7)
+	b, err := store.RunBackup(ctx, db, nil, dir, 7)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +76,7 @@ func TestBackupIsIdempotentPerDay(t *testing.T) {
 	dir := t.TempDir()
 
 	for i := 0; i < 3; i++ {
-		if _, err := store.RunBackup(ctx, db, dir, 7); err != nil {
+		if _, err := store.RunBackup(ctx, db, nil, dir, 7); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -101,7 +102,7 @@ func TestBackupRotation(t *testing.T) {
 		}
 	}
 	// 今日の分を取ると 6 件になり、3 世代に切り詰められる
-	b, err := store.RunBackup(context.Background(), db, dir, 3)
+	b, err := store.RunBackup(context.Background(), db, nil, dir, 3)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,11 +128,45 @@ func TestBackupRotation(t *testing.T) {
 	}
 }
 
+// 画像用 DB も一緒に控えること。分けた以上、両方無いと復旧できない。
+func TestBackupIncludesFilesDB(t *testing.T) {
+	db := openTestDB(t)
+	dir := t.TempDir()
+	blobs, err := files.Open(filepath.Join(t.TempDir(), "files.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer blobs.Close()
+	if _, err := blobs.Put(context.Background(), []byte("画像の中身"), "image/png", "a.png"); err != nil {
+		t.Fatal(err)
+	}
+
+	b, err := store.RunBackup(context.Background(), db, blobs, dir, 7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.FilesPath == "" || b.FilesBytes == 0 {
+		t.Fatalf("画像の控えが取られていない: %+v", b)
+	}
+	if _, err := os.Stat(b.FilesPath); err != nil {
+		t.Fatalf("画像の控えが無い: %v", err)
+	}
+
+	// 2回目は変わっていないので取り直さない
+	b2, err := store.RunBackup(context.Background(), db, blobs, dir, 7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !b2.FilesSkip {
+		t.Error("変わっていないのに取り直している")
+	}
+}
+
 // バックアップ先が無くても作られること。
 func TestBackupCreatesDir(t *testing.T) {
 	db := openTestDB(t)
 	dir := filepath.Join(t.TempDir(), "まだ無い", "階層")
-	if _, err := store.RunBackup(context.Background(), db, dir, 7); err != nil {
+	if _, err := store.RunBackup(context.Background(), db, nil, dir, 7); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(dir); err != nil {

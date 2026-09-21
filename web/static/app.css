@@ -154,6 +154,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 24px 0 6px; }
   margin: 16px 0; padding-left: 14px;
   border-left: 2px solid var(--border-strong); color: var(--fg-muted);
 }
+.prose img { max-width: 100%; height: auto; border-radius: var(--radius); }
 .prose table { border-collapse: collapse; }
 .prose th, .prose td { border: 1px solid var(--border); padding: 5px 10px; text-align: left; }
 .prose a { color: var(--fg); text-decoration-color: var(--border-strong); text-underline-offset: 2px; }
@@ -246,6 +247,7 @@ textarea {
   min-height: 60vh; resize: vertical;
 }
 input:focus, textarea:focus { outline: none; border-color: var(--border-strong); }
+textarea.dropping { border-color: var(--accent); background: var(--bg-sunken); }
 label { display: block; font-size: 12px; color: var(--fg-muted); margin: 16px 0 4px; }
 
 button, .btn {

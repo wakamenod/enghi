@@ -13,6 +13,7 @@ import (
 
 	enghi "github.com/wakamenod/enghi"
 	"github.com/wakamenod/enghi/internal/config"
+	filestore "github.com/wakamenod/enghi/internal/files"
 	"github.com/wakamenod/enghi/internal/gtd"
 	"github.com/wakamenod/enghi/internal/search"
 	"github.com/wakamenod/enghi/internal/store"
@@ -25,6 +26,7 @@ type Server struct {
 	db     *store.DB
 	pages  *wiki.Service
 	gtd    *gtd.Service
+	files  *filestore.Store
 	search *search.Service
 	hub    *Hub
 	tmpl   *template.Template
@@ -32,7 +34,8 @@ type Server struct {
 }
 
 // New はサーバを組み立てる。
-func New(cfg config.Config, db *store.DB) (*Server, error) {
+// files は画像などの保管庫(本体 DB とは別ファイル)。
+func New(cfg config.Config, db *store.DB, files *filestore.Store) (*Server, error) {
 	tmpl, err := parseTemplates()
 	if err != nil {
 		return nil, err
@@ -42,6 +45,7 @@ func New(cfg config.Config, db *store.DB) (*Server, error) {
 		db:     db,
 		pages:  wiki.New(db, cfg.RevisionCompactMinutes),
 		gtd:    gtd.New(db),
+		files:  files,
 		search: search.New(db),
 		hub:    NewHub(),
 		tmpl:   tmpl,
@@ -140,6 +144,10 @@ func (s *Server) routes() {
 	m.HandleFunc("POST /api/export", s.apiExport)
 	m.HandleFunc("POST /api/backup", s.apiBackup)
 	m.HandleFunc("GET /api/backups", s.apiBackups)
+	m.HandleFunc("POST /api/files", s.apiUploadFile)
+	m.HandleFunc("GET /api/files", s.apiListFiles)
+	m.HandleFunc("DELETE /api/files/{hash}", s.apiDeleteFile)
+	m.HandleFunc("GET /files/{hash}", s.serveFile)
 
 	m.HandleFunc("GET /api/tasks", s.apiListTasks)
 	m.HandleFunc("POST /api/tasks", s.apiCreateTask)

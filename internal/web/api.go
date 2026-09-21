@@ -190,7 +190,7 @@ func (s *Server) apiDoctor(w http.ResponseWriter, r *http.Request) {
 // apiExport は出力先をリクエストから受け取らない。
 // **設定ファイルの値に固定する。任意パスへの書き出しを外部から起動できる状態は危険**(DESIGN 4.4)。
 func (s *Server) apiExport(w http.ResponseWriter, r *http.Request) {
-	res, err := export.Run(ctxOf(r), s.db, s.cfg.ExportDir)
+	res, err := export.Run(ctxOf(r), s.db, s.files, s.cfg.ExportDir)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "export_failed", err.Error())
 		return
@@ -201,7 +201,7 @@ func (s *Server) apiExport(w http.ResponseWriter, r *http.Request) {
 // apiBackup は DB のバックアップを取る。
 // **出力先はリクエストから受け取らない。**設定ファイルの値に固定する(export と同じ)。
 func (s *Server) apiBackup(w http.ResponseWriter, r *http.Request) {
-	b, err := store.RunBackup(ctxOf(r), s.db, s.cfg.BackupDir, s.cfg.BackupKeep)
+	b, err := store.RunBackup(ctxOf(r), s.db, s.files, s.cfg.BackupDir, s.cfg.BackupKeep)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "backup_failed", err.Error())
 		return

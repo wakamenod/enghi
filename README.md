@@ -42,9 +42,35 @@ db_path    = "~/.local/share/enghi/enghi.db"
 export_dir = "~/.local/share/enghi/export"
 revision_compact_minutes = 10
 
+files_db_path  = "~/.local/share/enghi/enghi-files.db"   # 省略すると db_path に追従する
 backup_dir     = "~/.local/share/enghi/backup"
 backup_keep    = 7       # 残す世代数
 backup_enabled = true
+```
+
+## 画像
+
+記事の編集画面に画像を貼り付ける(ドラッグでも可)と、その場で保管して
+Markdown の記法が入る。`enghi files` で一覧と掃除ができる。
+
+**画像は本体とは別の SQLite ファイル(`enghi-files.db`)に置く。**
+記事もタスクも DB が正本という原則は変えないが、バイナリを同じファイルに混ぜると
+毎日の `VACUUM INTO` が画像ごと全部コピーすることになり、バックアップの費用が
+中身の量に比例して増えていく。分けておけば本体は数十 MB のままで済む。
+
+- 内容でアドレスする(SHA-256)。同じ画像を何度貼っても実体は1つ
+- 受け付けるのは PNG / JPEG / GIF / WebP / AVIF / PDF。1件 32 MB まで
+- **SVG は受け付けない。**スクリプトを含められるうえ同一オリジンで配信するため、
+  記事に貼った SVG から Cookie や DOM に触れる経路ができてしまう
+- 配信時は `X-Content-Type-Options: nosniff` と `Content-Security-Policy` を付ける
+- URL が内容で決まるので恒久的にキャッシュしてよい(`immutable`)
+
+エクスポートすると `files/` に実体を書き出し、本文中の参照を相対パスに書き換える。
+書き出したものだけで完結した Markdown になる。
+
+```sh
+./bin/enghi files            # 一覧と、未参照・リンク切れの件数
+./bin/enghi files --prune    # どこからも参照されていないものを消す
 ```
 
 ## バックアップ
@@ -55,6 +81,10 @@ backup_enabled = true
 
 単なるファイルコピーでは WAL の内容を取りこぼし、書き込みの途中を掴むと壊れた複製になる。
 `VACUUM INTO` は読み取りトランザクションの中で書き出すので、その心配がない。
+
+画像用 DB も一緒に控える。**ただし世代は持たない。**内容でアドレスしていて
+追記しかされないため、古い世代を残しても意味が無い。前回から変わっていなければ
+取り直さない。
 
 ```sh
 ./bin/enghi backup           # 手動で取る

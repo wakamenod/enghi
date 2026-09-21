@@ -318,7 +318,7 @@ func (s *Server) uiRewriteReferences(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) uiExport(w http.ResponseWriter, r *http.Request) {
-	res, err := export.Run(ctxOf(r), s.db, s.cfg.ExportDir)
+	res, err := export.Run(ctxOf(r), s.db, s.files, s.cfg.ExportDir)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

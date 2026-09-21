@@ -283,6 +283,70 @@ function openCapture() {
   });
 }
 
+// ---------------------------------------------------------------- 画像の貼り付け
+//
+// 編集中のテキストエリアに画像を貼る/落とすと、その場でアップロードして
+// Markdown の記法をカーソル位置に差し込む。
+
+(function () {
+  var ta = document.querySelector('textarea[name=body]');
+  if (!ta) return;
+
+  function insertAtCursor(text) {
+    var start = ta.selectionStart, end = ta.selectionEnd;
+    ta.value = ta.value.slice(0, start) + text + ta.value.slice(end);
+    ta.selectionStart = ta.selectionEnd = start + text.length;
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  function upload(file, placeholder) {
+    return fetch('/api/files?name=' + encodeURIComponent(file.name || ''), {
+      method: 'POST',
+      headers: { 'Content-Type': file.type },
+      body: file,
+    }).then(function (r) {
+      if (!r.ok) return r.json().then(function (e) { throw new Error(e.message || r.status); });
+      return r.json();
+    }).then(function (res) {
+      // 仮置きの文字列を実際のリンクに差し替える
+      ta.value = ta.value.replace(placeholder, res.markdown);
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+    }).catch(function (err) {
+      ta.value = ta.value.replace(placeholder, '<!-- アップロードに失敗: ' + err.message + ' -->');
+    });
+  }
+
+  function handle(fileList) {
+    var files = Array.prototype.slice.call(fileList).filter(function (f) {
+      return f && (f.type.indexOf('image/') === 0 || f.type === 'application/pdf');
+    });
+    if (!files.length) return false;
+    files.forEach(function (file, i) {
+      // 応答が返るまでの間、どこに入るかが分かるようにしておく
+      var placeholder = '![アップロード中…' + Date.now() + '-' + i + ']()';
+      insertAtCursor(placeholder + '\n');
+      upload(file, placeholder);
+    });
+    return true;
+  }
+
+  ta.addEventListener('paste', function (ev) {
+    if (ev.clipboardData && handle(ev.clipboardData.files)) ev.preventDefault();
+  });
+
+  ta.addEventListener('dragover', function (ev) {
+    if (ev.dataTransfer && ev.dataTransfer.types.indexOf('Files') >= 0) {
+      ev.preventDefault();
+      ta.classList.add('dropping');
+    }
+  });
+  ta.addEventListener('dragleave', function () { ta.classList.remove('dropping'); });
+  ta.addEventListener('drop', function (ev) {
+    ta.classList.remove('dropping');
+    if (ev.dataTransfer && handle(ev.dataTransfer.files)) ev.preventDefault();
+  });
+})();
+
 // ---------------------------------------------------------------- 編集画面のプレビュー
 (function () {
   var btn = document.getElementById('preview-toggle');

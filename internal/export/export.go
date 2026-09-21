@@ -7,18 +7,24 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"unicode"
 
+	filestore "github.com/wakamenod/enghi/internal/files"
 	"github.com/wakamenod/enghi/internal/store"
 )
 
 // Result は書き出しの結果。
 type Result struct {
-	Dir   string `json:"dir"`
-	Pages int    `json:"pages"`
-	Files int    `json:"files"`
+	Dir    string `json:"dir"`
+	Pages  int    `json:"pages"`
+	Files  int    `json:"files"`
+	Images int    `json:"images"`
 }
+
+// fileRefRe は本文中の /files/<hash> を拾う。
+var fileRefRe = regexp.MustCompile(`/files/([0-9a-f]{64})`)
 
 // Sanitize はファイル名に使える形に slug を直す。
 // **/ 、.. 、制御文字、先頭のドットを除去してからファイル名にすること**(DESIGN 7)。
@@ -52,10 +58,15 @@ func Sanitize(slug string) string {
 
 // Run は dir へ全件を書き出す。
 // **dir はリクエストから受け取らないこと**(設定ファイルの値に固定する。DESIGN 4.4)。
-func Run(ctx context.Context, db *store.DB, dir string) (*Result, error) {
+//
+// blobs が非 nil なら、本文から参照されている画像も `files/` に書き出し、
+// 本文中の `/files/<hash>` を相対パスに書き換える。書き出したものだけで
+// 完結した Markdown になるようにするため。
+func Run(ctx context.Context, db *store.DB, blobs *filestore.Store, dir string) (*Result, error) {
 	res := &Result{Dir: dir}
 	wikiDir := filepath.Join(dir, "wiki")
 	gtdDir := filepath.Join(dir, "gtd")
+	filesDir := filepath.Join(dir, "files")
 	for _, d := range []string{wikiDir, gtdDir} {
 		if err := os.MkdirAll(d, 0o700); err != nil {
 			return nil, err
@@ -70,6 +81,7 @@ func Run(ctx context.Context, db *store.DB, dir string) (*Result, error) {
 	defer rows.Close()
 
 	used := map[string]int{}
+	written := map[string]string{} // hash -> 拡張子(重複して書き出さない)
 	for rows.Next() {
 		var id int64
 		var slug, title, body, created, updated string
@@ -92,6 +104,23 @@ func Run(ctx context.Context, db *store.DB, dir string) (*Result, error) {
 			name = fmt.Sprintf("%s-%d", name, n+1)
 		}
 		used[key]++
+
+		// 本文から参照されている画像を書き出し、相対パスに直す
+		if blobs != nil {
+			var werr error
+			body = fileRefRe.ReplaceAllStringFunc(body, func(m string) string {
+				hash := fileRefRe.FindStringSubmatch(m)[1]
+				ext, err := writeBlob(ctx, blobs, filesDir, hash, written)
+				if err != nil {
+					werr = err
+					return m
+				}
+				return "../files/" + hash + ext
+			})
+			if werr != nil {
+				return nil, werr
+			}
+		}
 
 		var b strings.Builder
 		b.WriteString("---\n")
@@ -128,6 +157,8 @@ func Run(ctx context.Context, db *store.DB, dir string) (*Result, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	res.Images = len(written)
+	res.Files += len(written)
 
 	// GTD 側。第1段階では空でもファイルは作る(エクスポートの形を固定しておくため)。
 	for name, fn := range map[string]func(context.Context, *store.DB) (string, error){
@@ -145,6 +176,29 @@ func Run(ctx context.Context, db *store.DB, dir string) (*Result, error) {
 		res.Files++
 	}
 	return res, nil
+}
+
+// writeBlob は画像を1つ書き出し、拡張子を返す。既に書いてあれば何もしない。
+func writeBlob(ctx context.Context, blobs *filestore.Store, dir, hash string,
+	written map[string]string) (string, error) {
+
+	if ext, ok := written[hash]; ok {
+		return ext, nil
+	}
+	data, meta, err := blobs.Get(ctx, hash)
+	if err != nil {
+		// 本体が無い参照は、本文をそのままにして飛ばす
+		return "", nil
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", err
+	}
+	ext := filestore.Ext(meta.MediaType)
+	if err := os.WriteFile(filepath.Join(dir, hash+ext), data, 0o600); err != nil {
+		return "", err
+	}
+	written[hash] = ext
+	return ext, nil
 }
 
 func tagsOf(ctx context.Context, db *store.DB, pageID int64) ([]string, error) {
