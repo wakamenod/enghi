@@ -57,8 +57,13 @@ function t(key, arg) {
       }
       // 表示中のページが他の経路で更新されたら読み込み直す(編集中は触らない)
       if (msg.type === 'updated' && msg.slug) {
+        // **pathname はパーセントエンコード済み、slug は生。**日本語のスラグでは
+        // そのまま比べると必ず外れるので、復号した方とも突き合わせる。
         var here = window.location.pathname;
-        if (here === '/wiki/' + msg.slug && !document.querySelector('textarea')) {
+        var hereDecoded = here;
+        try { hereDecoded = decodeURIComponent(here); } catch (e) { /* 壊れた URL */ }
+        if ((here === '/wiki/' + msg.slug || hereDecoded === '/wiki/' + msg.slug) &&
+            !document.querySelector('textarea')) {
           window.location.reload();
         }
       }
