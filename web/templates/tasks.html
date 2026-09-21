@@ -4,7 +4,7 @@
 {{if $d.Note}}<div class="meta">{{$d.Note}}</div>{{end}}
 
 {{if $d.Contexts}}
-<div class="meta" style="margin-top:8px">
+<div class="meta filters">
   <a href="/gtd/next">{{t "gtd.all"}}</a>
   {{range $d.Contexts}} · <a href="/gtd/next?context={{.Name}}">{{.Name}} ({{.Count}})</a>{{end}}
 </div>
@@ -19,7 +19,6 @@
 {{end}}
 
 {{if $d.Tasks}}
-{{template "task_keys"}}
 <ul class="rows">
   {{range $d.Tasks}}{{template "task_row" .}}{{end}}
 </ul>

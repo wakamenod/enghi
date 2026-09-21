@@ -13,7 +13,7 @@
   {{range $d.Projects}}
   <li>
     <a href="/gtd/project/{{.ID}}">{{.Title}}</a>
-    {{if index $d.Stalled .ID}}<span class="tag" style="color:var(--warn)">{{t "project.stalled_badge"}}</span>{{end}}
+    {{if index $d.Stalled .ID}}<span class="tag warn">{{t "project.stalled_badge"}}</span>{{end}}
     {{if .AreaName}}<span class="tag">{{.AreaName}}</span>{{end}}
     {{if ne .Status "active"}}<span class="tag">{{.Status}}</span>{{end}}
     {{if .ReviewOn}}<span class="tag">{{t "project.review_on" .ReviewOn}}</span>{{end}}

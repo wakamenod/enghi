@@ -1,66 +1,107 @@
 /* enghi — シックで落ち着いたトーン。装飾を足さない。余白と階調で構造を示す(DESIGN 6)。
-   アクセント色は1色だけ。状態表示にのみ使う。 */
+   アクセント色は1色だけ。状態表示にのみ使う。
+
+   【色は light-dark() で1回だけ書く】
+   以前は同じ 10 個の値が「ライト」「OS がダーク」「明示的にダーク」の3か所に
+   並んでいて、1色変えるのに3か所直す必要があった。color-scheme を切り替えれば
+   light-dark() が両方の値から選ぶので、パレットの記述は1か所で済む。
+   base.html の先読みスクリプトが data-theme を置く役割は変わらない。 */
+
+/* ---- 欧文フォント ----
+   Inter Variable(SIL OFL、web/static/fonts/OFL.txt)を同梱する。CDN は使わない。
+   **unicode-range を欧文に限るのが要点**で、和文はフォールバックして OS の
+   ヒラギノ/游ゴシックが使われる。和文フォントを積むと数 MB になるが、
+   欧文だけなら 2 ファイルで約 100KB で済む。
+   ファイル名が _ や . で始まると embed から落ちるので、その命名をしないこと。 */
+
+@font-face {
+  font-family: "Inter Variable";
+  src: url("/static/fonts/inter-latin-wght-normal.woff2") format("woff2-variations");
+  font-weight: 100 900; font-style: normal; font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+                 U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC,
+                 U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Inter Variable";
+  src: url("/static/fonts/inter-latin-wght-italic.woff2") format("woff2-variations");
+  font-weight: 100 900; font-style: italic; font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+                 U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC,
+                 U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
 
 :root {
+  /* 既定は OS に従う。data-theme が付いたときだけ下で上書きする */
   color-scheme: light dark;
 
-  --bg:        #fbfaf8;
-  --bg-sunken: #f2f0ec;
-  --bg-raised: #ffffff;
-  --border:    #e0ddd6;
-  --border-strong: #cdc9c0;
+  /*                  ライト     ダーク  */
+  --bg:        light-dark(#fbfaf8, #16171a);
+  --bg-sunken: light-dark(#f2f0ec, #121316);
+  --bg-raised: light-dark(#ffffff, #1d1f23);
+  --bg-hover:  light-dark(#efece6, #23262b);   /* 行のホバー・カーソル用の階調 */
+  --border:        light-dark(#e0ddd6, #2c2f34);
+  --border-strong: light-dark(#cdc9c0, #3d4147);
 
-  --fg:        #26241f;
-  --fg-muted:  #6d685e;
-  --fg-faint:  #938d82;
+  --fg:        light-dark(#26241f, #d6d3cd);
+  --fg-muted:  light-dark(#6d685e, #918d86);
+  --fg-faint:  light-dark(#938d82, #6a665f);
 
   /* アクセントは1色。状態表示にのみ使う */
-  --accent:    #5b6f5a;
-  --accent-fg: #ffffff;
-  --warn:      #8a6a3d;
+  --accent:    light-dark(#5b6f5a, #8fa88c);
+  --accent-fg: light-dark(#ffffff, #16171a);
+  --warn:      light-dark(#8a6a3d, #b8956a);
+
+  accent-color: var(--accent);   /* チェックボックス等のネイティブ部品 */
 
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
-  --sans: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --sans: "Inter Variable", -apple-system, BlinkMacSystemFont,
+          "Hiragino Sans", "Noto Sans JP", sans-serif;
+
+  /* ---- 寸法のスケール ----
+     場当たりの px を使わず、必ずここから採る。
+     余白は 4px グリッド。角丸は3段。文字サイズは8段。 */
+
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 24px; --sp-6: 32px; --sp-7: 48px; --sp-8: 64px;
+
+  --fs-1: 11px;   /* バッジ、kbd、補助の注記 */
+  --fs-2: 12px;   /* meta、タグ、日時、ラベル */
+  --fs-3: 13px;   /* ナビ、ボタン、フォーム */
+  --fs-4: 14px;   /* 空状態、注意書き */
+  --fs-5: 15px;   /* 本文 */
+  --fs-6: 18px;   /* 小見出し */
+  --fs-7: 22px;   /* 節見出し */
+  --fs-8: 28px;   /* ページ見出し */
+
+  --lh-tight: 1.25;  /* 見出し */
+  --lh-snug:  1.45;  /* リスト行、UI */
+  --lh-body:  1.75;  /* 本文 */
+  --lh-prose: 1.85;  /* 記事本文 */
+
+  /* 大きい文字は字間を詰めないと間延びして見える */
+  --tracking-tight: -0.012em;
+  --tracking-label:  0.08em;
+
+  --r-sm: 4px;      /* タグ、バッジ、インラインコード */
+  --r-md: 8px;      /* ボタン、入力、パネル、コードブロック */
+  --r-lg: 12px;     /* モーダル、ポップオーバー */
+  --r-full: 999px;  /* ピル */
+
+  /* 影は「浮いている物」にだけ使う。地の面には使わない */
+  --shadow-1: 0 1px 2px light-dark(rgba(38,36,31,.06), rgba(0,0,0,.40));
+  --shadow-2: 0 8px 28px light-dark(rgba(38,36,31,.10), rgba(0,0,0,.50));
+
+  /* フォーカスの環。アクセントの「状態表示にのみ使う」に合致する */
+  --ring: 0 0 0 3px color-mix(in oklab, var(--accent) 28%, transparent);
 
   --measure: 74ch;   /* 行長は 70〜80 文字程度で頭打ちにする */
-  --radius: 3px;
+  --wrap: 900px;     /* 本文カラムの幅。ヘッダと本体で同じ値を使う */
 }
 
-/* OS の設定に従う。ただし data-theme で明示されていれば、そちらを優先する */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-  --bg:        #16171a;
-  --bg-sunken: #121316;
-  --bg-raised: #1d1f23;
-  --border:    #2c2f34;
-  --border-strong: #3d4147;
-
-  --fg:        #d6d3cd;
-  --fg-muted:  #918d86;
-  --fg-faint:  #6a665f;
-
-  --accent:    #8fa88c;
-  --accent-fg: #16171a;
-  --warn:      #b8956a;
-  }
-}
-
-/* ヘッダーのボタンで明示的に切り替えたとき */
-:root[data-theme="dark"] {
-  --bg:        #16171a;
-  --bg-sunken: #121316;
-  --bg-raised: #1d1f23;
-  --border:    #2c2f34;
-  --border-strong: #3d4147;
-
-  --fg:        #d6d3cd;
-  --fg-muted:  #918d86;
-  --fg-faint:  #6a665f;
-
-  --accent:    #8fa88c;
-  --accent-fg: #16171a;
-  --warn:      #b8956a;
-}
+/* 明示的に選ばれたときは OS の設定より優先する(app.js が data-theme を置く) */
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"]  { color-scheme: dark; }
 
 * { box-sizing: border-box; }
 
@@ -71,64 +112,113 @@ body {
   background: var(--bg);
   color: var(--fg);
   font-family: var(--sans);
-  font-size: 15px;
-  line-height: 1.75;
+  font-size: var(--fs-5);
+  line-height: var(--lh-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* キーボード操作を第一級に扱う(DESIGN 6)以上、フォーカスは必ず見えること。
+   :focus-visible なのでマウス操作では出ない。 */
+:where(a, button, input, textarea, select, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+  border-radius: var(--r-sm);
 }
 
 /* ---- レイアウト ---- */
 
-.wrap { max-width: 900px; margin: 0 auto; padding: 0 20px 64px; }
+.wrap { max-width: var(--wrap); margin: 0 auto; padding: 0 var(--sp-5) var(--sp-8); }
 
+/* ヘッダは本文の上に乗って動く。罫線1本で切るのではなく、背景を透かして
+   奥に本文がある状態を見せる。色は足していない(階調だけ) */
 header.top {
-  border-bottom: 1px solid var(--border);
-  background: var(--bg);
   position: sticky; top: 0; z-index: 10;
+  background: color-mix(in oklab, var(--bg) 82%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
 }
 header.top .inner {
-  max-width: 900px; margin: 0 auto; padding: 10px 20px;
-  display: flex; align-items: center; gap: 18px;
+  max-width: var(--wrap); margin: 0 auto; padding: var(--sp-3) var(--sp-5);
+  display: flex; align-items: center; gap: var(--sp-4);
 }
 header.top a.brand {
   font-weight: 600; letter-spacing: 0.04em; color: var(--fg); text-decoration: none;
-  font-family: var(--mono); font-size: 13px;
+  font-family: var(--mono); font-size: var(--fs-3);
+  padding: var(--sp-1) var(--sp-2); border-radius: var(--r-sm); margin-left: calc(-1 * var(--sp-2));
 }
-nav.main { display: flex; gap: 14px; flex: 1; }
+header.top a.brand:hover { background: var(--bg-hover); }
+header.top a.brand.on { background: var(--bg-sunken); }
+
+nav.main { display: flex; gap: var(--sp-1); flex: 1; }
 nav.main a {
-  color: var(--fg-muted); text-decoration: none; font-size: 13px; padding: 2px 0;
-  border-bottom: 1px solid transparent;
+  color: var(--fg-muted); text-decoration: none; font-size: var(--fs-3);
+  padding: var(--sp-1) var(--sp-3); border-radius: var(--r-full); line-height: var(--lh-snug);
 }
-nav.main a:hover { color: var(--fg); }
-nav.main a.on { color: var(--fg); border-bottom-color: var(--accent); }
+nav.main a:hover { color: var(--fg); background: var(--bg-hover); }
+nav.main a.on { color: var(--fg); background: var(--bg-sunken); font-weight: 500; }
+
+/* ---- アイコン ----
+   base.html のスプライトを <use> で参照する。線は currentColor を継ぐので
+   置いた場所の文字色になる。 */
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+.ic {
+  width: 1em; height: 1em; flex: none;
+  fill: none; stroke: currentColor; stroke-width: 1.5;
+  stroke-linecap: round; stroke-linejoin: round;
+  vertical-align: -0.125em;
+}
 
 /* ---- 検索 ---- */
 
 .searchbox { position: relative; }
-.searchbox input {
-  width: 260px; padding: 5px 9px; font-size: 13px; font-family: var(--sans);
-  background: var(--bg-sunken); color: var(--fg);
-  border: 1px solid var(--border); border-radius: var(--radius);
+.searchbox form { position: relative; display: flex; align-items: center; }
+.searchbox .ic-search {
+  position: absolute; left: var(--sp-3); color: var(--fg-faint);
+  pointer-events: none; font-size: var(--fs-3);
 }
-.searchbox input:focus { outline: none; border-color: var(--border-strong); background: var(--bg-raised); }
+/* 属性セレクタまで書く。下の共通規則 input[type=text] と詳細度が同じだと、
+   後に書かれている方が勝って幅も余白も効かない。 */
+.searchbox input[type=text] {
+  width: 280px; padding: var(--sp-2) var(--sp-4) var(--sp-2) var(--sp-7);
+  font-size: var(--fs-3); font-family: var(--sans);
+  background: var(--bg-sunken); color: var(--fg);
+  border: 1px solid transparent; border-radius: var(--r-full);
+}
+.searchbox input[type=text]::placeholder { color: var(--fg-faint); }
+.searchbox input[type=text]:hover { border-color: var(--border); }
+.searchbox input[type=text]:focus {
+  outline: none; border-color: var(--border-strong);
+  background: var(--bg-raised); box-shadow: var(--ring);
+}
+/* 候補は「浮いている物」なので影を使う。:empty で開閉しているので、
+   中身が空のときに何も描かないこと(空白文字も入れない) */
 .suggest {
-  position: absolute; right: 0; top: 32px; width: 420px; z-index: 20;
-  background: var(--bg-raised); border: 1px solid var(--border-strong);
-  border-radius: var(--radius); box-shadow: 0 6px 20px rgba(0,0,0,0.10);
-  max-height: 60vh; overflow-y: auto;
+  position: absolute; right: 0; top: calc(100% + var(--sp-2)); width: 420px; z-index: 20;
+  background: var(--bg-raised); border: 1px solid var(--border);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-2);
+  max-height: 60vh; overflow-y: auto; padding: var(--sp-1);
 }
 .suggest:empty { display: none; }
-.suggest a { display: block; padding: 7px 11px; text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border); }
-.suggest a:last-child { border-bottom: none; }
-.suggest a:hover, .suggest a.cur { background: var(--bg-sunken); }
-.suggest .t { font-size: 13px; }
-.suggest .s { font-size: 12px; color: var(--fg-muted); }
+.suggest a {
+  display: block; padding: var(--sp-2) var(--sp-3); text-decoration: none;
+  color: var(--fg); border-radius: var(--r-sm);
+}
+.suggest a:hover, .suggest a.cur { background: var(--bg-hover); }
+.suggest .t { font-size: var(--fs-3); }
+.suggest .s { font-size: var(--fs-2); color: var(--fg-muted); }
 
 /* ---- 見出しと本文 ---- */
 
-h1 { font-size: 22px; font-weight: 600; margin: 28px 0 4px; letter-spacing: 0.01em; }
-h2 { font-size: 16px; font-weight: 600; margin: 32px 0 8px; }
-h3 { font-size: 14px; font-weight: 600; margin: 24px 0 6px; }
+h1, h2, h3 { text-wrap: balance; line-height: var(--lh-tight); }
+h1 { font-size: var(--fs-8); font-weight: 650; margin: var(--sp-6) 0 var(--sp-2); letter-spacing: var(--tracking-tight); }
+h2 { font-size: var(--fs-7); font-weight: 600; margin: var(--sp-6) 0 var(--sp-3); letter-spacing: var(--tracking-tight); }
+h3 { font-size: var(--fs-6); font-weight: 600; margin: var(--sp-5) 0 var(--sp-2); }
 
-.meta { color: var(--fg-faint); font-size: 12px; font-family: var(--mono); }
+.meta {
+  color: var(--fg-faint); font-size: var(--fs-2); font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
 /* 既定の青リンクは配色から浮くので、本文と同じ階調に寄せる */
 .meta a, .empty a {
   color: var(--fg-muted); text-decoration: none;
@@ -136,240 +226,329 @@ h3 { font-size: 14px; font-weight: 600; margin: 24px 0 6px; }
 }
 .meta a:hover, .empty a:hover { color: var(--fg); border-bottom-color: var(--accent); }
 .meta a strong { font-weight: 600; color: var(--fg); }
+/* 選ばれている絞り込み。アクセントは状態表示にのみ使う(DESIGN 6) */
+.meta a.on { color: var(--fg); border-bottom: 2px solid var(--accent); }
 
-.prose { max-width: var(--measure); }
-.prose h1 { font-size: 20px; margin-top: 32px; }
-.prose h2 { font-size: 17px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
-.prose p, .prose li { line-height: 1.85; }
+/* 見出しの直下の meta は見出しと1つの塊に見せる */
+h1 + .meta { margin-top: calc(-1 * var(--sp-1)); }
+
+.prose { max-width: var(--measure); font-size: 16px; line-height: var(--lh-prose); }
+.prose p { text-wrap: pretty; }
+.prose h1 { font-size: var(--fs-7); margin-top: var(--sp-6); }
+.prose h2 {
+  font-size: var(--fs-6); border-bottom: 1px solid var(--border);
+  padding-bottom: var(--sp-2); margin-top: var(--sp-6);
+}
+.prose h3 { font-size: 16px; }
+.prose p, .prose li { line-height: var(--lh-prose); }
 .prose code {
-  font-family: var(--mono); font-size: 0.87em;
-  background: var(--bg-sunken); padding: 1px 4px; border-radius: 2px;
+  font-family: var(--mono); font-size: 0.875em;
+  background: var(--bg-sunken); padding: 2px var(--sp-1); border-radius: var(--r-sm);
 }
 .prose pre {
-  background: var(--bg-sunken); border: 1px solid var(--border);
-  padding: 12px 14px; border-radius: var(--radius); overflow-x: auto;
+  background: var(--bg-sunken); border: none;
+  padding: var(--sp-3) var(--sp-4); border-radius: var(--r-md); overflow-x: auto;
+  font-size: 13px; line-height: 1.7;
 }
-.prose pre code { background: none; padding: 0; }
+.prose pre code { background: none; padding: 0; font-size: inherit; }
 .prose blockquote {
-  margin: 16px 0; padding-left: 14px;
-  border-left: 2px solid var(--border-strong); color: var(--fg-muted);
+  margin: var(--sp-4) 0; padding: var(--sp-1) 0 var(--sp-1) var(--sp-4);
+  border-left: 3px solid var(--border-strong); color: var(--fg-muted);
 }
-.prose img { max-width: 100%; height: auto; border-radius: var(--radius); }
-.prose table { border-collapse: collapse; }
-.prose th, .prose td { border: 1px solid var(--border); padding: 5px 10px; text-align: left; }
-.prose a { color: var(--fg); text-decoration-color: var(--border-strong); text-underline-offset: 2px; }
+.prose img { max-width: 100%; height: auto; border-radius: var(--r-md); }
+.prose table { border-collapse: separate; border-spacing: 0; font-size: 14px; }
+.prose th, .prose td { border-bottom: 1px solid var(--border); padding: var(--sp-2) var(--sp-3); text-align: left; }
+.prose thead th { border-bottom: 1px solid var(--border-strong); font-weight: 600; }
+.prose tbody tr:last-child td { border-bottom: none; }
+.prose a { color: var(--fg); text-decoration-color: var(--border-strong); text-decoration-thickness: 1px; text-underline-offset: 3px; }
 .prose a:hover { text-decoration-color: var(--accent); }
 
 /* 未解決の wikilink。存在しないページであることを階調で示す */
 a.wikilink-new { color: var(--fg-faint) !important; text-decoration-style: dotted; }
 
-/* ---- リスト ---- */
+/* 検索結果の一致箇所。UA 既定の蛍光イエローはどちらのテーマでも浮く。
+   一致は「状態」なのでアクセントを薄く敷く(DESIGN 6 に反しない) */
+mark {
+  background: color-mix(in oklab, var(--accent) 24%, transparent);
+  color: inherit; border-radius: 2px; padding: 0 2px;
+}
 
-ul.rows { list-style: none; margin: 0; padding: 0; }
+/* ---- リスト ----
+   j/k のカーソルはこの `ul.rows > li` を選んでいる(app.js)。
+   構造と li.cur のクラス名は変えないこと。 */
+
+/* 行の「面」は本文の左右にはみ出させ、区切り線は本文の幅に揃える。
+   線まではみ出させると見出しより広い線が引かれて、列がずれて見える。 */
+ul.rows { list-style: none; margin: 0 calc(-1 * var(--sp-3)); padding: 0; }
 ul.rows li {
-  padding: 7px 0; border-bottom: 1px solid var(--border);
-  display: flex; align-items: baseline; gap: 10px;
+  position: relative;
+  padding: var(--sp-2) var(--sp-3); border-radius: var(--r-md);
+  display: flex; align-items: baseline; gap: var(--sp-3);
+  line-height: var(--lh-snug);
 }
-ul.rows li:last-child { border-bottom: none; }
+ul.rows li + li::before {
+  content: ""; position: absolute; top: 0; left: var(--sp-3); right: var(--sp-3);
+  height: 1px; background: var(--border);
+}
+ul.rows li:hover, li.cur { background: var(--bg-hover); }
+/* 面に触れる線は残さない。角丸の直下に線が来ると欠けて見える */
+ul.rows li:hover::before, li.cur::before,
+ul.rows li:hover + li::before, li.cur + li::before { display: none; }
 ul.rows a { color: var(--fg); text-decoration: none; }
-ul.rows a:hover { text-decoration: underline; text-underline-offset: 2px; }
-ul.rows .when { margin-left: auto; color: var(--fg-faint); font-size: 12px; font-family: var(--mono); white-space: nowrap; }
-li.cur { background: var(--bg-sunken); box-shadow: -8px 0 0 var(--bg-sunken), 8px 0 0 var(--bg-sunken); }
-
-.tag {
-  font-family: var(--mono); font-size: 11px; color: var(--fg-muted);
-  border: 1px solid var(--border); border-radius: 2px; padding: 0 5px; text-decoration: none;
+ul.rows a:hover { text-decoration: underline; text-underline-offset: 3px; }
+ul.rows .when {
+  margin-left: auto; color: var(--fg-faint); font-size: var(--fs-2);
+  font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap;
 }
-.tag:hover { border-color: var(--border-strong); color: var(--fg); }
+
+/* タグとバッジは罫線ではなく階調で示す。画面上の細い線が減るほど落ち着く */
+.tag {
+  font-family: var(--mono); font-size: var(--fs-2); color: var(--fg-muted);
+  background: var(--bg-sunken); border: none; border-radius: var(--r-full);
+  padding: 1px var(--sp-2); text-decoration: none; white-space: nowrap;
+}
+.tag:hover { background: var(--bg-hover); color: var(--fg); }
+.tag.warn { color: var(--warn); background: color-mix(in oklab, var(--warn) 12%, transparent); }
 
 .badge {
-  font-family: var(--mono); font-size: 10px; letter-spacing: 0.04em;
-  color: var(--fg-muted); border: 1px solid var(--border); border-radius: 2px;
-  padding: 0 4px; text-transform: uppercase;
+  font-family: var(--mono); font-size: var(--fs-1); letter-spacing: 0.04em;
+  color: var(--fg-muted); background: var(--bg-sunken);
+  border: none; border-radius: var(--r-sm);
+  padding: 1px var(--sp-2); text-transform: uppercase; white-space: nowrap;
 }
-.badge.page { border-color: var(--border-strong); }
+/* 種別は4つある。page だけ規則があって残りが素通しだったのを揃える */
+.badge.page, .badge.project, .badge.task, .badge.area { color: var(--fg-muted); }
 
-.count { font-family: var(--mono); color: var(--fg-faint); font-size: 12px; }
+.count { font-family: var(--mono); color: var(--fg-faint); font-size: var(--fs-2); font-variant-numeric: tabular-nums; }
+
+/* 行の中に置く POST フォーム(1行の操作ボタン) */
+.inline-form { display: inline; }
+
+/* Weekly Review のチェック。フォームの submit だが見た目はチェックボックス */
+button.check {
+  width: 22px; height: 22px; padding: 0; flex: none;
+  justify-content: center; border-radius: var(--r-sm);
+  background: var(--bg-sunken); border: 1px solid var(--border);
+  color: var(--accent); font-size: var(--fs-3); line-height: 1;
+}
+button.check:hover { background: var(--bg-hover); border-color: var(--border-strong); }
+/* 済んだ項目は階調で下げる。消さずに残すのがレビューの作法 */
+ul.rows a.done { color: var(--fg-faint); }
+
+/* 一覧の上に出る絞り込みの行 */
+.meta.filters { margin-top: var(--sp-2); }
+
+/* clarify の本文欄は記事の編集ほど高さが要らない */
+textarea.short { min-height: 220px; }
+
+/* 編集画面のプレビュー。表示の切り替えは app.js が inline style で行う */
+.preview-pane {
+  display: none; margin-top: var(--sp-5);
+  border-top: 1px solid var(--border); padding-top: var(--sp-4);
+}
 
 /* ---- グリッド ---- */
 
-.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 36px; }
-.cols > * + * { padding-left: 36px; border-left: 1px solid var(--border); margin-left: -36px; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--sp-7); }
+.cols > * + * { padding-left: var(--sp-7); border-left: 1px solid var(--border); margin-left: calc(-1 * var(--sp-7)); }
 @media (max-width: 720px) {
-  .cols { grid-template-columns: 1fr; gap: 28px 0; }
-  .cols > * + * { padding-left: 0; border-left: none; margin-left: 0; padding-top: 24px;
+  .cols { grid-template-columns: 1fr; gap: var(--sp-5) 0; }
+  .cols > * + * { padding-left: 0; border-left: none; margin-left: 0; padding-top: var(--sp-5);
                   border-top: 1px solid var(--border); }
 }
 
 /* ---- セクション ----
    見出しだけだと切れ目が読み取りにくいので、上に罫線を1本引き、
-   見出しの左に短いアクセントを置く。塗りや影は使わない。 */
+   見出しの左に短いアクセントを置く。
+   ダッシュボードだけは .panel.card で面に載せる(情報の塊が多いため)。 */
 
 section.panel {
-  margin-top: 36px;
-  padding-top: 18px;
+  margin-top: var(--sp-6);
+  padding-top: var(--sp-5);
   border-top: 1px solid var(--border);
 }
 section.panel:first-of-type { border-top: none; padding-top: 0; }
+/* 列の中の節は、列そのものが既に区切りなので上の罫線を引かない。
+   兄弟が2つ並ぶと片方だけ線が出て左右が揃わなくなる */
+.cols > section.panel { border-top: none; padding-top: 0; }
 
-section.panel > h2, .panel-title {
-  margin: 0 0 12px;
-  font-size: 11px; font-weight: 600; letter-spacing: 0.1em;
+section.panel.card {
+  border: 1px solid var(--border); border-top: 1px solid var(--border);
+  border-radius: var(--r-lg); background: var(--bg-raised);
+  padding: var(--sp-4) var(--sp-5) var(--sp-5); margin-top: var(--sp-4);
+}
+section.panel.card:first-of-type { border-top: 1px solid var(--border); padding-top: var(--sp-4); }
+/* カードの中では列の間の罫線は二重の区切りになる。余白だけで離す */
+section.panel.card .cols > * + * { border-left: none; }
+
+section.panel > h2 {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-2); font-weight: 600; letter-spacing: var(--tracking-label);
   text-transform: uppercase; color: var(--fg-muted);
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: var(--sp-2);
 }
-section.panel > h2::before, .panel-title::before {
-  content: ""; width: 14px; height: 2px; background: var(--accent);
-  flex: none; opacity: 0.7;
+section.panel > h2::before {
+  content: ""; width: 12px; height: 2px; border-radius: 1px; background: var(--accent);
+  flex: none;
 }
+section.panel .cols { margin-top: var(--sp-4); }
 
 /* 節の中の小見出し(cols の中など)。罫線は引かず、字送りだけで階層を示す */
 .subhead {
-  margin: 0 0 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+  margin: 0 0 var(--sp-2); font-size: var(--fs-2); font-weight: 600;
+  letter-spacing: var(--tracking-label);
   text-transform: uppercase; color: var(--fg-faint);
 }
 .subhead + ul.rows { margin-top: 0; }
-.col-block + .col-block { margin-top: 28px; }
+.col-block + .col-block { margin-top: var(--sp-5); }
 
 .empty {
-  color: var(--fg-faint); font-size: 13px; padding: 10px 0;
+  color: var(--fg-faint); font-size: var(--fs-4); padding: var(--sp-3) 0;
 }
 
 /* ---- フォーム ---- */
 
 input[type=text], textarea, select {
-  font-family: var(--sans); font-size: 14px; color: var(--fg);
+  font-family: var(--sans); font-size: var(--fs-4); color: var(--fg);
   background: var(--bg-raised); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 7px 9px; width: 100%;
+  border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3); width: 100%;
 }
 textarea {
   font-family: var(--mono); font-size: 13px; line-height: 1.7;
   min-height: 60vh; resize: vertical;
 }
-input:focus, textarea:focus { outline: none; border-color: var(--border-strong); }
+input:focus, textarea:focus, select:focus {
+  outline: none; border-color: var(--border-strong); box-shadow: var(--ring);
+}
 textarea.dropping { border-color: var(--accent); background: var(--bg-sunken); }
-label { display: block; font-size: 12px; color: var(--fg-muted); margin: 16px 0 4px; }
+label { display: block; font-size: var(--fs-2); color: var(--fg-muted); margin: var(--sp-4) 0 var(--sp-1); }
 
 button, .btn {
-  font-family: var(--sans); font-size: 13px; cursor: pointer;
+  font-family: var(--sans); font-size: var(--fs-3); font-weight: 500; cursor: pointer;
   background: var(--bg-raised); color: var(--fg);
-  border: 1px solid var(--border-strong); border-radius: var(--radius);
-  padding: 5px 12px; text-decoration: none; display: inline-block;
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  padding: var(--sp-2) var(--sp-4); text-decoration: none;
+  display: inline-flex; align-items: center; gap: var(--sp-2);
   white-space: nowrap;
 }
-button:hover, .btn:hover { border-color: var(--fg-faint); }
+button:hover, .btn:hover { background: var(--bg-hover); border-color: var(--border-strong); }
 button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+button.primary:hover { background: color-mix(in oklab, var(--accent) 88%, black); }
 button.danger { color: var(--warn); }
-.actions { display: flex; gap: 8px; align-items: center; margin-top: 18px; flex-wrap: wrap; }
+button.danger:hover { border-color: var(--warn); }
+.actions { display: flex; gap: var(--sp-2); align-items: center; margin-top: var(--sp-5); flex-wrap: wrap; }
 .actions input[type=text] { flex: 1; min-width: 200px; }
 .actions .spacer { flex: 1; }
 
 .notice {
-  border: 1px solid var(--warn); border-left-width: 3px; border-radius: var(--radius);
-  padding: 10px 14px; margin: 16px 0; font-size: 13px; color: var(--fg);
-  background: var(--bg-raised);
+  border: 1px solid color-mix(in oklab, var(--warn) 45%, transparent);
+  border-left-width: 3px; border-radius: var(--r-md);
+  padding: var(--sp-3) var(--sp-4); margin: var(--sp-4) 0; font-size: var(--fs-4); color: var(--fg);
+  background: color-mix(in oklab, var(--warn) 7%, var(--bg-raised));
 }
 
 .kbd {
-  font-family: var(--mono); font-size: 11px; color: var(--fg-faint);
-  border: 1px solid var(--border); border-radius: 2px; padding: 0 4px;
+  font-family: var(--mono); font-size: var(--fs-1); color: var(--fg-faint);
+  background: var(--bg-sunken); border: none; border-radius: var(--r-sm); padding: 1px var(--sp-1);
 }
-
-/* アニメーションは原則使わない。使うなら 120ms 以下の opacity のみ(DESIGN 6) */
-.fade { transition: opacity 120ms linear; }
 
 /* ---- クイックキャプチャ(c) ---- */
 
 .modal-overlay {
   position: fixed; inset: 0; z-index: 100;
-  background: rgba(0,0,0,0.28);
+  background: light-dark(rgba(38,36,31,0.24), rgba(0,0,0,0.48));
+  -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
   display: flex; align-items: flex-start; justify-content: center;
   padding-top: 18vh;
 }
 .modal {
-  background: var(--bg-raised); border: 1px solid var(--border-strong);
-  border-radius: var(--radius); box-shadow: 0 10px 40px rgba(0,0,0,0.22);
-  width: min(520px, calc(100vw - 32px)); padding: 16px 18px;
+  background: var(--bg-raised); border: 1px solid var(--border);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-2);
+  width: min(520px, calc(100vw - 32px)); padding: var(--sp-4) var(--sp-5) var(--sp-5);
 }
-.modal-label { font-size: 12px; color: var(--fg-muted); margin-bottom: 8px; }
-.modal input { font-size: 15px; }
-.modal-hint { font-size: 11px; color: var(--fg-faint); margin-top: 8px; font-family: var(--mono); }
-
+.modal-label { font-size: var(--fs-2); color: var(--fg-muted); margin-bottom: var(--sp-2); }
+.modal input { font-size: var(--fs-5); }
+.modal-hint { font-size: var(--fs-1); color: var(--fg-faint); margin-top: var(--sp-2); font-family: var(--mono); }
 
 /* ---- テーマ切り替え ---- */
 
 .theme-toggle {
-  flex: none; width: 28px; height: 28px; padding: 0;
+  flex: none; width: 30px; height: 30px; padding: 0;
   display: flex; align-items: center; justify-content: center;
-  border: 1px solid var(--border); border-radius: var(--radius);
+  border: 1px solid transparent; border-radius: var(--r-md);
   background: var(--bg-sunken); color: var(--fg-muted);
-  font-size: 13px; line-height: 1; cursor: pointer;
+  font-size: var(--fs-3); line-height: 1; cursor: pointer;
 }
-.theme-toggle:hover { color: var(--fg); border-color: var(--border-strong); }
-.theme-toggle::after { content: "◐"; }              /* OS の設定に従う */
-:root[data-theme="light"] .theme-toggle::after { content: "☀"; }
-:root[data-theme="dark"]  .theme-toggle::after { content: "☾"; }
-
+.theme-toggle:hover { color: var(--fg); background: var(--bg-hover); }
+.theme-toggle .ic { font-size: 15px; }
+/* 3つとも置いておき、今の状態のものだけ出す。
+   以前は ◐ ☀ ☾ の文字を使っていたが、環境によって字面が変わる。 */
+.theme-toggle .ic { display: none; }
+.theme-toggle .ic-auto { display: block; }            /* OS の設定に従う */
+:root[data-theme="light"] .theme-toggle .ic-auto,
+:root[data-theme="dark"]  .theme-toggle .ic-auto { display: none; }
+:root[data-theme="light"] .theme-toggle .ic-sun  { display: block; }
+:root[data-theme="dark"]  .theme-toggle .ic-moon { display: block; }
 
 /* ---- 言語の切り替え ---- */
 
-.lang-switch { flex: none; display: flex; gap: 6px; }
+.lang-switch { flex: none; display: flex; gap: var(--sp-1); }
 .lang-switch a {
-  font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em;
+  font-family: var(--mono); font-size: var(--fs-1); letter-spacing: 0.04em;
   color: var(--fg-muted); text-decoration: none;
-  border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 4px 7px; line-height: 1;
+  background: var(--bg-sunken); border: none; border-radius: var(--r-md);
+  padding: var(--sp-2) var(--sp-3); line-height: 1;
 }
-.lang-switch a:hover { color: var(--fg); border-color: var(--border-strong); }
+.lang-switch a:hover { color: var(--fg); background: var(--bg-hover); }
 
 /* [[...]] の補完。キャレットの位置に出すので body 直下に絶対配置する。
    体裁は検索窓の .suggest に合わせる */
 .wl-suggest {
   position: absolute; z-index: 60; min-width: 220px; max-width: 420px;
-  background: var(--bg-raised); border: 1px solid var(--border-strong);
-  border-radius: var(--radius); box-shadow: 0 6px 20px rgba(0,0,0,0.10);
-  max-height: 50vh; overflow-y: auto;
+  background: var(--bg-raised); border: 1px solid var(--border);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-2);
+  max-height: 50vh; overflow-y: auto; padding: var(--sp-1);
 }
 .wl-item {
-  display: flex; gap: 10px; align-items: baseline; cursor: pointer;
-  padding: 6px 11px; font-size: 13px; border-bottom: 1px solid var(--border);
+  display: flex; gap: var(--sp-3); align-items: baseline; cursor: pointer;
+  padding: var(--sp-2) var(--sp-3); font-size: var(--fs-3); border-radius: var(--r-sm);
 }
-.wl-item:last-of-type { border-bottom: none; }
-.wl-item.on { background: var(--bg-sunken); }
+.wl-item.on { background: var(--bg-hover); }
 .wl-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wl-note { margin-left: auto; white-space: nowrap; font-size: 12px; color: var(--fg-muted); }
+.wl-note { margin-left: auto; white-space: nowrap; font-size: var(--fs-2); color: var(--fg-muted); }
 .wl-hint {
-  padding: 5px 11px; border-top: 1px solid var(--border);
-  font-size: 11px; color: var(--fg-faint);
+  margin-top: var(--sp-1); padding: var(--sp-2) var(--sp-3);
+  border-top: 1px solid var(--border);
+  font-size: var(--fs-1); color: var(--fg-faint);
 }
 
 /* ---- 使い方ガイド ----
    左に目次、右に本文。本文は記事と同じ .prose を使う */
-.guide { display: grid; grid-template-columns: 180px 1fr; gap: 0 36px; }
+.guide { display: grid; grid-template-columns: 200px 1fr; gap: 0 var(--sp-7); }
 .guide-toc {
-  position: sticky; top: 56px; align-self: start;
-  padding-top: 32px; font-size: 12px; line-height: 1.7;
+  position: sticky; top: 64px; align-self: start;
+  padding-top: var(--sp-6); font-size: var(--fs-2); line-height: 1.7;
 }
-.guide-toc .guide-topic + .guide-topic { margin-top: 18px; }
+.guide-toc .guide-topic + .guide-topic { margin-top: var(--sp-4); }
 .guide-toc a { color: var(--fg-muted); text-decoration: none; }
 .guide-toc a:hover { color: var(--fg); }
-.guide-toc > .guide-topic > a { color: var(--fg); font-size: 13px; }
-.guide-toc > .guide-topic > a.on { border-bottom: 1px solid var(--accent); }
-.guide-toc ul { list-style: none; margin: 6px 0 0; padding: 0; border-left: 1px solid var(--border); }
-.guide-toc li { padding: 1px 0 1px 10px; }
+.guide-toc > .guide-topic > a { color: var(--fg); font-size: var(--fs-3); font-weight: 500; }
+.guide-toc > .guide-topic > a.on { border-bottom: 2px solid var(--accent); }
+.guide-toc ul { list-style: none; margin: var(--sp-2) 0 0; padding: 0; border-left: 1px solid var(--border); }
+.guide-toc li { padding: 1px 0 1px var(--sp-3); }
 /* 見出しはヘッダに隠れない位置で止める */
-.guide .prose h2, .guide .prose h3 { scroll-margin-top: 56px; }
+.guide .prose h2, .guide .prose h3 { scroll-margin-top: 64px; }
 @media (max-width: 720px) {
   .guide { grid-template-columns: 1fr; }
-  .guide-toc { position: static; padding-top: 24px; }
+  .guide-toc { position: static; padding-top: var(--sp-5); }
 }
 
 /* 見出しの脇に置く「?」。目立たせず、探せば見つかる程度に */
 a.help {
-  margin-left: 8px; text-decoration: none;
-  color: var(--fg-faint); font-family: var(--mono); font-size: 11px;
-  border: 1px solid var(--border); border-radius: 999px;
-  padding: 0 5px; line-height: 1.6; vertical-align: middle;
+  margin-left: var(--sp-2); text-decoration: none;
+  color: var(--fg-faint); font-family: var(--mono); font-size: var(--fs-1);
+  background: var(--bg-sunken); border: none; border-radius: var(--r-full);
+  padding: 1px var(--sp-2); line-height: 1.6; vertical-align: middle;
 }
-a.help:hover { color: var(--fg); border-color: var(--border-strong); }
-label a.help { border: none; padding: 0; margin-left: 6px; text-decoration: underline; border-radius: 0; }
+a.help:hover { color: var(--fg); background: var(--bg-hover); }
+label a.help { background: none; padding: 0; margin-left: var(--sp-2); text-decoration: underline; border-radius: 0; }

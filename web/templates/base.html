@@ -18,6 +18,15 @@
 <script src="/static/htmx.min.js" defer></script>
 </head>
 <body data-strings='{{.Strings}}'>
+{{/* アイコンは1か所に定義して <use> で参照する。外部 SVG ファイルへの <use href>
+     は Chrome / Safari では効かないので、ここに直接置く。
+     装飾なので aria-hidden。意味は必ず文字側に持たせること。 */}}
+<svg class="sprite" aria-hidden="true" width="0" height="0">
+  <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></symbol>
+  <symbol id="i-auto" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5a5.5 5.5 0 0 0 0 11z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3.2"/><path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 16 16"><path d="M13.2 9.6A5.7 5.7 0 0 1 6.4 2.8a5.7 5.7 0 1 0 6.8 6.8z"/></symbol>
+</svg>
 <header class="top">
   <div class="inner">
     <a class="brand{{if eq .Nav "dashboard"}} on{{end}}" href="/">enghi</a>
@@ -29,6 +38,7 @@
     </nav>
     <div class="searchbox">
       <form action="/search" method="get" autocomplete="off">
+        {{template "icon" "search"}}
         <input type="text" id="q" name="q" value="{{.Query}}" placeholder="{{t "search.placeholder"}}"
                hx-get="/ui/search" hx-trigger="keyup changed delay:100ms"
                hx-target="#suggest" hx-swap="innerHTML">
@@ -36,7 +46,8 @@
       <div class="suggest" id="suggest"></div>
     </div>
     <button type="button" id="theme-toggle" class="theme-toggle"
-            title="{{t "theme.toggle"}}" aria-label="{{t "theme.toggle"}}"></button>
+            title="{{t "theme.toggle"}}" aria-label="{{t "theme.toggle"}}"
+            >{{template "icon" "auto"}}{{template "icon" "sun"}}{{template "icon" "moon"}}</button>
     <div class="lang-switch" title="{{t "lang.switch"}}">
       {{range langs}}{{if ne (printf "%s" .) $.LangCode}}<a href="/ui/lang?set={{.}}&return_to={{$.Path}}">{{. | langName}}</a>{{end}}{{end}}
     </div>
@@ -47,27 +58,9 @@
 {{if .Flash}}<div class="notice">{{.Flash}}</div>{{end}}
 {{end}}
 
-{{/* 一覧の見出しの下に置くキーの一覧。**覚えていなくても使えるように常に出す。**
-     j/k/Enter は一覧共通、それ以外はカーソル行のタスクに効く(app.js)。 */}}
-{{define "task_keys"}}
-<div class="keys">
-  <span class="kbd">j</span><span class="kbd">k</span> {{t "keys.move"}}
-  · <span class="kbd">Enter</span> {{t "keys.open"}}
-  · <span class="kbd">n</span> {{t "keys.next"}}
-  · <span class="kbd">w</span> {{t "keys.waiting"}}
-  · <span class="kbd">s</span> {{t "keys.scheduled"}}
-  · <span class="kbd">l</span> {{t "keys.later"}}
-  · <span class="kbd">m</span> {{t "keys.someday"}}
-  · <span class="kbd">d</span> {{t "keys.done"}}
-  · <span class="kbd">S</span> {{t "keys.skip"}}
-  · <span class="kbd">f</span> {{t "keys.file"}}
-  · <span class="kbd">t</span> {{t "keys.title"}}
-  · <span class="kbd">x</span> {{t "keys.drop"}}
-  · <span class="kbd">c</span> {{t "keys.capture"}}
-</div>
-{{end}}
-
 {{/* help は見出しの脇に置く「?」。href はガイドの節へのアンカー。 */}}
+{{define "icon"}}<svg class="ic ic-{{.}}" aria-hidden="true" focusable="false"><use href="#i-{{.}}"/></svg>{{end}}
+
 {{define "help"}}<a class="help" href="/guide/{{.}}" title="{{t "guide.help"}}" aria-label="{{t "guide.help"}}">?</a>{{end}}
 
 {{define "foot"}}

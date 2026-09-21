@@ -10,13 +10,13 @@
   <ul class="rows">
     {{range $d.Checklist}}
     <li>
-      <form method="post" action="/ui/review/{{$d.Review.ID}}/check" style="display:inline">
+      <form method="post" action="/ui/review/{{$d.Review.ID}}/check" class="inline-form">
         <input type="hidden" name="return_to" value="/gtd/review">
         <input type="hidden" name="key" value="{{.Key}}">
         <input type="hidden" name="checked" value="{{if .Checked}}0{{else}}1{{end}}">
-        <button type="submit">{{if .Checked}}✓{{else}}　{{end}}</button>
+        <button type="submit" class="check">{{if .Checked}}✓{{end}}</button>
       </form>
-      <a href="#{{.Key}}" {{if .Checked}}style="color:var(--fg-faint)"{{end}}>{{.Label}}</a>
+      <a href="#{{.Key}}" class="{{if .Checked}}done{{end}}">{{.Label}}</a>
       {{if .Data}}<span class="meta">{{.Data}}</span>{{end}}
     </li>
     {{end}}
@@ -31,7 +31,7 @@
     {{range $d.Stalled}}
     <li><a href="/gtd/project/{{.ID}}">{{.Title}}</a>
         {{if .AreaName}}<span class="tag">{{.AreaName}}</span>{{end}}
-        {{if not .Outcome}}<span class="tag" style="color:var(--warn)">{{t "review.outcome_missing"}}</span>{{end}}
+        {{if not .Outcome}}<span class="tag warn">{{t "review.outcome_missing"}}</span>{{end}}
         <span class="when">{{t "gtd.unprocessed" .OpenTasks}}</span></li>
     {{end}}
   </ul>
@@ -132,7 +132,7 @@
       {{if .NextOn}}<span class="tag">{{t "review.series_next" .NextOn}}</span>{{end}}
       {{if .EndsOn}}<span class="tag">{{t "review.series_ends" .EndsOn}}</span>{{end}}
       {{if .OpenTaskID}}
-      <form method="post" action="/ui/tasks/{{.OpenTaskID}}/end-series" style="display:inline"
+      <form method="post" action="/ui/tasks/{{.OpenTaskID}}/end-series" class="inline-form"
             onsubmit="return confirm('{{t "review.series_confirm"}}')">
         <input type="hidden" name="return_to" value="/gtd/review#review_recurring">
         <button type="submit">{{t "review.series_stop"}}</button>

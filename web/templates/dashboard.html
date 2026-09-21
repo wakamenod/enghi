@@ -4,7 +4,7 @@
 <h1>{{t "dash.title"}}</h1>
 
 {{/* 上段 — GTD。使っていなければ自然に空になる。登録を強く促す UI にはしない(DESIGN 5) */}}
-<section class="panel">
+<section class="panel card">
   <h2>{{t "dash.gtd"}}</h2>
   {{if $d.GTD.Enabled}}
     <div class="meta">
@@ -18,7 +18,7 @@
       {{range $d.GTD.Contexts}} · <a href="/gtd/next?context={{.Name}}">{{.Name}} {{.Count}}</a>{{end}}
     </div>
 
-    <div class="cols" style="margin-top:18px">
+    <div class="cols">
       <div>
         <div class="col-block">
           <div class="subhead">{{t "dash.today"}}</div>
@@ -26,7 +26,7 @@
           <ul class="rows">
             {{range $d.GTD.Today}}
             <li><a href="/gtd/clarify/{{.ID}}">{{.Title}}</a>
-                {{if .DeadlineOn}}<span class="tag" style="color:var(--warn)">{{t "gtd.deadline" .DeadlineOn}}</span>{{end}}
+                {{if .DeadlineOn}}<span class="tag warn">{{t "gtd.deadline" .DeadlineOn}}</span>{{end}}
                 {{if .ContextName}}<span class="tag">{{.ContextName}}</span>{{end}}
                 <span class="when">{{.State}}</span></li>
             {{end}}
@@ -81,7 +81,7 @@
 </section>
 
 {{/* 下段 — Wiki */}}
-<section class="panel">
+<section class="panel card">
   <h2>{{t "dash.articles"}}</h2>
 
   {{/* 新規も更新も同じ流れとして1つの節に出す。version が 1 なら
@@ -119,7 +119,7 @@
   {{end}}
 </section>
 
-<section class="panel">
+<section class="panel card">
   <h2>{{t "dash.overall"}}</h2>
   <div class="meta">{{t "dash.summary" $d.Wiki.TotalPages (len $d.Wiki.Tags)}}</div>
   <div class="actions">

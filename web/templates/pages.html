@@ -3,9 +3,9 @@
 <h1>{{t "page.list_title"}} <span class="count">{{$d.Total}}</span></h1>
 <div class="meta">
   {{t "page.sort"}}
-  <a href="/wiki?sort=updated">{{t "page.sort_updated"}}</a> ·
-  <a href="/wiki?sort=created">{{t "page.sort_created"}}</a> ·
-  <a href="/wiki?sort=title">{{t "page.sort_title"}}</a>
+  <a class="{{if or (eq $d.Sort "updated") (eq $d.Sort "")}}on{{end}}" href="/wiki?sort=updated">{{t "page.sort_updated"}}</a> ·
+  <a class="{{if eq $d.Sort "created"}}on{{end}}" href="/wiki?sort=created">{{t "page.sort_created"}}</a> ·
+  <a class="{{if eq $d.Sort "title"}}on{{end}}" href="/wiki?sort=title">{{t "page.sort_title"}}</a>
   · {{t "page.keyhint" "j" "k" "Enter"}}
 </div>
 
