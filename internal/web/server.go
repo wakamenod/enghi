@@ -82,7 +82,7 @@ func parseTemplates(lang i18n.Lang) (*template.Template, error) {
 }
 
 // Handler は 4.4 節のセキュリティ3層を通したハンドラを返す。
-func (s *Server) Handler() http.Handler { return s.secure(s.mux) }
+func (s *Server) Handler() http.Handler { return logErrors(s.secure(s.mux)) }
 
 // Hub は focus チャネル。CLI からの通知にも使う。
 func (s *Server) Hub() *Hub { return s.hub }
