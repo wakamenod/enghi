@@ -2,6 +2,12 @@
 
 ローカル専用の個人向け Wiki + GTD。常駐サーバとして動き、ブラウザから使う。
 
+> **enghi** is a local-only personal wiki + GTD server for macOS and Linux.
+> It runs as a background service and you use it from your browser -- nothing
+> leaves your machine. Full-text search over tens of thousands of pages stays
+> instant (SQLite FTS5), `[[wikilinks]]` resolve by title, and everything can be
+> exported to plain Markdown at any time. Japanese docs below.
+
 設計と判断の根拠は [docs/DESIGN.md](docs/DESIGN.md)、スキーマは [docs/schema.sql](docs/schema.sql)。
 **実装は DESIGN.md に従うこと。特に 3 節(検索)は実測に基づく確定仕様である。**
 
@@ -21,13 +27,30 @@
 | 8 | `/api/events` と `POST /api/focus`(指数バックオフ再接続付き) | ✅ |
 | 9 | Markdown エクスポート | ✅ |
 | 10 | `enghi doctor`(起動時にも実行) | ✅ |
-| 11 | launchd plist の生成 | ✅ |
+| 11 | 常駐設定の生成(macOS: launchd / Linux: systemd) | ✅ |
 | 12 | 使い方ガイド(`/guide`。GTD 入門 + 操作説明、日英) | ✅ |
+
+## インストール
+
+```sh
+brew install wakamenod/tap/enghi
+brew services start enghi     # macOS は launchd、Linux は systemd に登録される
+```
+
+ブラウザで http://127.0.0.1:7777/ を開く。
+
+brew を使わない場合は [Releases](https://github.com/wakamenod/enghi/releases) から
+tarball を取る(macOS arm64 / amd64、Linux amd64)。常駐させるには `enghi install-agent`。
 
 ## ビルドと実行
 
 **build tag `sqlite_fts5` は必須。** FTS5 と trigram tokenizer が要る(DESIGN 1)。
-付け忘れた場合は起動時の検証が明示的なエラーで落とす。
+付け忘れた場合は `cmd/enghi/require_fts5.go` が**コンパイルエラー**で止める。
+`CGO_ENABLED=0` も同様(`require_cgo.go`)。go-sqlite3 は cgo 無しでも
+「実行すると必ず失敗するスタブ」としてコンパイルが通ってしまうため、手前で落とす。
+
+cgo なので **GOOS を跨いだビルドはできない**。配布物は各 OS の runner で作る
+(`.github/workflows/release.yml`)。
 
 ```sh
 make build          # bin/enghi
@@ -130,12 +153,16 @@ rm -f ~/.local/share/enghi/enghi.db-wal ~/.local/share/enghi/enghi.db-shm
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dev.enghi.server.plist
 ```
 
-常駐させる:
+常駐させる(brew で入れた場合は `brew services start enghi` で済む):
 
 ```sh
-./bin/enghi install-agent          # plist を書き出す
-./bin/enghi install-agent -load    # 書き出して launchctl bootstrap まで行う
+./bin/enghi install-agent          # 設定ファイルを書き出す
+./bin/enghi install-agent -load    # 書き出して登録まで行う
 ```
+
+macOS は launchd の plist を `~/Library/LaunchAgents` に、Linux は systemd の
+user unit を `~/.config/systemd/user` に書く。**Linux ではログアウト後も常駐させるために
+`loginctl enable-linger` が要る**(`install-agent` が案内する)。
 
 その他:
 
@@ -215,6 +242,20 @@ org-mode のリピータ記法に準拠(`recurrence` 列にそのまま格納):
 同じ系列で開いているインスタンスは常に高々1件になる。
 生成される次インスタンスは必ず `scheduled` で、`next` では作らない
 (`weekly:tue,fri` のゴミ出しが常時 Next Actions に居座るのを避けるため)。
+
+## リリース
+
+タグを push すると `.github/workflows/release.yml` が各 OS の runner でビルドし、
+tarball と `SHA256SUMS` を付けて GitHub Release を作る。
+
+```sh
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+そのあと、`packaging/homebrew/enghi.rb` の `url` と `sha256` を更新して
+`wakamenod/homebrew-tap` の `Formula/enghi.rb` へ反映する。
+formula はバイナリではなく**ソースからビルドする**ので、ビルドタグの付け忘れも
+Gatekeeper の quarantine も構造的に起きない。
 
 ## テスト
 

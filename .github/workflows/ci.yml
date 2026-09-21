@@ -1,0 +1,35 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    # cgo なのでクロスコンパイルができない。各 OS の runner で実際に回す。
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - run: make vet
+      - run: make test
+
+      # ビルドガードが効いていることを毎回確かめる。
+      # ここが壊れると、FTS5 の無いバイナリや cgo 無しのスタブが配布物に混ざる。
+      - name: build guards reject bad builds
+        run: |
+          if go build -o /dev/null ./cmd/enghi 2>/dev/null; then
+            echo "タグ無しビルドが通ってしまった (require_fts5.go が効いていない)"; exit 1
+          fi
+          if CGO_ENABLED=0 go build -tags sqlite_fts5 -o /dev/null ./cmd/enghi 2>/dev/null; then
+            echo "CGO_ENABLED=0 のビルドが通ってしまった (require_cgo.go が効いていない)"; exit 1
+          fi

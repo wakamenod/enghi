@@ -1,0 +1,79 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    # cgo なので GOOS を跨いだビルドができない(require_cgo.go が止める)。
+    # 目的の OS/ARCH と同じ runner でネイティブにビルドする。
+    #
+    # linux/arm64 を足すなら runs-on を ubuntu-24.04-arm にしたジョブを
+    # 増やす(public リポジトリなら無料の arm64 runner が使える)。
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runs-on: macos-latest   # Apple Silicon
+            goos: darwin
+            goarch: arm64
+          - runs-on: macos-13       # Intel
+            goos: darwin
+            goarch: amd64
+          - runs-on: ubuntu-latest
+            goos: linux
+            goarch: amd64
+    runs-on: ${{ matrix.runs-on }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # git describe にタグが要る
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: build
+        run: make build
+
+      - name: 出来上がったバイナリを検査する
+        run: |
+          ./bin/enghi version
+          # 目的のアーキテクチャになっているか(runner の取り違えを検出する)
+          test "$(go env GOARCH)" = "${{ matrix.goarch }}"
+          test "$(go env GOOS)" = "${{ matrix.goos }}"
+
+      - name: package
+        run: |
+          name="enghi_${GITHUB_REF_NAME}_${{ matrix.goos }}_${{ matrix.goarch }}"
+          mkdir -p "dist/$name"
+          cp bin/enghi README.md LICENSE "dist/$name/"
+          tar -C dist -czf "dist/$name.tar.gz" "$name"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: enghi_${{ matrix.goos }}_${{ matrix.goarch }}
+          path: dist/*.tar.gz
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      # Homebrew の formula が sha256 を要求するので必ず出す。
+      - name: checksums
+        run: cd dist && sha256sum *.tar.gz | tee SHA256SUMS
+
+      - name: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --generate-notes dist/*.tar.gz dist/SHA256SUMS
