@@ -83,53 +83,40 @@
 {{/* 下段 — Wiki */}}
 <section class="panel">
   <h2>{{t "dash.articles"}}</h2>
-  <div class="cols">
-    <div>
-      <div class="col-block">
-        <div class="subhead">{{t "dash.recent_updated"}}</div>
-        {{if $d.Wiki.RecentUpdate}}
-          <ul class="rows">
-          {{range $d.Wiki.RecentUpdate}}
-            <li>
-              <a href="/wiki/{{.Slug}}">{{.Title}}</a>
-              {{range .Tags}}<a class="tag" href="/tags/{{.}}">{{.}}</a>{{end}}
-              <span class="when">{{shortTime .UpdatedAt}}</span>
-            </li>
-          {{end}}
-          </ul>
-        {{else}}
-          <div class="empty">{{t "dash.no_articles"}} <a href="/wiki/new">{{t "dash.write_first"}}</a></div>
-        {{end}}
-      </div>
-    </div>
 
-    <div>
-      <div class="col-block">
-        <div class="subhead">{{t "dash.recent_created"}}</div>
-        {{if $d.Wiki.RecentCreate}}
-          <ul class="rows">
-          {{range $d.Wiki.RecentCreate}}
-            <li><a href="/wiki/{{.Slug}}">{{.Title}}</a>
-                <span class="when">{{shortTime .CreatedAt}}</span></li>
-          {{end}}
-          </ul>
-        {{else}}<div class="empty">{{t "common.none"}}</div>{{end}}
-      </div>
-
-      <div class="col-block">
-        <div class="subhead">{{t "dash.unresolved"}}</div>
-        {{if $d.Wiki.Unresolved}}
-          <ul class="rows">
-          {{range $d.Wiki.Unresolved}}
-            <li><a href="/wiki/new?title={{.Title}}">{{.Title}}</a>
-                <span class="when">{{t "dash.referenced_by" .Count}}</span></li>
-          {{end}}
-          </ul>
-          <div class="meta">{{t "dash.unresolved_note"}}</div>
-        {{else}}<div class="empty">{{t "common.none"}}</div>{{end}}
-      </div>
-    </div>
+  {{/* 新規も更新も同じ流れとして1つの節に出す。version が 1 なら
+       作られてから一度も直されていない = 新規 */}}
+  <div class="col-block">
+    <div class="subhead">{{t "dash.recent_changes"}}</div>
+    {{if $d.Wiki.RecentUpdate}}
+      <ul class="rows">
+      {{range $d.Wiki.RecentUpdate}}
+        <li>
+          <a href="/wiki/{{.Slug}}">{{.Title}}</a>
+          {{if eq .Version 1}}<span class="tag">{{t "dash.new"}}</span>{{end}}
+          {{range .Tags}}<a class="tag" href="/tags/{{.}}">{{.}}</a>{{end}}
+          <span class="when">{{shortTime .UpdatedAt}}</span>
+        </li>
+      {{end}}
+      </ul>
+    {{else}}
+      <div class="empty">{{t "dash.no_articles"}} <a href="/wiki/new">{{t "dash.write_first"}}</a></div>
+    {{end}}
   </div>
+
+  {{/* 未解決リンクは、あるときだけ記事一覧の下に出す */}}
+  {{if $d.Wiki.Unresolved}}
+  <div class="col-block">
+    <div class="subhead">{{t "dash.unresolved"}}</div>
+    <ul class="rows">
+    {{range $d.Wiki.Unresolved}}
+      <li><a href="/wiki/new?title={{.Title}}">{{.Title}}</a>
+          <span class="when">{{t "dash.referenced_by" .Count}}</span></li>
+    {{end}}
+    </ul>
+    <div class="meta">{{t "dash.unresolved_note"}}</div>
+  </div>
+  {{end}}
 </section>
 
 <section class="panel">

@@ -51,11 +51,13 @@ func (s *Server) dashboardData(ctx context.Context) (*Dashboard, error) {
 	}
 	d.Wiki.TotalPages = total
 
-	// 7. 最近更新した記事 20 件
+	// 7. 最近更新した記事 20 件。
+	// **ダッシュボードの「最近の変更」はこれ1本で出す。**新規作成も updated_at が
+	// 動くのでここに入る。新規かどうかは version == 1 で見分ける(dashboard.html)。
 	if d.Wiki.RecentUpdate, err = s.pages.List(ctx, "updated", 20, 0); err != nil {
 		return nil, err
 	}
-	// 8. 最近作成した記事(更新と分ける)
+	// 8. 最近作成した記事。画面では 7 に併合したが、API の利用者のために残す。
 	if d.Wiki.RecentCreate, err = s.pages.RecentlyCreated(ctx, 10); err != nil {
 		return nil, err
 	}
