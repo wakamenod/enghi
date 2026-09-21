@@ -1,5 +1,5 @@
 {{define "task_row"}}
-<li>
+<li data-task-id="{{.ID}}">
   <form method="post" action="/ui/tasks/{{.ID}}/complete" style="display:inline">
     <button type="submit" title="{{t "gtd.complete"}}">✓</button>
   </form>

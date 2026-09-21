@@ -171,6 +171,75 @@ function t(key, arg) {
     list[next].scrollIntoView({ block: 'nearest' });
   }
 
+  // ---- カーソル行のタスクを1キーで動かす
+  //
+  // 状態変更の口はサーバに揃っているので、ここは form を1つ作って投げるだけ。
+  // **fetch ではなく form 送信にする。**Origin と Sec-Fetch-Site が付き、
+  // 既存の画面と同じ経路(secure ミドルウェアの formAllowed)を通る。
+  //
+  // `k' は既にカーソルの上移動なので、agenda で `k' だった「今回は飛ばす」は
+  // `S' に逃がしてある。
+  function post(path, fields) {
+    var form = document.createElement('form');
+    form.method = 'post';
+    form.action = path;
+    fields = fields || {};
+    fields.return_to = window.location.pathname + window.location.search;
+    Object.keys(fields).forEach(function (name) {
+      var input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = name;
+      input.value = fields[name];
+      form.appendChild(input);
+    });
+    document.body.appendChild(form);
+    form.submit();
+  }
+
+  var STATES = { n: 'next', l: 'later', m: 'someday' };
+  var PATHS = { d: 'complete', S: 'skip', f: 'file' };
+
+  function cursorTask() {
+    var list = rows();
+    var i = cursorIndex(list);
+    if (i < 0) return null;
+    var id = list[i].getAttribute('data-task-id');
+    if (!id) return null;                       // 記事の一覧など、タスクでない行
+    var link = list[i].querySelector('a[href]');
+    return { id: id, title: link ? link.textContent.trim() : '' };
+  }
+
+  function taskKey(key) {
+    var task = cursorTask();
+    if (!task) return false;
+    var base = '/ui/tasks/' + task.id;
+
+    if (STATES[key]) { post(base, { state: STATES[key] }); return true; }
+
+    if (key === 'w') {
+      var who = window.prompt(t('keys.ask_waiting'));
+      if (who) post(base, { state: 'waiting', waiting_for: who });
+      return true;
+    }
+    if (key === 's') {
+      var on = window.prompt(t('keys.ask_scheduled'));
+      if (on) post(base, { state: 'scheduled', scheduled_on: on });
+      return true;
+    }
+    if (key === 't') {
+      var title = window.prompt(t('keys.ask_title'), task.title);
+      if (title) post(base, { title: title });
+      return true;
+    }
+    if (key === 'x') {
+      // 破棄だけは戻せないので確認する
+      if (window.confirm(t('keys.confirm_drop', task.title))) post(base + '/delete');
+      return true;
+    }
+    if (PATHS[key]) { post(base + '/' + PATHS[key]); return true; }
+    return false;
+  }
+
   function openCursor() {
     var list = rows();
     var i = cursorIndex(list);
@@ -218,6 +287,9 @@ function t(key, arg) {
         ev.preventDefault(); moveCursor(1); break;
       case 'k':
         ev.preventDefault(); moveCursor(-1); break;
+      default:
+        if (taskKey(ev.key)) ev.preventDefault();
+        break;
       case 'Enter':
         if (openCursor()) ev.preventDefault();
         break;

@@ -13,6 +13,7 @@
   } catch (e) {}
 })();
 </script>
+<link rel="preload" href="/static/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/htmx.min.js" defer></script>
 </head>
@@ -44,6 +45,26 @@
 <main class="wrap">
 {{if .Err}}<div class="notice">{{.Err}}</div>{{end}}
 {{if .Flash}}<div class="notice">{{.Flash}}</div>{{end}}
+{{end}}
+
+{{/* 一覧の見出しの下に置くキーの一覧。**覚えていなくても使えるように常に出す。**
+     j/k/Enter は一覧共通、それ以外はカーソル行のタスクに効く(app.js)。 */}}
+{{define "task_keys"}}
+<div class="keys">
+  <span class="kbd">j</span><span class="kbd">k</span> {{t "keys.move"}}
+  · <span class="kbd">Enter</span> {{t "keys.open"}}
+  · <span class="kbd">n</span> {{t "keys.next"}}
+  · <span class="kbd">w</span> {{t "keys.waiting"}}
+  · <span class="kbd">s</span> {{t "keys.scheduled"}}
+  · <span class="kbd">l</span> {{t "keys.later"}}
+  · <span class="kbd">m</span> {{t "keys.someday"}}
+  · <span class="kbd">d</span> {{t "keys.done"}}
+  · <span class="kbd">S</span> {{t "keys.skip"}}
+  · <span class="kbd">f</span> {{t "keys.file"}}
+  · <span class="kbd">t</span> {{t "keys.title"}}
+  · <span class="kbd">x</span> {{t "keys.drop"}}
+  · <span class="kbd">c</span> {{t "keys.capture"}}
+</div>
 {{end}}
 
 {{/* help は見出しの脇に置く「?」。href はガイドの節へのアンカー。 */}}

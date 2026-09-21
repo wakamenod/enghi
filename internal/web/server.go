@@ -273,6 +273,7 @@ func jsStrings(lang i18n.Lang) string {
 		"capture.title", "capture.hint", "capture.added", "capture.failed",
 		"capture.uploading", "capture.upload_failed",
 		"wikilink.alias", "wikilink.create", "wikilink.hint",
+		"keys.ask_waiting", "keys.ask_scheduled", "keys.ask_title", "keys.confirm_drop",
 	}
 	m := make(map[string]string, len(keys))
 	for _, k := range keys {

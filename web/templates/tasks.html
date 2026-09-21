@@ -19,6 +19,7 @@
 {{end}}
 
 {{if $d.Tasks}}
+{{template "task_keys"}}
 <ul class="rows">
   {{range $d.Tasks}}{{template "task_row" .}}{{end}}
 </ul>

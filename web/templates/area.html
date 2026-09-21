@@ -21,6 +21,7 @@
   <h2>{{t "area.direct_tasks"}}</h2>
   <div class="meta">{{t "area.direct_note"}}</div>
   {{if $d.Tasks}}
+  {{template "task_keys"}}
   <ul class="rows">{{range $d.Tasks}}{{template "task_row" .}}{{end}}</ul>
   {{else}}<div class="empty">{{t "common.none"}}</div>{{end}}
 </section>
