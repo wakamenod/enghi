@@ -57,6 +57,16 @@ revision_compact_minutes = 10
 ./bin/enghi export --dir /path     # --dir を許すのは CLI だけ(API は設定値に固定)
 ```
 
+## Markdown の扱い
+
+**段落内の改行1つを、そのまま改行として描画します**(goldmark の `html.WithHardWraps`)。
+CommonMark の既定では段落内の改行はスペースになり、日本語の本文では文の途中に
+見えるスペースが入ってしまうためです。行末にスペース2つを置く記法は目に見えず、
+エディタの行末空白削除で消えるので採っていません。
+
+エクスポートした Markdown は原文をそのまま書き出すので、他所のレンダラで開くと
+段落内の改行は失われます(1行に繋がります)。
+
 ## 実装上の決定
 
 - **`/api/events` は WebSocket**(DESIGN 4.3 が第一に挙げている方式)。

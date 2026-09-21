@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/wakamenod/enghi/internal/store"
@@ -312,5 +313,44 @@ func TestBigrams(t *testing.T) {
 	}
 	if got := wiki.Bigrams("Go"); got != "go" {
 		t.Fatalf("Bigrams(Go) = %q", got)
+	}
+}
+
+// 段落内の改行1つをそのまま改行として扱うこと(html.WithHardWraps)。
+// CommonMark の既定ではスペースになり、日本語の本文では文の途中に
+// 見えるスペースが入ってしまう。
+func TestRenderHardWraps(t *testing.T) {
+	r := wiki.NewRenderer(func(string) (string, bool) { return "", false })
+
+	html, err := r.Render("一行目\n二行目")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(html, "<br>") {
+		t.Fatalf("改行が <br> になっていない: %q", html)
+	}
+
+	// 段落・箇条書き・コードブロック・表は影響を受けないこと
+	cases := []struct {
+		name, src, want string
+	}{
+		{"段落", "一段落目\n\n二段落目", "<p>二段落目</p>"},
+		{"箇条書き", "- 一つ目\n- 二つ目", "<li>二つ目</li>"},
+		{"コードブロック", "```\nコード内の\n改行\n```", "<pre>"},
+		{"表", "| 表 | も |\n|---|---|\n| 壊れ | ない |", "<table>"},
+	}
+	for _, c := range cases {
+		got, err := r.Render(c.src)
+		if err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		if !strings.Contains(got, c.want) {
+			t.Errorf("%s: %q が出ていない\n%s", c.name, c.want, got)
+		}
+	}
+	// コードブロックの中の改行は <br> にならない
+	code, _ := r.Render("```\nコード内の\n改行\n```")
+	if strings.Contains(code, "<br>") {
+		t.Errorf("コードブロック内に <br> が入っている:\n%s", code)
 	}
 }

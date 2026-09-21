@@ -10,6 +10,7 @@ import (
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
+	"github.com/yuin/goldmark/renderer/html"
 	"github.com/yuin/goldmark/text"
 	"github.com/yuin/goldmark/util"
 )
@@ -84,12 +85,24 @@ func queryEscape(s string) string {
 type Renderer struct{ md goldmark.Markdown }
 
 // NewRenderer は GFM + 見出し ID 付きのレンダラを作る。
+//
+// **改行1つをそのまま改行として扱う**(`html.WithHardWraps`)。
+// CommonMark の既定では段落内の改行はスペースになるため、日本語の本文では
+// 文の途中に見えるスペースが入る。行末にスペース2つを置く記法は目に見えず、
+// エディタの行末空白削除で消えてしまうので採らない。
+//
+// 代償として、**エクスポートした Markdown を他所のレンダラで開くと改行が失われる**
+// (段落が1行に繋がる)。エクスポートは原文をそのまま書き出すので、
+// この差は表示側だけの話である。
 func NewRenderer(resolve Resolver) *Renderer {
 	md := goldmark.New(
 		goldmark.WithExtensions(extension.GFM),
 		goldmark.WithParserOptions(
 			parser.WithAutoHeadingID(),
 			parser.WithInlineParsers(util.Prioritized(&wikilinkParser{resolve: resolve}, 150)),
+		),
+		goldmark.WithRendererOptions(
+			html.WithHardWraps(),
 		),
 	)
 	return &Renderer{md: md}
