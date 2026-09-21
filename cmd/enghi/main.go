@@ -7,7 +7,8 @@
 //	enghi export [--dir]  Markdown に全件エクスポート
 //	enghi doctor          整合性検査(DESIGN 2.5)
 //	enghi backup          DB のバックアップ(1日1回、常駐中にも自動で取る)
-//	enghi install-agent   launchd の plist を書き出す
+//	enghi install-agent   常駐設定(launchd / systemd)を書き出す
+//	enghi version         バージョンを表示する
 package main
 
 import (
@@ -35,7 +36,10 @@ func main() {
 
 	cmd := "serve"
 	args := os.Args[1:]
-	if len(args) > 0 && args[0][0] != '-' {
+	// 先頭が '-' でなければサブコマンド。ただし --help / --version は
+	// 慣習どおりフラグの形でも来るので、サブコマンドとして拾う
+	// (拾わないと serve のフラグ解析に流れ、serve だけの usage が出る)。
+	if len(args) > 0 && (args[0][0] != '-' || isGlobalFlag(args[0])) {
 		cmd, args = args[0], args[1:]
 	}
 
@@ -53,6 +57,8 @@ func main() {
 		err = cmdFiles(args)
 	case "install-agent":
 		err = cmdInstallAgent(args)
+	case "version", "-v", "--version":
+		err = cmdVersion(args)
 	case "help", "-h", "--help":
 		usage()
 		return
@@ -73,7 +79,8 @@ func usage() {
   enghi doctor [--fix]   整合性検査。--fix で文字の正規化を直す
   enghi backup [--dir D] DB のバックアップを取る
   enghi files [--prune]  画像などの一覧。--prune で未参照のものを消す
-  enghi install-agent    launchd の plist を書き出す
+  enghi install-agent    常駐設定(launchd / systemd)を書き出す
+  enghi version          バージョンを表示する
 
 設定: `+config.Path()+`
 `)
