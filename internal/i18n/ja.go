@@ -11,6 +11,7 @@ func init() {
 		"nav.articles":           "記事",
 		"nav.tags":               "タグ",
 		"nav.gtd":                "GTD",
+		"nav.guide":              "ガイド",
 		"nav.dashboard":          "ダッシュボード",
 		"search.placeholder":     "検索  /",
 		"search.all_results":     "すべての結果を見る →",
@@ -58,6 +59,7 @@ func init() {
 		"dash.new_article":     "新しい記事",
 		"dash.export":          "Markdown にエクスポート",
 		"dash.referenced_by":   "%d 件から参照",
+		"dash.gtd_guide":       "GTD の始め方を読む →",
 
 		// ---- 記事
 		"page.list_title":       "記事一覧",
@@ -148,6 +150,7 @@ func init() {
 		"gtd.recurring":           "定期タスク: %s",
 		"gtd.complete":            "完了",
 		"gtd.unprocessed":         "未処理 %d",
+		"gtd.contexts_empty":      "まだありません。@電話 @自宅 @買い物 あたりから始めると十分です。",
 
 		// ---- プロジェクト
 		"project.stalled_badge":   "停滞",
@@ -172,6 +175,7 @@ func init() {
 		"project.review_label":    "再検討日 — Someday に設定する際に指定します（期日が来ると再検討候補として表示されます）",
 		"project.support_label":   "Project Support Material の記事タイトル",
 		"project.none":            "まだプロジェクトがありません",
+		"project.none_hint":       "まだプロジェクトがありません。2つ以上の行動が要るものはプロジェクトにします。",
 		"project.done":            "完了",
 
 		// ---- Area
@@ -185,6 +189,7 @@ func init() {
 		"area.memo":         "メモ",
 		"area.memo_label":   "メモとして使用する記事のタイトル",
 		"area.none":         "まだありません",
+		"area.none_hint":    "まだありません。「経理」「健康」のような、完了することのない責任範囲を登録します。",
 
 		// ---- clarify
 		"clarify.title":              "処理: %s",
@@ -193,6 +198,7 @@ func init() {
 		"clarify.action_label":       "行動（動詞で始める）",
 		"clarify.note":               "メモ",
 		"clarify.state":              "状態",
+		"clarify.state_help":         "使い分けを見る",
 		"clarify.project":            "プロジェクト",
 		"clarify.context":            "コンテキスト",
 		"clarify.area":               "Area（プロジェクト化しない単発行動）",
@@ -259,6 +265,18 @@ func init() {
 		"checklist.data.review_projects":          "停滞プロジェクトの検出結果",
 		"checklist.data.review_someday":           "再検討期日を迎えた Someday",
 		"checklist.data.review_recurring":         "定期タスク系列の一覧",
+
+		// ---- 使い方ガイド(本文は docs/guide/<lang>/*.md)
+		"guide.title": "使い方ガイド",
+		"guide.lead":  "GTD を知らなくても読めるように書いてあります。まず「GTD 入門」で考え方を、次に「enghi の使い方」で操作を確認してください。",
+		"guide.help":  "この画面の説明を読む",
+
+		// ---- 一覧が空のときに出す案内(画面ごとに書き分ける)
+		"empty.inbox":     "Inbox は空です。気になっていることが残っていれば、上の欄から書き出してください。",
+		"empty.next":      "実行できる行動がありません。プロジェクトを見直して、次に取れる物理的な行動を1つ決めてください。",
+		"empty.waiting":   "人待ちの項目はありません。誰かに頼んだものは、処理画面で状態を Waiting For にすると、経過日数付きでここに並びます。",
+		"empty.scheduled": "日付付きの項目はありません。「その日まで見たくない」ものは、処理画面で予定日を入れるとここに入ります。",
+		"empty.someday":   "ありません。今はやらないが捨てたくないものを置く場所です。Weekly Review で毎週見直します。",
 
 		// ---- エラーと通知
 		"err.not_found":         "見つかりません",

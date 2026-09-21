@@ -112,6 +112,8 @@ func (s *Server) routes() {
 	m.HandleFunc("GET /gtd/area/{id}", s.viewArea)
 	m.HandleFunc("GET /gtd/review", s.viewReview)
 	m.HandleFunc("GET /gtd/clarify/{id}", s.viewClarify)
+	m.HandleFunc("GET /guide", s.viewGuideIndex)
+	m.HandleFunc("GET /guide/{topic}", s.viewGuide)
 
 	// ---- UI からの form 送信(htmx / 素の form)
 	m.HandleFunc("POST /ui/pages", s.uiCreatePage)

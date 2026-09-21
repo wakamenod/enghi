@@ -14,3 +14,10 @@ var TemplatesFS embed.FS
 
 //go:embed web/static
 var StaticFS embed.FS
+
+// GuideFS は使い方ガイドの本文(docs/guide/<lang>/<topic>.md)。
+// **ガイドはプログラムの一部としてバイナリに同梱する。**DB に投入すると
+// 利用者が編集・削除でき、版を上げるたびに衝突する。
+//
+//go:embed docs/guide
+var GuideFS embed.FS

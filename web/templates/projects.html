@@ -1,6 +1,6 @@
 {{template "head" .}}
 {{$d := .Data}}
-<h1>{{t "gtd.projects"}} <span class="count">{{len $d.Projects}}</span></h1>
+<h1>{{t "gtd.projects"}} <span class="count">{{len $d.Projects}}</span>{{template "help" "enghi#projects"}}</h1>
 <div class="meta">
   <a href="/gtd/projects">{{t "gtd.all"}}</a> ·
   <a href="/gtd/projects?status=active">Active</a> ·
@@ -21,7 +21,7 @@
   </li>
   {{end}}
 </ul>
-{{else}}<div class="empty">{{t "project.none"}}</div>{{end}}
+{{else}}<div class="empty">{{t "project.none_hint"}}</div>{{end}}
 
 <section class="panel">
   <h2>{{t "project.new"}}</h2>

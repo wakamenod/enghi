@@ -38,6 +38,7 @@ func TestAllScreensRenderCompletely(t *testing.T) {
 		"/gtd/waiting", "/gtd/scheduled", "/gtd/someday",
 		"/gtd/projects", "/gtd/projects?status=active", "/gtd/project/1",
 		"/gtd/areas", "/gtd/area/1", "/gtd/review", "/gtd/clarify/5",
+		"/guide", "/guide/gtd", "/guide/enghi",
 	}
 	for _, path := range screens {
 		w := do(h, req("GET", path, ""))

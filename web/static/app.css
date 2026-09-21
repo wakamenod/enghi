@@ -342,3 +342,34 @@ button.danger { color: var(--warn); }
   padding: 5px 11px; border-top: 1px solid var(--border);
   font-size: 11px; color: var(--fg-faint);
 }
+
+/* ---- 使い方ガイド ----
+   左に目次、右に本文。本文は記事と同じ .prose を使う */
+.guide { display: grid; grid-template-columns: 180px 1fr; gap: 0 36px; }
+.guide-toc {
+  position: sticky; top: 56px; align-self: start;
+  padding-top: 32px; font-size: 12px; line-height: 1.7;
+}
+.guide-toc .guide-topic + .guide-topic { margin-top: 18px; }
+.guide-toc a { color: var(--fg-muted); text-decoration: none; }
+.guide-toc a:hover { color: var(--fg); }
+.guide-toc > .guide-topic > a { color: var(--fg); font-size: 13px; }
+.guide-toc > .guide-topic > a.on { border-bottom: 1px solid var(--accent); }
+.guide-toc ul { list-style: none; margin: 6px 0 0; padding: 0; border-left: 1px solid var(--border); }
+.guide-toc li { padding: 1px 0 1px 10px; }
+/* 見出しはヘッダに隠れない位置で止める */
+.guide .prose h2, .guide .prose h3 { scroll-margin-top: 56px; }
+@media (max-width: 720px) {
+  .guide { grid-template-columns: 1fr; }
+  .guide-toc { position: static; padding-top: 24px; }
+}
+
+/* 見出しの脇に置く「?」。目立たせず、探せば見つかる程度に */
+a.help {
+  margin-left: 8px; text-decoration: none;
+  color: var(--fg-faint); font-family: var(--mono); font-size: 11px;
+  border: 1px solid var(--border); border-radius: 999px;
+  padding: 0 5px; line-height: 1.6; vertical-align: middle;
+}
+a.help:hover { color: var(--fg); border-color: var(--border-strong); }
+label a.help { border: none; padding: 0; margin-left: 6px; text-decoration: underline; border-radius: 0; }

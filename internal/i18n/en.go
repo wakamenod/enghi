@@ -11,6 +11,7 @@ func init() {
 		"nav.articles":           "Articles",
 		"nav.tags":               "Tags",
 		"nav.gtd":                "GTD",
+		"nav.guide":              "Guide",
 		"nav.dashboard":          "Dashboard",
 		"search.placeholder":     "Search  /",
 		"search.all_results":     "View all results →",
@@ -58,6 +59,7 @@ func init() {
 		"dash.new_article":     "New article",
 		"dash.export":          "Export to Markdown",
 		"dash.referenced_by":   "Referenced by %d",
+		"dash.gtd_guide":       "How to get started with GTD →",
 
 		// ---- articles
 		"page.list_title":       "Articles",
@@ -148,6 +150,7 @@ func init() {
 		"gtd.recurring":           "Recurring: %s",
 		"gtd.complete":            "Done",
 		"gtd.unprocessed":         "%d open",
+		"gtd.contexts_empty":      "None yet. @phone, @home and @errands are enough to start with.",
 
 		// ---- projects
 		"project.stalled_badge":   "Stalled",
@@ -172,6 +175,7 @@ func init() {
 		"project.review_label":    "Review date — set when moving to Someday so it resurfaces for review",
 		"project.support_label":   "Article title for Project Support Material",
 		"project.none":            "No projects yet",
+		"project.none_hint":       "No projects yet. Anything that takes more than one action belongs here.",
 		"project.done":            "Done",
 
 		// ---- areas
@@ -185,6 +189,7 @@ func init() {
 		"area.memo":         "Notes",
 		"area.memo_label":   "Article title for notes",
 		"area.none":         "Nothing here yet",
+		"area.none_hint":    "Nothing here yet. Areas are standards you maintain — Finances, Health — and they never complete.",
 
 		// ---- clarify
 		"clarify.title":              "Clarify: %s",
@@ -193,6 +198,7 @@ func init() {
 		"clarify.action_label":       "Action (start with a verb)",
 		"clarify.note":               "Note",
 		"clarify.state":              "State",
+		"clarify.state_help":         "which one?",
 		"clarify.project":            "Project",
 		"clarify.context":            "Context",
 		"clarify.area":               "Area (for one-off actions without a project)",
@@ -259,6 +265,18 @@ func init() {
 		"checklist.data.review_projects":          "Stalled project detection",
 		"checklist.data.review_someday":           "Someday items due for review",
 		"checklist.data.review_recurring":         "Recurring series list",
+
+		// ---- guide (the prose lives in docs/guide/<lang>/*.md)
+		"guide.title": "Guide",
+		"guide.lead":  "Written for someone who has never used GTD. Start with the introduction, then read how enghi puts it on screen.",
+		"guide.help":  "Read about this screen",
+
+		// ---- empty lists (worded per screen)
+		"empty.inbox":     "Inbox is empty. If anything is still on your mind, write it down above.",
+		"empty.next":      "Nothing you can act on. Go through your projects and decide one physical next action.",
+		"empty.waiting":   "Nothing is waiting on anyone. Set an item's state to Waiting For and it shows up here with the days elapsed.",
+		"empty.scheduled": "Nothing dated. Give an item a scheduled date and it stays out of sight until that day.",
+		"empty.someday":   "Empty. This is where things you are not doing now, but do not want to throw away, wait for the Weekly Review.",
 
 		// ---- errors and notices
 		"err.not_found":         "Not found",

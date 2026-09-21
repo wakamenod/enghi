@@ -22,6 +22,7 @@
 | 9 | Markdown エクスポート | ✅ |
 | 10 | `enghi doctor`(起動時にも実行) | ✅ |
 | 11 | launchd plist の生成 | ✅ |
+| 12 | 使い方ガイド(`/guide`。GTD 入門 + 操作説明、日英) | ✅ |
 
 ## ビルドと実行
 
@@ -47,6 +48,18 @@ backup_dir     = "~/.local/share/enghi/backup"
 backup_keep    = 7       # 残す世代数
 backup_enabled = true
 ```
+
+## 使い方ガイド
+
+`/guide` に GTD の入門と enghi の操作説明を置いている(日本語 / 英語)。
+本文は `docs/guide/<lang>/<topic>.md` で、バイナリに埋め込まれる。
+
+- `gtd.md` — GTD そのものの入門。enghi を知らなくても読める
+- `enghi.md` — 画面ごとの操作、状態の使い分け、定期タスクの記法、用語の対応表
+
+**見出しには `{#id}` で明示的なアンカーを必ず書くこと。** 各画面の「?」リンクがここを指しており、
+自動生成 ID に任せると日本語版と英語版で ID がずれて切れる。
+アンカーの過不足と、画面から張ったリンクの飛び先は `internal/web/guide_web_test.go` が検査する。
 
 ## 文字の正規化
 

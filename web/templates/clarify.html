@@ -1,7 +1,7 @@
 {{template "head" .}}
 {{$d := .Data}}
 {{$t := $d.Task}}
-<h1>{{$t.Title}}</h1>
+<h1>{{$t.Title}}{{template "help" "enghi#clarify-screen"}}</h1>
 <div class="meta">state: {{$t.State}} · {{t "clarify.captured_at"}} {{shortTime $t.CreatedAt}}</div>
 
 <div class="cols">
@@ -14,7 +14,7 @@
       <input type="text" id="title" name="title" value="{{$t.Title}}">
       <label for="note">{{t "clarify.note"}}</label>
       <input type="text" id="note" name="note" value="{{$t.Note}}">
-      <label for="state">{{t "clarify.state"}}</label>
+      <label for="state">{{t "clarify.state"}} <a class="help" href="/guide/enghi#states">{{t "clarify.state_help"}}</a></label>
       <select id="state" name="state">
         {{range $s := (list "inbox" "next" "later" "waiting" "scheduled" "someday")}}
         <option value="{{$s}}" {{if eq $t.State $s}}selected{{end}}>{{$s}}</option>

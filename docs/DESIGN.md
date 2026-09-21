@@ -550,7 +550,14 @@ SELECT p.id, p.slug, p.title, p.updated_at,
 /gtd/areas                 Area 一覧
 /gtd/area/:id              Area 詳細
 /gtd/review                Weekly Review
+/guide                     使い方ガイド(目次)
+/guide/:topic              使い方ガイド(gtd = GTD 入門 / enghi = 操作)
 ```
+
+**ガイドの本文は `docs/guide/<lang>/<topic>.md` に置き、バイナリに埋め込む。**
+Wiki ページとして DB に投入しない(利用者が編集・削除でき、版を上げるたびに衝突するため)。
+見出しには `{#id}` で**明示的なアンカーを必ず書く**。自動生成の ID は日本語と英語でずれ、
+画面から張ったリンクが言語を切り替えた途端に切れる。この2点は `guide_web_test.go` が検査する。
 
 ### 4.2 API(JSON)
 

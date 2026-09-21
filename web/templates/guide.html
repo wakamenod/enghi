@@ -1,0 +1,31 @@
+{{template "head" .}}
+{{$d := .Data}}
+<div class="guide">
+  <nav class="guide-toc">
+    {{range $d.Topics}}
+    <div class="guide-topic">
+      <a href="/guide/{{.Slug}}" class="{{if .Current}}on{{end}}">{{.Title}}</a>
+      {{if .Current}}
+      <ul>{{range .Sections}}<li><a href="#{{.ID}}">{{.Title}}</a></li>{{end}}</ul>
+      {{end}}
+    </div>
+    {{end}}
+  </nav>
+
+  <article class="prose">
+    {{if $d.Topic}}
+      {{$d.HTML}}
+    {{else}}
+      <h1>{{t "guide.title"}}</h1>
+      <p>{{t "guide.lead"}}</p>
+      {{range $d.Topics}}
+      {{$slug := .Slug}}
+      <h2><a href="/guide/{{$slug}}">{{.Title}}</a></h2>
+      <ul>
+        {{range .Sections}}<li><a href="/guide/{{$slug}}#{{.ID}}">{{.Title}}</a></li>{{end}}
+      </ul>
+      {{end}}
+    {{end}}
+  </article>
+</div>
+{{template "foot" .}}

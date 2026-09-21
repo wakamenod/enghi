@@ -1,6 +1,6 @@
 {{template "head" .}}
 {{$d := .Data}}
-<h1>{{t "gtd.title"}}</h1>
+<h1>{{t "gtd.title"}}{{template "help" "enghi#start"}}</h1>
 
 <form method="post" action="/ui/tasks" class="actions">
   <input type="hidden" name="return_to" value="/gtd">
@@ -31,7 +31,7 @@
       <li><a href="/gtd/next?context={{.Name}}">{{.Name}}</a><span class="when">{{.Count}}</span></li>
       {{end}}
     </ul>
-    {{else}}<div class="empty">{{t "area.none"}}</div>{{end}}
+    {{else}}<div class="empty">{{t "gtd.contexts_empty"}}</div>{{end}}
     <form method="post" action="/ui/contexts" class="actions">
       <input type="hidden" name="return_to" value="/gtd">
       <input type="text" name="name" placeholder="{{t "gtd.context_placeholder"}}">
@@ -42,7 +42,7 @@
 
 {{if $d.Stalled}}
 <section class="panel">
-  <h2>{{t "dash.stalled"}}</h2>
+  <h2>{{t "dash.stalled"}}{{template "help" "enghi#stalled"}}</h2>
   <div class="meta">{{t "dash.stalled_note"}}</div>
   <ul class="rows">
     {{range $d.Stalled}}

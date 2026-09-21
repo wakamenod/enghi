@@ -1,6 +1,6 @@
 {{template "head" .}}
 {{$d := .Data}}
-<h1>{{t "area.title"}}</h1>
+<h1>{{t "area.title"}}{{template "help" "enghi#areas"}}</h1>
 <div class="meta">{{t "area.note"}}</div>
 
 {{if $d.Areas}}
@@ -10,7 +10,7 @@
       {{if .Description}}<span class="meta">{{.Description}}</span>{{end}}</li>
   {{end}}
 </ul>
-{{else}}<div class="empty">{{t "area.none"}}</div>{{end}}
+{{else}}<div class="empty">{{t "area.none_hint"}}</div>{{end}}
 
 <section class="panel">
   <h2>{{t "common.add"}}</h2>

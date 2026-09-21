@@ -24,6 +24,7 @@
       <a href="/wiki"  class="{{if eq .Nav "wiki"}}on{{end}}">{{t "nav.articles"}}</a>
       <a href="/tags"  class="{{if eq .Nav "tags"}}on{{end}}">{{t "nav.tags"}}</a>
       <a href="/gtd"   class="{{if eq .Nav "gtd"}}on{{end}}">{{t "nav.gtd"}}</a>
+      <a href="/guide" class="{{if eq .Nav "guide"}}on{{end}}">{{t "nav.guide"}}</a>
     </nav>
     <div class="searchbox">
       <form action="/search" method="get" autocomplete="off">
@@ -44,6 +45,9 @@
 {{if .Err}}<div class="notice">{{.Err}}</div>{{end}}
 {{if .Flash}}<div class="notice">{{.Flash}}</div>{{end}}
 {{end}}
+
+{{/* help は見出しの脇に置く「?」。href はガイドの節へのアンカー。 */}}
+{{define "help"}}<a class="help" href="/guide/{{.}}" title="{{t "guide.help"}}" aria-label="{{t "guide.help"}}">?</a>{{end}}
 
 {{define "foot"}}
 </main>

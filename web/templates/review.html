@@ -1,6 +1,6 @@
 {{template "head" .}}
 {{$d := .Data}}
-<h1>{{t "review.title"}}</h1>
+<h1>{{t "review.title"}}{{template "help" "enghi#review-screen"}}</h1>
 <div class="meta">
   {{t "review.started" (shortTime $d.Review.StartedAt)}} · {{t "review.note"}}
 </div>

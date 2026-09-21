@@ -1,6 +1,6 @@
 {{template "head" .}}
 {{$d := .Data}}
-<h1>{{$d.Heading}} <span class="count">{{len $d.Tasks}}</span></h1>
+<h1>{{$d.Heading}} <span class="count">{{len $d.Tasks}}</span>{{template "help" (printf "enghi#%s" $d.Kind)}}</h1>
 {{if $d.Note}}<div class="meta">{{$d.Note}}</div>{{end}}
 
 {{if $d.Contexts}}
@@ -23,6 +23,6 @@
   {{range $d.Tasks}}{{template "task_row" .}}{{end}}
 </ul>
 {{else}}
-<div class="empty">{{t "common.empty"}}</div>
+<div class="empty">{{t (printf "empty.%s" $d.Kind)}}</div>
 {{end}}
 {{template "foot" .}}
