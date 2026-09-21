@@ -8,3 +8,5 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.52
 	github.com/yuin/goldmark v1.8.6
 )
+
+require golang.org/x/text v0.42.0 // indirect

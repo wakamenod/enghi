@@ -5,12 +5,16 @@ import (
 	"regexp"
 	"strings"
 	"unicode"
+
+	"github.com/wakamenod/enghi/internal/textnorm"
 )
 
 // Slugify は URL 用の slug を作る。**必ず小文字に正規化する**(DESIGN 2.1)。
 // APFS は大小を区別しないため、Foo と foo を別ページにするとエクスポート時に衝突する。
 func Slugify(s string) string {
-	s = strings.ToLower(strings.TrimSpace(s))
+	// **正規化を先に行う。**macOS は「ビ」を「ヒ」+ 濁点で渡してくることがあり、
+	// 揃えないと見た目が同じ別の slug ができる(textnorm を参照)。
+	s = textnorm.NFC(strings.ToLower(strings.TrimSpace(s)))
 	var b strings.Builder
 	prevDash := false
 	for _, r := range s {
@@ -72,7 +76,7 @@ func ParseLinks(body string) []Wikilink {
 	var out []Wikilink
 	seen := map[string]bool{}
 	for _, m := range wikilinkRe.FindAllStringSubmatch(cleaned, -1) {
-		title := strings.TrimSpace(m[1])
+		title := textnorm.NFC(strings.TrimSpace(m[1]))
 		if title == "" {
 			continue
 		}
@@ -82,7 +86,7 @@ func ParseLinks(body string) []Wikilink {
 			continue
 		}
 		seen[key] = true
-		out = append(out, Wikilink{Title: title, Label: strings.TrimSpace(m[2])})
+		out = append(out, Wikilink{Title: textnorm.NFC(title), Label: strings.TrimSpace(m[2])})
 	}
 	return out
 }
@@ -95,7 +99,7 @@ func ParseLinks(body string) []Wikilink {
 // 空白で区切られた語の境界は跨がない。1 文字の語はその文字自体を1トークンとする。
 func Bigrams(s string) string {
 	var toks []string
-	for _, field := range strings.Fields(strings.ToLower(s)) {
+	for _, field := range strings.Fields(textnorm.NFC(strings.ToLower(s))) {
 		rs := []rune(field)
 		if len(rs) == 1 {
 			toks = append(toks, string(rs))

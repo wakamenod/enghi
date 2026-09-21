@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/wakamenod/enghi/internal/store"
+	"github.com/wakamenod/enghi/internal/textnorm"
 )
 
 // Service はページに関するすべての書き込み経路。
@@ -47,7 +48,7 @@ func scanPage(row interface{ Scan(...any) error }) (*Page, error) {
 // BySlug はページを1件返す(タグ込み)。
 func (s *Service) BySlug(ctx context.Context, slug string) (*Page, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT `+pageCols+` FROM pages p WHERE p.slug = ? COLLATE NOCASE`, slug)
+		`SELECT `+pageCols+` FROM pages p WHERE p.slug = ? COLLATE NOCASE`, textnorm.NFC(slug))
 	p, err := scanPage(row)
 	if err != nil {
 		return nil, err
@@ -63,7 +64,7 @@ func (s *Service) ByTitle(ctx context.Context, title string) (*Page, error) {
 	row := s.db.QueryRowContext(ctx,
 		`SELECT `+pageCols+` FROM pages p
 		   JOIN page_titles t ON t.page_id = p.id
-		  WHERE t.title = ?`, strings.TrimSpace(title))
+		  WHERE t.title = ?`, textnorm.NFC(strings.TrimSpace(title)))
 	p, err := scanPage(row)
 	if err != nil {
 		return nil, err

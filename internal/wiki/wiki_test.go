@@ -354,3 +354,78 @@ func TestRenderHardWraps(t *testing.T) {
 		t.Errorf("コードブロック内に <br> が入っている:\n%s", code)
 	}
 }
+
+// macOS は日本語を NFD(分解形)で渡してくる経路が多い。
+// 「ビ」が「ヒ」+ 濁点になっていても、同じページとして扱えること。
+//
+// 揃えないと「同じ見た目のタイトルが引けない」「同じ名前のページが2つ作れる」が起きる。
+func TestUnicodeNormalization(t *testing.T) {
+	s, _ := newSvc(t)
+	ctx := context.Background()
+
+	nfc := "ビデオリンク"   // 合成形
+	nfd := "\u30d2\u3099\u30c6\u3099\u30aa\u30ea\u30f3\u30af" // ビデオリンク の分解形
+
+	if nfc == nfd {
+		t.Fatal("テストの前提が壊れている: NFC と NFD が同じ文字列になっている")
+	}
+
+	p := mustCreate(t, s, nfc, "本文")
+
+	// NFD で引いても同じページに辿り着くこと
+	got, err := s.ByTitle(ctx, nfd)
+	if err != nil {
+		t.Fatalf("NFD のタイトルで引けない: %v", err)
+	}
+	if got.ID != p.ID {
+		t.Fatalf("別のページが返った: %d != %d", got.ID, p.ID)
+	}
+
+	// slug も同じになること(見た目が同じなら同じ URL)
+	if s2 := wiki.Slugify(nfd); s2 != wiki.Slugify(nfc) {
+		t.Errorf("slug が揃わない: %q != %q", s2, wiki.Slugify(nfc))
+	}
+	if _, err := s.BySlug(ctx, wiki.Slugify(nfd)); err != nil {
+		t.Errorf("NFD 由来の slug で引けない: %v", err)
+	}
+
+	// NFD で同名ページを作ろうとしたら衝突すること(二重登録を防ぐ)
+	if _, err := s.Create(ctx, wiki.CreateInput{Title: nfd}); err == nil {
+		t.Error("NFD で同名ページが作れてしまった")
+	}
+
+	// 本文中の [[NFD]] が NFC のページに解決されること
+	src := mustCreate(t, s, "参照元", "[["+nfd+"]] を参照")
+	links, _ := s.Links(ctx, src.ID)
+	if len(links) != 1 || !links[0].Resolved {
+		t.Fatalf("NFD の wikilink が解決されていない: %+v", links)
+	}
+	if *links[0].PageID != p.ID {
+		t.Errorf("別のページに解決された")
+	}
+}
+
+// タグも揃えること。
+func TestTagNormalization(t *testing.T) {
+	s, _ := newSvc(t)
+	ctx := context.Background()
+	nfd := "\u30d2\u3099\u30c6\u3099\u30aa" // ビデオ の分解形
+
+	mustCreate(t, s, "記事A", "本文", "ビデオ")
+	mustCreate(t, s, "記事B", "本文", nfd)
+
+	tags, err := s.Tags(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tags) != 1 {
+		names := []string{}
+		for _, tc := range tags {
+			names = append(names, tc.Name)
+		}
+		t.Fatalf("同じ見た目のタグが %d 個に分かれた: %v", len(tags), names)
+	}
+	if tags[0].Count != 2 {
+		t.Errorf("タグの件数 = %d, want 2", tags[0].Count)
+	}
+}

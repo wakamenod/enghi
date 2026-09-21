@@ -2,8 +2,62 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+
+	"github.com/wakamenod/enghi/internal/textnorm"
 )
+
+// FixNormalization は NFD で入っている行を NFC に直す。
+//
+// **doctor が見つけても自動では直さない。**タイトルは名前空間そのものなので、
+// 書き換えは利用者が明示的に選ぶ操作にする。
+func FixNormalization(ctx context.Context, db *DB) (int, error) {
+	fixed := 0
+	err := db.Tx(ctx, func(tx *sql.Tx) error {
+		for _, c := range []struct{ table, key, col string }{
+			{"pages", "id", "title"},
+			{"pages", "id", "slug"},
+			{"page_titles", "rowid", "title"},
+			{"tags", "id", "name"},
+		} {
+			rows, err := tx.QueryContext(ctx,
+				fmt.Sprintf(`SELECT %s, %s FROM %s`, c.key, c.col, c.table))
+			if err != nil {
+				return err
+			}
+			type row struct {
+				key any
+				val string
+			}
+			var todo []row
+			for rows.Next() {
+				var r row
+				if err := rows.Scan(&r.key, &r.val); err != nil {
+					rows.Close()
+					return err
+				}
+				if !textnorm.IsNFC(r.val) {
+					todo = append(todo, r)
+				}
+			}
+			rows.Close()
+			if err := rows.Err(); err != nil {
+				return err
+			}
+			for _, r := range todo {
+				if _, err := tx.ExecContext(ctx,
+					fmt.Sprintf(`UPDATE %s SET %s = ? WHERE %s = ?`, c.table, c.col, c.key),
+					textnorm.NFC(r.val), r.key); err != nil {
+					return err
+				}
+				fixed++
+			}
+		}
+		return nil
+	})
+	return fixed, err
+}
 
 // Problem は doctor が見つけた不整合1件。
 type Problem struct {
@@ -70,6 +124,40 @@ func Doctor(ctx context.Context, db *DB) ([]Problem, error) {
 	rows.Close()
 	if err := rows.Err(); err != nil {
 		return nil, err
+	}
+
+	// 正規化されていない行(macOS 由来の NFD)。
+	// 見た目が同じでも別の文字列なので、タイトルで引けなくなる。
+	for _, c := range []struct{ table, col, label string }{
+		{"pages", "title", "記事のタイトル"},
+		{"pages", "slug", "記事の slug"},
+		{"page_titles", "title", "タイトル/別名"},
+		{"tags", "name", "タグ"},
+	} {
+		rows, err := db.QueryContext(ctx,
+			fmt.Sprintf(`SELECT %s FROM %s`, c.col, c.table))
+		if err != nil {
+			return nil, err
+		}
+		var bad []string
+		for rows.Next() {
+			var v string
+			if err := rows.Scan(&v); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			if !textnorm.IsNFC(v) {
+				bad = append(bad, v)
+			}
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
+		for _, v := range bad {
+			problems = append(problems, Problem{Kind: "not_nfc",
+				Detail: fmt.Sprintf("%s が正規化されていない(NFD): %q — `enghi doctor --fix` で直せる", c.label, v)})
+		}
 	}
 
 	// titles_fts の欠落(2 文字クエリ経路が静かに壊れるため)

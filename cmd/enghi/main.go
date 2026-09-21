@@ -70,7 +70,7 @@ func usage() {
 
   enghi [serve]          常駐サーバを起動する
   enghi export [--dir D] Markdown に全件エクスポート
-  enghi doctor           整合性検査
+  enghi doctor [--fix]   整合性検査。--fix で文字の正規化を直す
   enghi backup [--dir D] DB のバックアップを取る
   enghi files [--prune]  画像などの一覧。--prune で未参照のものを消す
   enghi install-agent    launchd の plist を書き出す
@@ -349,6 +349,7 @@ func cmdFiles(args []string) error {
 func cmdDoctor(args []string) error {
 	fs := flag.NewFlagSet("doctor", flag.ExitOnError)
 	configPath := fs.String("config", "", "設定ファイルのパス")
+	fix := fs.Bool("fix", false, "直せる問題(文字の正規化)を直す")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -357,6 +358,14 @@ func cmdDoctor(args []string) error {
 		return err
 	}
 	defer db.Close()
+
+	if *fix {
+		n, err := store.FixNormalization(context.Background(), db)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("%d 件を正規化した\n", n)
+	}
 
 	problems, err := store.Doctor(context.Background(), db)
 	if err != nil {

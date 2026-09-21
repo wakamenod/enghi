@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/wakamenod/enghi/internal/store"
+	"github.com/wakamenod/enghi/internal/textnorm"
 	"github.com/wakamenod/enghi/internal/wiki"
 )
 
@@ -38,7 +39,8 @@ const (
 
 // Search は横断検索。kind が空なら全種別。
 func (s *Service) Search(ctx context.Context, q string, kinds []string, limit, offset int) ([]Result, error) {
-	q = strings.TrimSpace(q)
+	// 入力経路によって NFD で来ることがあるので、索引と同じ NFC に揃える
+	q = textnorm.NFC(strings.TrimSpace(q))
 	if q == "" {
 		return []Result{}, nil
 	}

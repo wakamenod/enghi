@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/wakamenod/enghi/internal/textnorm"
 )
 
 // CreateInput は POST /api/pages の入力。
@@ -27,7 +29,7 @@ type UpdateInput struct {
 // Create はページを作る。
 // ページ保存 + page_titles + page_tags + links + titles_fts + page_revisions を単一トランザクションで行う。
 func (s *Service) Create(ctx context.Context, in CreateInput) (*Page, error) {
-	title := strings.TrimSpace(in.Title)
+	title := textnorm.NFC(strings.TrimSpace(in.Title))
 	if title == "" {
 		return nil, errors.New("タイトルが空です")
 	}
@@ -89,7 +91,7 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (*Page, error) {
 // Update はページを更新する。version 不一致は VersionConflictError、
 // タイトル衝突は TitleConflictError(まったく別の意味なので混ぜないこと。DESIGN 4.2)。
 func (s *Service) Update(ctx context.Context, slug string, in UpdateInput) (*Page, error) {
-	newTitle := strings.TrimSpace(in.Title)
+	newTitle := textnorm.NFC(strings.TrimSpace(in.Title))
 	if newTitle == "" {
 		return nil, errors.New("タイトルが空です")
 	}
@@ -231,7 +233,7 @@ func (s *Service) Delete(ctx context.Context, slug string) error {
 
 // AddAlias は別名を明示登録する(「GNU Emacs / イーマックス」など。DESIGN 2.5)。
 func (s *Service) AddAlias(ctx context.Context, pageID int64, alias string) error {
-	alias = strings.TrimSpace(alias)
+	alias = textnorm.NFC(strings.TrimSpace(alias))
 	if alias == "" {
 		return errors.New("別名が空です")
 	}
@@ -256,7 +258,8 @@ func (s *Service) AddAlias(ctx context.Context, pageID int64, alias string) erro
 func (s *Service) DeleteAlias(ctx context.Context, pageID int64, alias string) error {
 	return s.db.Tx(ctx, func(tx *sql.Tx) error {
 		res, err := tx.ExecContext(ctx,
-			`DELETE FROM page_titles WHERE title = ? AND page_id = ? AND is_canonical = 0`, alias, pageID)
+			`DELETE FROM page_titles WHERE title = ? AND page_id = ? AND is_canonical = 0`,
+			textnorm.NFC(alias), pageID)
 		if err != nil {
 			return err
 		}
@@ -275,8 +278,8 @@ func (s *Service) DeleteAlias(ctx context.Context, pageID int64, alias string) e
 // **自動では絶対に実行しない。ユーザが明示的に呼ぶ操作である**(DESIGN 2.5)。
 // 置換したページ数を返す。
 func (s *Service) RewriteReferences(ctx context.Context, oldTitle, newTitle string) (int, error) {
-	oldTitle = strings.TrimSpace(oldTitle)
-	newTitle = strings.TrimSpace(newTitle)
+	oldTitle = textnorm.NFC(strings.TrimSpace(oldTitle))
+	newTitle = textnorm.NFC(strings.TrimSpace(newTitle))
 	if oldTitle == "" || newTitle == "" {
 		return 0, errors.New("置換元/置換先が空です")
 	}

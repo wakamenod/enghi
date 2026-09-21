@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"sort"
 	"strings"
+
+	"github.com/wakamenod/enghi/internal/textnorm"
 )
 
 // syncTitlesFTS は titles_fts を更新する。
@@ -22,7 +24,7 @@ func normalizeTags(tags []string) []string {
 	seen := map[string]bool{}
 	out := []string{}
 	for _, t := range tags {
-		t = strings.TrimSpace(t)
+		t = textnorm.NFC(strings.TrimSpace(t))
 		if t == "" || seen[t] {
 			continue
 		}
