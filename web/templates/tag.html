@@ -1,0 +1,13 @@
+{{template "head" .}}
+{{$d := .Data}}
+<h1>タグ: {{$d.Tag}} <span class="count">{{len $d.Pages}}</span></h1>
+{{if $d.Pages}}
+<ul class="rows">
+{{range $d.Pages}}
+  <li><a href="/wiki/{{.Slug}}">{{.Title}}</a>
+      {{range .Tags}}<a class="tag" href="/tags/{{.}}">{{.}}</a>{{end}}
+      <span class="when">{{shortTime .UpdatedAt}}</span></li>
+{{end}}
+</ul>
+{{else}}<div class="empty">このタグの記事はありません</div>{{end}}
+{{template "foot" .}}

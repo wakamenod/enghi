@@ -1,0 +1,56 @@
+{{template "head" .}}
+{{$d := .Data}}
+<h1>{{$d.Page.Title}}</h1>
+<div class="meta">
+  <a href="/wiki/{{$d.Page.Slug}}/history">v{{$d.Page.Version}}</a> ·
+  更新 {{shortTime $d.Page.UpdatedAt}} · 作成 {{shortTime $d.Page.CreatedAt}}
+  {{range $d.Page.Tags}} <a class="tag" href="/tags/{{.}}">{{.}}</a>{{end}}
+</div>
+
+<article class="prose">{{$d.HTML}}</article>
+
+{{if $d.Aliases}}
+<section class="panel">
+  <h2>別名</h2>
+  <div class="meta">{{range $d.Aliases}}<span class="tag">{{.Title}}</span> {{end}}</div>
+</section>
+{{end}}
+
+<div class="cols">
+{{if $d.Backlinks}}
+<section class="panel">
+  <h2>このページへのリンク</h2>
+  <ul class="rows">
+  {{range $d.Backlinks}}
+    <li><span class="badge {{.Kind}}">{{kindLabel .Kind}}</span>
+        <a href="/wiki/{{.Slug}}">{{.Title}}</a>
+        {{if ne .DstTitle $d.Page.Title}}<span class="meta">[[{{.DstTitle}}]]</span>{{end}}</li>
+  {{end}}
+  </ul>
+</section>
+{{end}}
+
+{{if $d.Links}}
+<section class="panel">
+  <h2>このページから出るリンク</h2>
+  <ul class="rows">
+  {{range $d.Links}}
+    <li>{{if .Resolved}}<a href="/wiki/{{.Slug}}">{{.Title}}</a>
+        {{else}}<a class="wikilink-new" href="/wiki/new?title={{.Title}}">{{.Title}}</a>
+        <span class="meta">未作成</span>{{end}}</li>
+  {{end}}
+  </ul>
+</section>
+{{end}}
+</div>
+
+<div class="actions">
+  <a class="btn" href="/wiki/{{$d.Page.Slug}}/edit" data-key="edit">編集 <span class="kbd">e</span></a>
+  <a class="btn" href="/wiki/{{$d.Page.Slug}}/history">履歴</a>
+  <span class="spacer"></span>
+  <form method="post" action="/ui/pages/{{$d.Page.Slug}}/delete"
+        onsubmit="return confirm('このページを削除します。参照しているリンクは未解決リンクとして残ります。よろしいですか?')">
+    <button type="submit" class="danger">削除</button>
+  </form>
+</div>
+{{template "foot" .}}

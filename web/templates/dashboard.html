@@ -1,0 +1,73 @@
+{{template "head" .}}
+{{$d := .Data}}
+
+<h1>ダッシュボード</h1>
+
+{{/* 上段 — GTD。使っていなければ自然に空になる。登録を強く促す UI にはしない(DESIGN 5) */}}
+<section class="panel">
+  <h2>GTD</h2>
+  {{if $d.GTD.Enabled}}
+    <ul class="rows">
+      <li>Inbox <span class="count">{{$d.GTD.InboxCount}}</span></li>
+    </ul>
+  {{else}}
+    <div class="empty">まだ何もありません</div>
+  {{end}}
+</section>
+
+{{/* 下段 — Wiki */}}
+<div class="cols">
+  <section class="panel">
+    <h2>最近更新した記事</h2>
+    {{if $d.Wiki.RecentUpdate}}
+      <ul class="rows">
+      {{range $d.Wiki.RecentUpdate}}
+        <li>
+          <a href="/wiki/{{.Slug}}">{{.Title}}</a>
+          {{range .Tags}}<a class="tag" href="/tags/{{.}}">{{.}}</a>{{end}}
+          <span class="when">{{shortTime .UpdatedAt}}</span>
+        </li>
+      {{end}}
+      </ul>
+    {{else}}
+      <div class="empty">まだ記事がありません。<a href="/wiki/new">最初の1件を書く</a></div>
+    {{end}}
+  </section>
+
+  <section class="panel">
+    <h2>最近作成した記事</h2>
+    {{if $d.Wiki.RecentCreate}}
+      <ul class="rows">
+      {{range $d.Wiki.RecentCreate}}
+        <li><a href="/wiki/{{.Slug}}">{{.Title}}</a>
+            <span class="when">{{shortTime .CreatedAt}}</span></li>
+      {{end}}
+      </ul>
+    {{else}}
+      <div class="empty">—</div>
+    {{end}}
+
+    <h2 style="margin-top:28px">未解決リンク</h2>
+    {{if $d.Wiki.Unresolved}}
+      <ul class="rows">
+      {{range $d.Wiki.Unresolved}}
+        <li><a href="/wiki/new?title={{.Title}}">{{.Title}}</a>
+            <span class="when">{{.Count}}件から参照</span></li>
+      {{end}}
+      </ul>
+    {{else}}
+      <div class="empty">—</div>
+    {{end}}
+  </section>
+</div>
+
+<section class="panel">
+  <h2>全体</h2>
+  <div class="meta">記事 {{$d.Wiki.TotalPages}} 件 / タグ {{len $d.Wiki.Tags}} 種</div>
+  <div class="actions">
+    <a class="btn" href="/wiki/new">新しい記事</a>
+    <form method="post" action="/ui/export"><button type="submit">Markdown にエクスポート</button></form>
+  </div>
+</section>
+
+{{template "foot" .}}

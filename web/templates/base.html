@@ -1,0 +1,40 @@
+{{define "head"}}<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}} — enghi</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/htmx.min.js" defer></script>
+</head>
+<body>
+<header class="top">
+  <div class="inner">
+    <a class="brand" href="/">enghi</a>
+    <nav class="main">
+      <a href="/"      class="{{if eq .Nav "dashboard"}}on{{end}}">ダッシュボード</a>
+      <a href="/wiki"  class="{{if eq .Nav "wiki"}}on{{end}}">記事</a>
+      <a href="/tags"  class="{{if eq .Nav "tags"}}on{{end}}">タグ</a>
+      <a href="/gtd"   class="{{if eq .Nav "gtd"}}on{{end}}">GTD</a>
+    </nav>
+    <div class="searchbox">
+      <form action="/search" method="get" autocomplete="off">
+        <input type="text" id="q" name="q" value="{{.Query}}" placeholder="検索  /"
+               hx-get="/ui/search" hx-trigger="keyup changed delay:100ms"
+               hx-target="#suggest" hx-swap="innerHTML">
+      </form>
+      <div class="suggest" id="suggest"></div>
+    </div>
+  </div>
+</header>
+<main class="wrap">
+{{if .Err}}<div class="notice">{{.Err}}</div>{{end}}
+{{if .Flash}}<div class="notice">{{.Flash}}</div>{{end}}
+{{end}}
+
+{{define "foot"}}
+</main>
+<script src="/static/app.js" defer></script>
+</body>
+</html>
+{{end}}

@@ -1,0 +1,27 @@
+{{template "head" .}}
+{{$d := .Data}}
+<h1>{{if $d.IsNew}}新しい記事{{else}}{{$d.Page.Title}} を編集{{end}}</h1>
+
+<form method="post" action="{{if $d.IsNew}}/ui/pages{{else}}/ui/pages/{{$d.Page.Slug}}{{end}}">
+  {{if not $d.IsNew}}<input type="hidden" name="version" value="{{$d.Page.Version}}">{{end}}
+
+  <label for="title">タイトル</label>
+  <input type="text" id="title" name="title" value="{{$d.Page.Title}}" required autofocus>
+
+  <label for="tags">タグ(カンマ区切り)</label>
+  <input type="text" id="tags" name="tags" value="{{$d.TagText}}">
+
+  <label for="body">本文 — Markdown。<code>[[タイトル]]</code> で他の記事へリンクできる(存在しなくてよい)</label>
+  <textarea id="body" name="body" spellcheck="false">{{$d.Page.Body}}</textarea>
+
+  <div class="actions">
+    <button type="submit" class="primary">保存</button>
+    <button type="button" id="preview-toggle">プレビュー</button>
+    <span class="spacer"></span>
+    {{if not $d.IsNew}}<a class="btn" href="/wiki/{{$d.Page.Slug}}">やめる</a>
+    {{else}}<a class="btn" href="/wiki">やめる</a>{{end}}
+  </div>
+</form>
+
+<div id="preview" class="prose" style="display:none;margin-top:28px;border-top:1px solid var(--border);padding-top:16px"></div>
+{{template "foot" .}}

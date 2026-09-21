@@ -1,0 +1,24 @@
+{{template "head" .}}
+{{$d := .Data}}
+<h1>検索</h1>
+{{if $d.Query}}
+  <div class="meta">「{{$d.Query}}」 {{len $d.Results}} 件</div>
+  {{if $d.Results}}
+  <ul class="rows">
+  {{range $d.Results}}
+    <li>
+      <span class="badge {{.Kind}}">{{kindLabel .Kind}}</span>
+      {{if eq .Kind "page"}}<a href="/wiki/{{.Slug}}">{{.Title}}</a>
+      {{else}}{{.Title}}{{end}}
+      {{if .Snippet}}<span class="meta">{{snippet .Snippet}}</span>{{end}}
+      <span class="when">{{shortTime .UpdatedAt}}</span>
+    </li>
+  {{end}}
+  </ul>
+  {{else}}
+  <div class="empty">見つかりませんでした</div>
+  {{end}}
+{{else}}
+  <div class="empty">上の検索窓に入力してください(<span class="kbd">/</span> でフォーカス)</div>
+{{end}}
+{{template "foot" .}}

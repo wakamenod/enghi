@@ -1,0 +1,8 @@
+{{template "head" .}}
+<h1>ページがありません</h1>
+<p class="prose"><code>{{.Data}}</code> という記事はまだありません。</p>
+<div class="actions">
+  <a class="btn" href="/wiki/new?title={{.Data}}">この名前で作る</a>
+  <a class="btn" href="/wiki">記事一覧へ</a>
+</div>
+{{template "foot" .}}

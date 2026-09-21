@@ -1,0 +1,57 @@
+{{template "head" .}}
+{{$d := .Data}}
+<h1>{{$d.Page.Title}} の履歴</h1>
+<div class="meta"><a href="/wiki/{{$d.Page.Slug}}">← 記事へ戻る</a></div>
+
+<section class="panel">
+  <h2>リビジョン</h2>
+  <div class="meta">本文かタイトルが変わったときだけ記録する。タグだけの変更では作らない。
+    直前のリビジョンが 10 分以内なら上書きする。</div>
+  {{if $d.Revisions}}
+  <ul class="rows">
+  {{range $d.Revisions}}
+    <li><span class="count">v{{.Version}}</span> {{.Title}}
+        <span class="when">{{shortTime .CreatedAt}}</span></li>
+  {{end}}
+  </ul>
+  {{else}}<div class="empty">—</div>{{end}}
+</section>
+
+{{/* 別名の管理 UI は必須(DESIGN 2.5)。リネームのたびに増え続けるため。 */}}
+<section class="panel">
+  <h2>別名</h2>
+  <div class="meta">リネームすると旧タイトルがここに残り、<code>[[旧タイトル]]</code> は引き続き解決される。
+    不要になったものは削除できる(正式名は削除できない)。</div>
+  {{if $d.Aliases}}
+  <ul class="rows">
+  {{range $d.Aliases}}
+    <li><span class="tag">{{.Title}}</span>
+      <span class="when">{{shortTime .CreatedAt}}</span>
+      <form method="post" action="/ui/pages/{{$d.Page.Slug}}/aliases/delete"
+            onsubmit="return confirm('この別名を削除すると [[{{.Title}}]] は未解決リンクになります。よろしいですか?')">
+        <input type="hidden" name="alias" value="{{.Title}}">
+        <button type="submit" class="danger">削除</button>
+      </form>
+    </li>
+  {{end}}
+  </ul>
+  {{else}}<div class="empty">—</div>{{end}}
+
+  <form method="post" action="/ui/pages/{{$d.Page.Slug}}/aliases" class="actions">
+    <input type="text" name="alias" placeholder="別名を追加(例: GNU Emacs)">
+    <button type="submit">追加</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>参照元の一括置換</h2>
+  <div class="meta">誤記を直す目的でリネームした場合のための操作。
+    <strong>明示的に実行したときだけ動く。自動では行わない。</strong>
+    指定した旧タイトルの <code>[[...]]</code> を、このページの現タイトルに書き換える。</div>
+  <form method="post" action="/ui/pages/{{$d.Page.Slug}}/rewrite-references" class="actions"
+        onsubmit="return confirm('参照元の本文を書き換えます。元に戻せません。よろしいですか?')">
+    <input type="text" name="from" placeholder="置換する旧タイトル">
+    <button type="submit">[[…]] を「{{$d.Page.Title}}」に書き換える</button>
+  </form>
+</section>
+{{template "foot" .}}
