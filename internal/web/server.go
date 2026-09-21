@@ -13,6 +13,7 @@ import (
 
 	enghi "github.com/wakamenod/enghi"
 	"github.com/wakamenod/enghi/internal/config"
+	"github.com/wakamenod/enghi/internal/gtd"
 	"github.com/wakamenod/enghi/internal/search"
 	"github.com/wakamenod/enghi/internal/store"
 	"github.com/wakamenod/enghi/internal/wiki"
@@ -23,6 +24,7 @@ type Server struct {
 	cfg    config.Config
 	db     *store.DB
 	pages  *wiki.Service
+	gtd    *gtd.Service
 	search *search.Service
 	hub    *Hub
 	tmpl   *template.Template
@@ -39,6 +41,7 @@ func New(cfg config.Config, db *store.DB) (*Server, error) {
 		cfg:    cfg,
 		db:     db,
 		pages:  wiki.New(db, cfg.RevisionCompactMinutes),
+		gtd:    gtd.New(db),
 		search: search.New(db),
 		hub:    NewHub(),
 		tmpl:   tmpl,
@@ -55,6 +58,9 @@ func parseTemplates() (*template.Template, error) {
 		"add":       func(a, b int) int { return a + b },
 		"kindLabel": kindLabel,
 		"snippet":   search.SnippetHTML,
+		"list":      func(vals ...string) []string { return vals },
+		// eqID は *int64 と int64 を比べる。テンプレートの eq は型が違うと実行時エラーになる。
+		"eqID": func(p *int64, id int64) bool { return p != nil && *p == id },
 	}
 	return template.New("").Funcs(funcs).ParseFS(enghi.TemplatesFS, "web/templates/*.html")
 }
@@ -78,7 +84,18 @@ func (s *Server) routes() {
 	m.HandleFunc("GET /tags/{name}", s.viewTag)
 	m.HandleFunc("GET /tags", s.viewTagList)
 	m.HandleFunc("GET /search", s.viewSearch)
-	m.HandleFunc("GET /gtd", s.viewGTDPlaceholder)
+	m.HandleFunc("GET /gtd", s.viewGTDTop)
+	m.HandleFunc("GET /gtd/inbox", s.viewInbox)
+	m.HandleFunc("GET /gtd/next", s.viewNextActions)
+	m.HandleFunc("GET /gtd/waiting", s.viewWaiting)
+	m.HandleFunc("GET /gtd/scheduled", s.viewScheduled)
+	m.HandleFunc("GET /gtd/someday", s.viewSomeday)
+	m.HandleFunc("GET /gtd/projects", s.viewProjects)
+	m.HandleFunc("GET /gtd/project/{id}", s.viewProject)
+	m.HandleFunc("GET /gtd/areas", s.viewAreas)
+	m.HandleFunc("GET /gtd/area/{id}", s.viewArea)
+	m.HandleFunc("GET /gtd/review", s.viewReview)
+	m.HandleFunc("GET /gtd/clarify/{id}", s.viewClarify)
 
 	// ---- UI からの form 送信(htmx / 素の form)
 	m.HandleFunc("POST /ui/pages", s.uiCreatePage)
@@ -88,6 +105,20 @@ func (s *Server) routes() {
 	m.HandleFunc("POST /ui/pages/{slug}/aliases/delete", s.uiDeleteAlias)
 	m.HandleFunc("POST /ui/pages/{slug}/rewrite-references", s.uiRewriteReferences)
 	m.HandleFunc("POST /ui/export", s.uiExport)
+	m.HandleFunc("POST /ui/tasks", s.uiCapture)
+	m.HandleFunc("POST /ui/tasks/{id}", s.uiPatchTask)
+	m.HandleFunc("POST /ui/tasks/{id}/complete", s.uiCompleteTask)
+	m.HandleFunc("POST /ui/tasks/{id}/skip", s.uiSkipTask)
+	m.HandleFunc("POST /ui/tasks/{id}/end-series", s.uiEndSeries)
+	m.HandleFunc("POST /ui/tasks/{id}/file", s.uiFileAsReference)
+	m.HandleFunc("POST /ui/tasks/{id}/delete", s.uiDeleteTask)
+	m.HandleFunc("POST /ui/projects", s.uiCreateProject)
+	m.HandleFunc("POST /ui/projects/{id}", s.uiPatchProject)
+	m.HandleFunc("POST /ui/areas", s.uiCreateArea)
+	m.HandleFunc("POST /ui/areas/{id}", s.uiPatchArea)
+	m.HandleFunc("POST /ui/contexts", s.uiCreateContext)
+	m.HandleFunc("POST /ui/review/{id}/check", s.uiReviewCheck)
+	m.HandleFunc("POST /ui/review/{id}/complete", s.uiReviewComplete)
 	m.HandleFunc("GET /ui/search", s.uiSearchFragment) // 打鍵ごとのインクリメンタル検索
 	m.HandleFunc("POST /ui/preview", s.uiPreview)      // 編集画面のプレビュー
 
@@ -107,6 +138,26 @@ func (s *Server) routes() {
 	m.HandleFunc("GET /api/events", s.handleEvents)
 	m.HandleFunc("GET /api/status", s.handleStatus)
 	m.HandleFunc("POST /api/export", s.apiExport)
+
+	m.HandleFunc("GET /api/tasks", s.apiListTasks)
+	m.HandleFunc("POST /api/tasks", s.apiCreateTask)
+	m.HandleFunc("GET /api/tasks/{id}", s.apiGetTask)
+	m.HandleFunc("PATCH /api/tasks/{id}", s.apiPatchTask)
+	m.HandleFunc("DELETE /api/tasks/{id}", s.apiDeleteTask)
+	m.HandleFunc("POST /api/tasks/{id}/complete", s.apiCompleteTask)
+	m.HandleFunc("POST /api/tasks/{id}/file", s.apiFileAsReference)
+	m.HandleFunc("GET /api/projects", s.apiListProjects)
+	m.HandleFunc("POST /api/projects", s.apiCreateProject)
+	m.HandleFunc("GET /api/projects/stalled", s.apiStalledProjects)
+	m.HandleFunc("GET /api/projects/{id}", s.apiGetProject)
+	m.HandleFunc("PATCH /api/projects/{id}", s.apiPatchProject)
+	m.HandleFunc("GET /api/areas", s.apiListAreas)
+	m.HandleFunc("POST /api/areas", s.apiCreateArea)
+	m.HandleFunc("PATCH /api/areas/{id}", s.apiPatchArea)
+	m.HandleFunc("GET /api/contexts", s.apiListContexts)
+	m.HandleFunc("POST /api/contexts", s.apiCreateContext)
+	m.HandleFunc("GET /api/review", s.apiReview)
+	m.HandleFunc("GET /api/series", s.apiSeries)
 
 	// ---- 静的ファイル
 	static, err := fs.Sub(enghi.StaticFS, "web/static")

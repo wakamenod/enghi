@@ -1,0 +1,42 @@
+{{template "head" .}}
+{{$d := .Data}}
+<h1>プロジェクト <span class="count">{{len $d.Projects}}</span></h1>
+<div class="meta">
+  <a href="/gtd/projects">すべて</a> ·
+  <a href="/gtd/projects?status=active">Active</a> ·
+  <a href="/gtd/projects?status=someday">Someday</a> ·
+  <a href="/gtd/projects?status=done">完了</a>
+</div>
+
+{{if $d.Projects}}
+<ul class="rows">
+  {{range $d.Projects}}
+  <li>
+    <a href="/gtd/project/{{.ID}}">{{.Title}}</a>
+    {{if index $d.Stalled .ID}}<span class="tag" style="color:var(--warn)">停滞</span>{{end}}
+    {{if .AreaName}}<span class="tag">{{.AreaName}}</span>{{end}}
+    {{if ne .Status "active"}}<span class="tag">{{.Status}}</span>{{end}}
+    {{if .ReviewOn}}<span class="tag">再検討 {{.ReviewOn}}</span>{{end}}
+    <span class="when">{{.NextCount}} / {{.OpenTasks}}</span>
+  </li>
+  {{end}}
+</ul>
+{{else}}<div class="empty">まだプロジェクトがありません</div>{{end}}
+
+<section class="panel">
+  <h2>新しいプロジェクト</h2>
+  <div class="meta">1年以内に完了でき、2つ以上の行動ステップを要する、望ましい結果。</div>
+  <form method="post" action="/ui/projects">
+    <label for="title">タイトル(短い識別名)</label>
+    <input type="text" id="title" name="title" placeholder="オフィス移転" required>
+    <label for="outcome">完了状態の記述 — どうなっていれば終わりか</label>
+    <input type="text" id="outcome" name="outcome" placeholder="新オフィスに移転完了し業務が再開している">
+    <label for="area_id">Area</label>
+    <select id="area_id" name="area_id">
+      <option value="">—</option>
+      {{range $d.Areas}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+    </select>
+    <div class="actions"><button type="submit" class="primary">作る</button></div>
+  </form>
+</section>
+{{template "foot" .}}

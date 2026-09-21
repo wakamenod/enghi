@@ -199,11 +199,13 @@ button, .btn {
   background: var(--bg-raised); color: var(--fg);
   border: 1px solid var(--border-strong); border-radius: var(--radius);
   padding: 5px 12px; text-decoration: none; display: inline-block;
+  white-space: nowrap;
 }
 button:hover, .btn:hover { border-color: var(--fg-faint); }
 button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
 button.danger { color: var(--warn); }
-.actions { display: flex; gap: 8px; align-items: center; margin-top: 18px; }
+.actions { display: flex; gap: 8px; align-items: center; margin-top: 18px; flex-wrap: wrap; }
+.actions input[type=text] { flex: 1; min-width: 200px; }
 .actions .spacer { flex: 1; }
 
 .notice {
@@ -219,3 +221,20 @@ button.danger { color: var(--warn); }
 
 /* アニメーションは原則使わない。使うなら 120ms 以下の opacity のみ(DESIGN 6) */
 .fade { transition: opacity 120ms linear; }
+
+/* ---- クイックキャプチャ(c) ---- */
+
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0,0,0,0.28);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding-top: 18vh;
+}
+.modal {
+  background: var(--bg-raised); border: 1px solid var(--border-strong);
+  border-radius: var(--radius); box-shadow: 0 10px 40px rgba(0,0,0,0.22);
+  width: min(520px, calc(100vw - 32px)); padding: 16px 18px;
+}
+.modal-label { font-size: 12px; color: var(--fg-muted); margin-bottom: 8px; }
+.modal input { font-size: 15px; }
+.modal-hint { font-size: 11px; color: var(--fg-faint); margin-top: 8px; font-family: var(--mono); }

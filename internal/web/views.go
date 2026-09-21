@@ -202,10 +202,6 @@ func (s *Server) uiSearchFragment(w http.ResponseWriter, r *http.Request) {
 	s.renderFragment(w, "search_suggest.html", searchData{Query: q, Results: results})
 }
 
-func (s *Server) viewGTDPlaceholder(w http.ResponseWriter, r *http.Request) {
-	s.render(w, "gtd_placeholder.html", viewData{Title: "GTD", Nav: "gtd"})
-}
-
 // ---------------------------------------------------------------- form 送信
 
 func (s *Server) uiCreatePage(w http.ResponseWriter, r *http.Request) {

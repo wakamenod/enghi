@@ -1,0 +1,28 @@
+{{template "head" .}}
+{{$d := .Data}}
+<h1>{{$d.Heading}} <span class="count">{{len $d.Tasks}}</span></h1>
+{{if $d.Note}}<div class="meta">{{$d.Note}}</div>{{end}}
+
+{{if $d.Contexts}}
+<div class="meta" style="margin-top:8px">
+  <a href="/gtd/next">すべて</a>
+  {{range $d.Contexts}} · <a href="/gtd/next?context={{.Name}}">{{.Name}} ({{.Count}})</a>{{end}}
+</div>
+{{end}}
+
+{{if eq $d.Kind "inbox"}}
+<form method="post" action="/ui/tasks" class="actions">
+  <input type="hidden" name="return_to" value="/gtd/inbox">
+  <input type="text" name="title" placeholder="1行で投げ込む" required>
+  <button type="submit" class="primary">追加</button>
+</form>
+{{end}}
+
+{{if $d.Tasks}}
+<ul class="rows">
+  {{range $d.Tasks}}{{template "task_row" .}}{{end}}
+</ul>
+{{else}}
+<div class="empty">ありません</div>
+{{end}}
+{{template "foot" .}}

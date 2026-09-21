@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 
+	"github.com/wakamenod/enghi/internal/gtd"
 	"github.com/wakamenod/enghi/internal/wiki"
 )
 
@@ -13,15 +14,22 @@ type Dashboard struct {
 	Wiki WikiSummary `json:"wiki"`
 }
 
-// GTDSummary は上段。第2段階で埋まる。第1段階では空のまま返る。
+// GTDSummary は上段(DESIGN 5)。**GTD を使っていなければ自然に空になる。**
 type GTDSummary struct {
-	InboxCount       int   `json:"inbox_count"`
-	TodayCount       int   `json:"today_count"`
-	StalledProjects  []any `json:"stalled_projects"`
-	WaitingOverdue   []any `json:"waiting_overdue"`
-	SomedayDueReview []any `json:"someday_due_review"`
-	ContextCounts    []any `json:"context_counts"`
-	Enabled          bool  `json:"enabled"` // GTD のデータが1件でもあるか
+	// 1. Inbox 件数(0 でないときだけ強調する)
+	InboxCount int `json:"inbox_count"`
+	// 2. 今日の Next Actions(deadline_on <= today または scheduled_on <= today)
+	Today []*gtd.Task `json:"today"`
+	// 3. コンテキスト別の Next Action 件数
+	Contexts []*gtd.Context `json:"contexts"`
+	// 4. **停滞プロジェクト(Next Action が無いもの)** — DESIGN 2.4
+	StalledProjects []*gtd.Project `json:"stalled_projects"`
+	// 5. Waiting For のうち委譲から一定日数が経過したもの(既定 7 日)
+	WaitingOverdue []*gtd.Task `json:"waiting_overdue"`
+	// 6. 再検討日が到来した Someday プロジェクト
+	SomedayDueReview []*gtd.Project `json:"someday_due_review"`
+
+	Enabled bool `json:"enabled"` // GTD のデータが1件でもあるか
 }
 
 // WikiSummary は下段。
@@ -59,8 +67,7 @@ func (s *Server) dashboardData(ctx context.Context) (*Dashboard, error) {
 		return nil, err
 	}
 
-	// 上段は第2段階。ここでは「GTD のデータが存在するか」だけを見る。
-	// 空でも崩れないレイアウトにすること(DESIGN 5)。
+	// 上段 — GTD。**空でも崩れないレイアウトにすること**(DESIGN 5)。
 	var gtdRows int
 	if err := s.db.QueryRowContext(ctx,
 		`SELECT (SELECT count(*) FROM tasks) + (SELECT count(*) FROM projects) + (SELECT count(*) FROM areas)`).
@@ -68,9 +75,27 @@ func (s *Server) dashboardData(ctx context.Context) (*Dashboard, error) {
 		return nil, err
 	}
 	d.GTD.Enabled = gtdRows > 0
-	d.GTD.StalledProjects = []any{}
-	d.GTD.WaitingOverdue = []any{}
-	d.GTD.SomedayDueReview = []any{}
-	d.GTD.ContextCounts = []any{}
+
+	inbox, err := s.gtd.Inbox(ctx)
+	if err != nil {
+		return nil, err
+	}
+	d.GTD.InboxCount = len(inbox)
+
+	if d.GTD.Today, err = s.gtd.Today(ctx); err != nil {
+		return nil, err
+	}
+	if d.GTD.Contexts, err = s.gtd.Contexts(ctx); err != nil {
+		return nil, err
+	}
+	if d.GTD.StalledProjects, err = s.gtd.StalledProjects(ctx); err != nil {
+		return nil, err
+	}
+	if d.GTD.WaitingOverdue, err = s.gtd.WaitingOverdue(ctx, 7); err != nil {
+		return nil, err
+	}
+	if d.GTD.SomedayDueReview, err = s.gtd.SomedayDueReview(ctx); err != nil {
+		return nil, err
+	}
 	return d, nil
 }

@@ -1,0 +1,80 @@
+{{template "head" .}}
+{{$d := .Data}}
+{{$p := $d.Project}}
+<h1>{{$p.Title}}</h1>
+<div class="meta">
+  {{$p.Status}}
+  {{if $p.AreaName}} · <a href="/gtd/area/{{$p.AreaID}}">{{$p.AreaName}}</a>{{end}}
+  {{if $p.ReviewOn}} · 再検討 {{$p.ReviewOn}}{{end}}
+</div>
+
+{{if $d.Stalled}}
+<div class="notice">
+  このプロジェクトには Next Action がありません。次に取れる物理的な行動を1つ決めてください。
+</div>
+{{end}}
+
+{{if $p.Outcome}}
+<p class="prose"><strong>完了状態:</strong> {{$p.Outcome}}</p>
+{{else}}
+<div class="meta">完了状態が書かれていません。「どうなっていれば終わりか」を1文で書くと、次の行動が決めやすくなります。</div>
+{{end}}
+
+<section class="panel">
+  <h2>タスク</h2>
+  {{if $d.Tasks}}
+  <ul class="rows">{{range $d.Tasks}}{{template "task_row" .}}{{end}}</ul>
+  {{else}}<div class="empty">まだありません</div>{{end}}
+
+  <form method="post" action="/ui/tasks" class="actions">
+    <input type="hidden" name="return_to" value="/gtd/project/{{$p.ID}}">
+    <input type="text" name="title" placeholder="次に取れる物理的な行動を1つ" required>
+    <button type="submit" class="primary">追加</button>
+  </form>
+  <div class="meta">追加した行動は Inbox に入ります。このプロジェクトに紐づけるには開いて設定してください。</div>
+</section>
+
+{{if $d.NoteHTML}}
+<section class="panel">
+  <h2>Project Support Material</h2>
+  <div class="meta"><a href="/wiki/{{$p.NotePageSlug}}">{{$p.NotePageSlug}}</a></div>
+  <article class="prose">{{$d.NoteHTML}}</article>
+</section>
+{{end}}
+
+{{if $d.Links}}
+<section class="panel">
+  <h2>関連する記事</h2>
+  <ul class="rows">
+    {{range $d.Links}}<li><a href="/wiki/{{.Slug}}">{{.Title}}</a></li>{{end}}
+  </ul>
+</section>
+{{end}}
+
+<section class="panel">
+  <h2>設定</h2>
+  <form method="post" action="/ui/projects/{{$p.ID}}">
+    <input type="hidden" name="return_to" value="/gtd/project/{{$p.ID}}">
+    <label for="title">タイトル</label>
+    <input type="text" id="title" name="title" value="{{$p.Title}}">
+    <label for="outcome">完了状態の記述</label>
+    <input type="text" id="outcome" name="outcome" value="{{$p.Outcome}}">
+    <label for="status">状態</label>
+    <select id="status" name="status">
+      {{range $s := (list "active" "someday" "done" "dropped")}}
+      <option value="{{$s}}" {{if eq $p.Status $s}}selected{{end}}>{{$s}}</option>
+      {{end}}
+    </select>
+    <label for="review_on">再検討日 — someday にするなら必ず入れる(入れないと二度と浮上しない)</label>
+    <input type="text" id="review_on" name="review_on" value="{{$p.ReviewOn}}" placeholder="YYYY-MM-DD">
+    <label for="area_id">Area</label>
+    <select id="area_id" name="area_id">
+      <option value="">—</option>
+      {{range $d.Areas}}<option value="{{.ID}}" {{if eqID $.Data.Project.AreaID .ID}}selected{{end}}>{{.Name}}</option>{{end}}
+    </select>
+    <label for="note_page">Project Support Material の記事タイトル</label>
+    <input type="text" id="note_page" name="note_page" value="{{$p.NotePageSlug}}">
+    <div class="actions"><button type="submit" class="primary">保存</button></div>
+  </form>
+</section>
+{{template "foot" .}}

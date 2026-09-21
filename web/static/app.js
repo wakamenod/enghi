@@ -160,6 +160,10 @@
         pendingG = true;
         gTimer = setTimeout(function () { pendingG = false; }, 900);
         break;
+      case 'c':
+        ev.preventDefault();
+        openCapture();
+        break;
       case 'e':
         var edit = document.querySelector('a[data-key="edit"]');
         if (edit) { ev.preventDefault(); window.location.assign(edit.getAttribute('href')); }
@@ -178,6 +182,65 @@
     }
   });
 })();
+
+// ---------------------------------------------------------------- クイックキャプチャ
+//
+// DESIGN 6: c … どこからでも Inbox へ1行追加するモーダル。
+// 頭の中を空にする操作は、どの画面からでも1打鍵で始まること。
+
+function openCapture() {
+  if (document.getElementById('capture-modal')) return;
+
+  var overlay = document.createElement('div');
+  overlay.id = 'capture-modal';
+  overlay.className = 'modal-overlay';
+
+  var box = document.createElement('div');
+  box.className = 'modal';
+
+  var label = document.createElement('div');
+  label.className = 'modal-label';
+  label.textContent = 'Inbox に追加';
+
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = '1行で投げ込む';
+
+  var hint = document.createElement('div');
+  hint.className = 'modal-hint';
+  hint.textContent = 'Enter で追加 · Esc で閉じる';
+
+  box.appendChild(label);
+  box.appendChild(input);
+  box.appendChild(hint);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  input.focus();
+
+  function close() { overlay.remove(); }
+
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+
+  input.addEventListener('keydown', function (e) {
+    e.stopPropagation();
+    if (e.key === 'Escape') { close(); return; }
+    if (e.key !== 'Enter') return;
+    var title = input.value.trim();
+    if (!title) { close(); return; }
+    fetch('/api/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: title }),
+    }).then(function (r) {
+      if (!r.ok) throw new Error('capture failed');
+      label.textContent = '追加した';
+      input.value = '';
+      setTimeout(close, 400);
+    }).catch(function () {
+      label.textContent = '追加できなかった';
+    });
+  });
+}
 
 // ---------------------------------------------------------------- 編集画面のプレビュー
 (function () {

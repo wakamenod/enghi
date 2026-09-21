@@ -1,0 +1,49 @@
+{{template "head" .}}
+{{$d := .Data}}
+{{$a := $d.Area}}
+<h1>{{$a.Name}}</h1>
+{{if $a.Description}}<div class="meta">{{$a.Description}}</div>{{end}}
+
+<section class="panel">
+  <h2>プロジェクト</h2>
+  {{if $d.Projects}}
+  <ul class="rows">
+    {{range $d.Projects}}
+    <li><a href="/gtd/project/{{.ID}}">{{.Title}}</a>
+        {{if ne .Status "active"}}<span class="tag">{{.Status}}</span>{{end}}
+        <span class="when">{{.NextCount}} / {{.OpenTasks}}</span></li>
+    {{end}}
+  </ul>
+  {{else}}<div class="empty">—</div>{{end}}
+</section>
+
+<section class="panel">
+  <h2>この Area に直接紐づく行動</h2>
+  <div class="meta">プロジェクト化するほどでない単発行動。</div>
+  {{if $d.Tasks}}
+  <ul class="rows">{{range $d.Tasks}}{{template "task_row" .}}{{end}}</ul>
+  {{else}}<div class="empty">—</div>{{end}}
+</section>
+
+{{if $d.NoteHTML}}
+<section class="panel">
+  <h2>メモ</h2>
+  <div class="meta"><a href="/wiki/{{$a.NotePageSlug}}">{{$a.NotePageSlug}}</a></div>
+  <article class="prose">{{$d.NoteHTML}}</article>
+</section>
+{{end}}
+
+<section class="panel">
+  <h2>設定</h2>
+  <form method="post" action="/ui/areas/{{$a.ID}}">
+    <input type="hidden" name="return_to" value="/gtd/area/{{$a.ID}}">
+    <label for="name">名前</label>
+    <input type="text" id="name" name="name" value="{{$a.Name}}">
+    <label for="description">説明</label>
+    <input type="text" id="description" name="description" value="{{$a.Description}}">
+    <label for="note_page">メモにする記事タイトル</label>
+    <input type="text" id="note_page" name="note_page" value="{{$a.NotePageSlug}}">
+    <div class="actions"><button type="submit" class="primary">保存</button></div>
+  </form>
+</section>
+{{template "foot" .}}

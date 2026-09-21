@@ -1,0 +1,15 @@
+{{define "task_row"}}
+<li>
+  <form method="post" action="/ui/tasks/{{.ID}}/complete" style="display:inline">
+    <button type="submit" title="完了">✓</button>
+  </form>
+  <a href="/gtd/clarify/{{.ID}}">{{.Title}}</a>
+  {{if .Recurrence}}<span class="tag" title="定期タスク: {{.Recurrence}}">↻ {{.Recurrence}}</span>{{end}}
+  {{if .ProjectTitle}}<a class="tag" href="/gtd/project/{{.ProjectID}}">{{.ProjectTitle}}</a>{{end}}
+  {{if .ContextName}}<a class="tag" href="/gtd/next?context={{.ContextName}}">{{.ContextName}}</a>{{end}}
+  {{if .DeadlineOn}}<span class="tag" style="color:var(--warn)">締切 {{.DeadlineOn}}</span>{{end}}
+  {{if and .ScheduledOn (ne .State "next")}}<span class="tag">予定 {{.ScheduledOn}}</span>{{end}}
+  {{if eq .State "waiting"}}<span class="tag">{{.WaitingFor}} — {{.WaitingDays}}日経過</span>{{end}}
+  <span class="when">{{.State}}</span>
+</li>
+{{end}}

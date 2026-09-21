@@ -7,9 +7,66 @@
 <section class="panel">
   <h2>GTD</h2>
   {{if $d.GTD.Enabled}}
-    <ul class="rows">
-      <li>Inbox <span class="count">{{$d.GTD.InboxCount}}</span></li>
-    </ul>
+    <div class="meta">
+      {{if $d.GTD.InboxCount}}
+        <a href="/gtd/inbox"><strong>Inbox {{$d.GTD.InboxCount}}</strong></a>
+      {{else}}
+        <a href="/gtd/inbox">Inbox 0</a>
+      {{end}}
+      · <a href="/gtd/next">Next</a>
+      · <a href="/gtd/review">Weekly Review</a>
+      {{range $d.GTD.Contexts}} · <a href="/gtd/next?context={{.Name}}">{{.Name}} {{.Count}}</a>{{end}}
+    </div>
+
+    <div class="cols" style="margin-top:14px">
+      <div>
+        <h2>今日</h2>
+        {{if $d.GTD.Today}}
+        <ul class="rows">
+          {{range $d.GTD.Today}}
+          <li><a href="/gtd/clarify/{{.ID}}">{{.Title}}</a>
+              {{if .DeadlineOn}}<span class="tag" style="color:var(--warn)">締切 {{.DeadlineOn}}</span>{{end}}
+              {{if .ContextName}}<span class="tag">{{.ContextName}}</span>{{end}}
+              <span class="when">{{.State}}</span></li>
+          {{end}}
+        </ul>
+        {{else}}<div class="empty">今日やるものはありません</div>{{end}}
+
+        {{if $d.GTD.WaitingOverdue}}
+        <h2 style="margin-top:24px">待ちが長いもの</h2>
+        <ul class="rows">
+          {{range $d.GTD.WaitingOverdue}}
+          <li><a href="/gtd/clarify/{{.ID}}">{{.Title}}</a>
+              <span class="tag">{{.WaitingFor}}</span>
+              <span class="when">{{.WaitingDays}} 日</span></li>
+          {{end}}
+        </ul>
+        {{end}}
+      </div>
+
+      <div>
+        <h2>停滞プロジェクト</h2>
+        {{if $d.GTD.StalledProjects}}
+        <ul class="rows">
+          {{range $d.GTD.StalledProjects}}
+          <li><a href="/gtd/project/{{.ID}}">{{.Title}}</a>
+              <span class="when">未処理 {{.OpenTasks}}</span></li>
+          {{end}}
+        </ul>
+        <div class="meta">Next Action が1つも無いアクティブなプロジェクト。</div>
+        {{else}}<div class="empty">ありません</div>{{end}}
+
+        {{if $d.GTD.SomedayDueReview}}
+        <h2 style="margin-top:24px">再検討の時期が来た Someday</h2>
+        <ul class="rows">
+          {{range $d.GTD.SomedayDueReview}}
+          <li><a href="/gtd/project/{{.ID}}">{{.Title}}</a>
+              <span class="when">{{.ReviewOn}}</span></li>
+          {{end}}
+        </ul>
+        {{end}}
+      </div>
+    </div>
   {{else}}
     <div class="empty">まだ何もありません</div>
   {{end}}
