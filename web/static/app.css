@@ -158,6 +158,23 @@ nav.main a {
 nav.main a:hover { color: var(--fg); background: var(--bg-hover); }
 nav.main a.on { color: var(--fg); background: var(--bg-sunken); font-weight: 500; }
 
+/* 狭い画面。項目を折り返させると「ガ/イ/ド」のように割れて header が2段になる。
+   折り返しは禁止し、代わりに検索欄を縮める。 */
+nav.main a { white-space: nowrap; }
+@media (max-width: 720px) {
+  header.top .inner { padding-left: var(--sp-4); padding-right: var(--sp-4); gap: var(--sp-2); }
+  nav.main { flex: 0 1 auto; gap: 0; }
+  .searchbox { flex: 1 1 auto; min-width: 0; }
+  .searchbox input[type=text] { width: 100%; }
+}
+/* これ以上は1段に収まらない。検索欄だけ2段目に送る(隠さない。`/` の
+   フォーカス先が無くなるとキーボード操作が成立しない) */
+@media (max-width: 560px) {
+  header.top .inner { flex-wrap: wrap; }
+  .searchbox { order: 3; flex-basis: 100%; }
+  .suggest { width: 100%; }
+}
+
 /* ---- アイコン ----
    base.html のスプライトを <use> で参照する。線は currentColor を継ぐので
    置いた場所の文字色になる。 */
@@ -318,6 +335,9 @@ ul.rows .when {
 }
 /* 種別は4つある。page だけ規則があって残りが素通しだったのを揃える */
 .badge.page, .badge.project, .badge.task, .badge.area { color: var(--fg-muted); }
+/* 行の先頭に置かれたバッジは幅を揃える。種別ごとに文字数が違うと
+   タイトルの頭が1行ずつずれて読みにくい */
+ul.rows li > .badge:first-child { min-width: 6em; text-align: center; }
 
 .count { font-family: var(--mono); color: var(--fg-faint); font-size: var(--fs-2); font-variant-numeric: tabular-nums; }
 
@@ -350,7 +370,12 @@ textarea.short { min-height: 220px; }
 /* ---- グリッド ---- */
 
 .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--sp-7); }
-.cols > * + * { padding-left: var(--sp-7); border-left: 1px solid var(--border); margin-left: calc(-1 * var(--sp-7)); }
+/* 仕切り線は隙間の**中央**に置く。padding と同じ値を margin で戻すと線が
+   左の列の右端に密着し、件数や入力欄が線に触れてしまう。 */
+.cols > * + * {
+  padding-left: var(--sp-7); border-left: 1px solid var(--border);
+  margin-left: calc(-1 * var(--sp-5));
+}
 @media (max-width: 720px) {
   .cols { grid-template-columns: 1fr; gap: var(--sp-5) 0; }
   .cols > * + * { padding-left: 0; border-left: none; margin-left: 0; padding-top: var(--sp-5);
@@ -405,6 +430,11 @@ section.panel .cols { margin-top: var(--sp-4); }
 .empty {
   color: var(--fg-faint); font-size: var(--fs-4); padding: var(--sp-3) 0;
 }
+/* 中身が空の節は詰める。Weekly Review は「1画面に判断材料を全部並べる」のが
+   規定(DESIGN 2.4)なので節は減らせない。空の節が場所を取るぶんだけ、
+   埋まっている節が視界から出ていってしまう。 */
+section.panel:has(> .empty:last-child) { margin-top: var(--sp-5); padding-top: var(--sp-4); }
+section.panel:has(> .empty:last-child) > h2 { margin-bottom: var(--sp-1); }
 
 /* ---- フォーム ---- */
 

@@ -9,7 +9,7 @@
 </form>
 
 <div class="cols">
-  <section class="panel">
+  <section class="panel card">
     <h2>{{t "gtd.lists"}}</h2>
     <ul class="rows">
       <li><a href="/gtd/inbox">{{t "gtd.inbox"}}</a><span class="when">{{$d.InboxCount}}</span></li>
@@ -23,7 +23,7 @@
     </ul>
   </section>
 
-  <section class="panel">
+  <section class="panel card">
     <h2>{{t "gtd.contexts"}}</h2>
     {{if $d.Contexts}}
     <ul class="rows">
@@ -41,7 +41,7 @@
 </div>
 
 {{if $d.Stalled}}
-<section class="panel">
+<section class="panel card">
   <h2>{{t "dash.stalled"}}{{template "help" "enghi#stalled"}}</h2>
   <div class="meta">{{t "dash.stalled_note"}}</div>
   <ul class="rows">

@@ -160,7 +160,7 @@ func (s *Server) viewTag(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	s.render(w, r, "tag.html", viewData{Title: s.tr(r, "tag.title", name), Nav: "wiki",
+	s.render(w, r, "tag.html", viewData{Title: s.tr(r, "tag.title", name), Nav: "tags",
 		Data: tagData{Tag: name, Pages: pages}})
 }
 
@@ -170,7 +170,7 @@ func (s *Server) viewTagList(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	s.render(w, r, "tags.html", viewData{Title: s.tr(r, "tag.list_title"), Nav: "wiki", Data: tags})
+	s.render(w, r, "tags.html", viewData{Title: s.tr(r, "tag.list_title"), Nav: "tags", Data: tags})
 }
 
 type searchData struct {
