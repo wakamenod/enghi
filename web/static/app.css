@@ -344,7 +344,9 @@ ul.rows li > .badge:first-child { min-width: 6em; text-align: center; }
 /* 行の中に置く POST フォーム(1行の操作ボタン) */
 .inline-form { display: inline; }
 
-/* Weekly Review のチェック。フォームの submit だが見た目はチェックボックス */
+/* 記号1文字だけのボタン(タスクの完了、Weekly Review のチェック)。
+   中身が文字1つなので、普通のボタンの余白では大きな四角になってしまう。
+   フォームの submit だが、見た目はチェックボックスに寄せる。 */
 button.check {
   width: 22px; height: 22px; padding: 0; flex: none;
   justify-content: center; border-radius: var(--r-sm);

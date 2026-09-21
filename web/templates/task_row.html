@@ -1,7 +1,7 @@
 {{define "task_row"}}
 <li data-task-id="{{.ID}}">
   <form method="post" action="/ui/tasks/{{.ID}}/complete" class="inline-form">
-    <button type="submit" title="{{t "gtd.complete"}}">✓</button>
+    <button type="submit" class="check" title="{{t "gtd.complete"}}">✓</button>
   </form>
   <a href="/gtd/clarify/{{.ID}}">{{.Title}}</a>
   {{if .Recurrence}}<span class="tag" title="{{t "gtd.recurring" .Recurrence}}">↻ {{.Recurrence}}</span>{{end}}
