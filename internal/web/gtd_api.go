@@ -171,7 +171,7 @@ func (s *Server) apiFileAsReference(w http.ResponseWriter, r *http.Request) {
 	}
 	task, page, err := s.gtd.FileAsReference(ctxOf(r), s.pages, id, in)
 	if err != nil {
-		if writeConflict(w, err) {
+		if s.writeConflict(w, r, err) {
 			return
 		}
 		s.gtdErr(w, err)
@@ -325,7 +325,7 @@ func (s *Server) apiCreateContext(w http.ResponseWriter, r *http.Request) {
 // ---------------------------------------------------------------- Review
 
 func (s *Server) apiReview(w http.ResponseWriter, r *http.Request) {
-	d, err := s.reviewData(ctxOf(r))
+	d, err := s.reviewData(ctxOf(r), s.langOf(r))
 	if err != nil {
 		s.gtdErr(w, err)
 		return

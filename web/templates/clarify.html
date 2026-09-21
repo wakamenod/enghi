@@ -2,65 +2,64 @@
 {{$d := .Data}}
 {{$t := $d.Task}}
 <h1>{{$t.Title}}</h1>
-<div class="meta">state: {{$t.State}} · 取り込み {{shortTime $t.CreatedAt}}</div>
+<div class="meta">state: {{$t.State}} · {{t "clarify.captured_at"}} {{shortTime $t.CreatedAt}}</div>
 
 <div class="cols">
   <section class="panel">
-    <h2>行動にする</h2>
-    <div class="meta">Next Actions に載せるのは「今すぐ物理的に実行できる単一行動」だけ。</div>
+    <h2>{{t "clarify.as_action"}}</h2>
+    <div class="meta">{{t "clarify.as_action_note"}}</div>
     <form method="post" action="/ui/tasks/{{$t.ID}}">
       <input type="hidden" name="return_to" value="/gtd/inbox">
-      <label for="title">行動(動詞で始める)</label>
+      <label for="title">{{t "clarify.action_label"}}</label>
       <input type="text" id="title" name="title" value="{{$t.Title}}">
-      <label for="note">メモ</label>
+      <label for="note">{{t "clarify.note"}}</label>
       <input type="text" id="note" name="note" value="{{$t.Note}}">
-      <label for="state">状態</label>
+      <label for="state">{{t "clarify.state"}}</label>
       <select id="state" name="state">
         {{range $s := (list "inbox" "next" "later" "waiting" "scheduled" "someday")}}
         <option value="{{$s}}" {{if eq $t.State $s}}selected{{end}}>{{$s}}</option>
         {{end}}
       </select>
-      <label for="project_id">プロジェクト</label>
+      <label for="project_id">{{t "clarify.project"}}</label>
       <select id="project_id" name="project_id">
         <option value="">—</option>
         {{range $d.Projects}}<option value="{{.ID}}" {{if eqID $.Data.Task.ProjectID .ID}}selected{{end}}>{{.Title}}</option>{{end}}
       </select>
-      <label for="context_id">コンテキスト</label>
+      <label for="context_id">{{t "clarify.context"}}</label>
       <select id="context_id" name="context_id">
         <option value="">—</option>
         {{range $d.Contexts}}<option value="{{.ID}}" {{if eqID $.Data.Task.ContextID .ID}}selected{{end}}>{{.Name}}</option>{{end}}
       </select>
-      <label for="area_id">Area(プロジェクト化しない単発行動)</label>
+      <label for="area_id">{{t "clarify.area"}}</label>
       <select id="area_id" name="area_id">
         <option value="">—</option>
         {{range $d.Areas}}<option value="{{.ID}}" {{if eqID $.Data.Task.AreaID .ID}}selected{{end}}>{{.Name}}</option>{{end}}
       </select>
-      <label for="scheduled_on">予定日 — state=scheduled のとき必須。この日まで通常リストに出ない</label>
+      <label for="scheduled_on">{{t "clarify.scheduled"}}</label>
       <input type="text" id="scheduled_on" name="scheduled_on" value="{{$t.ScheduledOn}}" placeholder="YYYY-MM-DD">
-      <label for="deadline_on">締切 — 本当の締切だけに使う</label>
+      <label for="deadline_on">{{t "clarify.deadline"}}</label>
       <input type="text" id="deadline_on" name="deadline_on" value="{{$t.DeadlineOn}}" placeholder="YYYY-MM-DD">
-      <label for="waiting_for">待っている相手 — state=waiting のとき</label>
+      <label for="waiting_for">{{t "clarify.waiting_for"}}</label>
       <input type="text" id="waiting_for" name="waiting_for" value="{{$t.WaitingFor}}">
-      <label for="recurrence">繰り返し — +1w(予定日基準) / .+2w(完了日基準) / ++1w(追いつく) / weekly:tue,fri / monthly:25 / monthly:last / yearly:04-01</label>
+      <label for="recurrence">{{t "clarify.recurrence"}}</label>
       <input type="text" id="recurrence" name="recurrence" value="{{$t.Recurrence}}">
-      <div class="actions"><button type="submit" class="primary">保存</button></div>
+      <div class="actions"><button type="submit" class="primary">{{t "common.save"}}</button></div>
     </form>
   </section>
 
   <section class="panel">
-    <h2>資料にする</h2>
+    <h2>{{t "clarify.as_reference"}}</h2>
     <div class="meta">
-      行動ではなく参照資料だった場合。Wiki ページを作り、この項目は <code>filed</code> になります。
-      完了でも破棄でもありません。
+      {{t "clarify.as_reference_note"}}
     </div>
     <form method="post" action="/ui/tasks/{{$t.ID}}/file">
-      <label for="ftitle">記事タイトル</label>
+      <label for="ftitle">{{t "clarify.page_title"}}</label>
       <input type="text" id="ftitle" name="title" value="{{$t.Title}}">
-      <label for="fbody">本文</label>
+      <label for="fbody">{{t "clarify.body"}}</label>
       <textarea id="fbody" name="body" style="min-height:220px">{{$t.Note}}</textarea>
-      <label for="ftags">タグ(カンマ区切り)</label>
+      <label for="ftags">{{t "clarify.tags"}}</label>
       <input type="text" id="ftags" name="tags">
-      <div class="actions"><button type="submit">記事にする</button></div>
+      <div class="actions"><button type="submit">{{t "clarify.make_page"}}</button></div>
     </form>
   </section>
 </div>
@@ -68,24 +67,24 @@
 <div class="actions">
   <form method="post" action="/ui/tasks/{{$t.ID}}/complete">
     <input type="hidden" name="return_to" value="/gtd/inbox">
-    <button type="submit">完了にする</button>
+    <button type="submit">{{t "clarify.mark_done"}}</button>
   </form>
   {{if $t.Recurrence}}
   <form method="post" action="/ui/tasks/{{$t.ID}}/skip">
     <input type="hidden" name="return_to" value="/gtd/inbox">
-    <button type="submit">今回は飛ばす</button>
+    <button type="submit">{{t "clarify.skip"}}</button>
   </form>
   <form method="post" action="/ui/tasks/{{$t.ID}}/end-series"
-        onsubmit="return confirm('この系列全体を終わらせます。次のインスタンスは生成されなくなります。')">
+        onsubmit="return confirm('{{t "clarify.end_series_confirm"}}')">
     <input type="hidden" name="return_to" value="/gtd/inbox">
-    <button type="submit">系列全体を終わらせる</button>
+    <button type="submit">{{t "clarify.end_series"}}</button>
   </form>
   {{end}}
   <span class="spacer"></span>
   <form method="post" action="/ui/tasks/{{$t.ID}}/delete"
-        onsubmit="return confirm('この項目を削除します。よろしいですか?')">
+        onsubmit="return confirm('{{t "clarify.delete_confirm"}}')">
     <input type="hidden" name="return_to" value="/gtd/inbox">
-    <button type="submit" class="danger">削除</button>
+    <button type="submit" class="danger">{{t "common.delete"}}</button>
   </form>
 </div>
 {{template "foot" .}}

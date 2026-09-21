@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/wakamenod/enghi/internal/gtd"
+	"github.com/wakamenod/enghi/internal/i18n"
 )
 
 // ReviewData は Weekly Review 画面に出すすべて。
@@ -42,16 +43,20 @@ type ChecklistItem struct {
 	Checked bool   `json:"checked"`
 }
 
-func (s *Server) reviewData(ctx context.Context) (*ReviewData, error) {
+func (s *Server) reviewData(ctx context.Context, lang i18n.Lang) (*ReviewData, error) {
 	d := &ReviewData{}
 	var err error
 
 	if d.Review, err = s.gtd.CurrentReview(ctx); err != nil {
 		return nil, err
 	}
+	// 文言は i18n から引く。**gtd 側に日本語を持たせない。**
 	for _, c := range gtd.ChecklistKeys {
 		d.Checklist = append(d.Checklist, ChecklistItem{
-			Key: c.Key, Label: c.Label, Data: c.Data, Checked: d.Review.Checklist[c.Key],
+			Key:     c.Key,
+			Label:   i18n.T(lang, "checklist."+c.Key),
+			Data:    i18n.T(lang, "checklist.data."+c.Key),
+			Checked: d.Review.Checklist[c.Key],
 		})
 	}
 

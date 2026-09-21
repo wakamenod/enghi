@@ -1,8 +1,8 @@
 {{template "head" .}}
-<h1>ページがありません</h1>
-<p class="prose"><code>{{.Data}}</code> という記事はまだありません。</p>
+<h1>{{t "page.not_found_title"}}</h1>
+<p class="prose">{{t "page.not_found_body" .Data}}</p>
 <div class="actions">
-  <a class="btn" href="/wiki/new?title={{.Data}}">この名前で作る</a>
-  <a class="btn" href="/wiki">記事一覧へ</a>
+  <a class="btn" href="/wiki/new?title={{.Data}}">{{t "page.create_with_name"}}</a>
+  <a class="btn" href="/wiki">{{t "page.to_list"}}</a>
 </div>
 {{template "foot" .}}

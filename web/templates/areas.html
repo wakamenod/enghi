@@ -1,7 +1,7 @@
 {{template "head" .}}
 {{$d := .Data}}
-<h1>Areas of Responsibility</h1>
-<div class="meta">維持し続ける責任範囲。完了しない。</div>
+<h1>{{t "area.title"}}</h1>
+<div class="meta">{{t "area.note"}}</div>
 
 {{if $d.Areas}}
 <ul class="rows">
@@ -10,17 +10,17 @@
       {{if .Description}}<span class="meta">{{.Description}}</span>{{end}}</li>
   {{end}}
 </ul>
-{{else}}<div class="empty">まだありません</div>{{end}}
+{{else}}<div class="empty">{{t "area.none"}}</div>{{end}}
 
 <section class="panel">
-  <h2>追加</h2>
+  <h2>{{t "common.add"}}</h2>
   <form method="post" action="/ui/areas">
     <input type="hidden" name="return_to" value="/gtd/areas">
-    <label for="name">名前</label>
-    <input type="text" id="name" name="name" placeholder="経理 / 健康 / チームの採用" required>
-    <label for="description">説明</label>
+    <label for="name">{{t "area.name"}}</label>
+    <input type="text" id="name" name="name" placeholder="{{t "area.name_example"}}" required>
+    <label for="description">{{t "area.description"}}</label>
     <input type="text" id="description" name="description">
-    <div class="actions"><button type="submit" class="primary">作る</button></div>
+    <div class="actions"><button type="submit" class="primary">{{t "common.create"}}</button></div>
   </form>
 </section>
 {{template "foot" .}}

@@ -309,3 +309,15 @@ button.danger { color: var(--warn); }
 .theme-toggle::after { content: "◐"; }              /* OS の設定に従う */
 :root[data-theme="light"] .theme-toggle::after { content: "☀"; }
 :root[data-theme="dark"]  .theme-toggle::after { content: "☾"; }
+
+
+/* ---- 言語の切り替え ---- */
+
+.lang-switch { flex: none; display: flex; gap: 6px; }
+.lang-switch a {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em;
+  color: var(--fg-muted); text-decoration: none;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 4px 7px; line-height: 1;
+}
+.lang-switch a:hover { color: var(--fg); border-color: var(--border-strong); }

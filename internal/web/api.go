@@ -53,7 +53,7 @@ func (s *Server) apiCreatePage(w http.ResponseWriter, r *http.Request) {
 	}
 	p, err := s.pages.Create(ctxOf(r), in)
 	if err != nil {
-		if writeConflict(w, err) {
+		if s.writeConflict(w, r, err) {
 			return
 		}
 		writeErr(w, http.StatusBadRequest, "create_failed", err.Error())
@@ -101,12 +101,12 @@ func (s *Server) apiUpdatePage(w http.ResponseWriter, r *http.Request) {
 	}
 	if in.Version <= 0 {
 		// 楽観ロックは必須。version 無しの書き戻しを許すと Emacs 側の競合検出が意味を失う。
-		writeErr(w, http.StatusBadRequest, "version_required", "version は必須です")
+		writeErr(w, http.StatusBadRequest, "version_required", s.tr(r, "err.version_required"))
 		return
 	}
 	p, err := s.pages.Update(ctxOf(r), r.PathValue("slug"), in)
 	if err != nil {
-		if writeConflict(w, err) {
+		if s.writeConflict(w, r, err) {
 			return
 		}
 		s.apiNotFound(w, err)
@@ -224,7 +224,7 @@ func (s *Server) apiBackups(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) apiNotFound(w http.ResponseWriter, err error) {
 	if errors.Is(err, wiki.ErrNotFound) {
-		writeErr(w, http.StatusNotFound, "not_found", "ページが見つかりません")
+		writeErr(w, http.StatusNotFound, "not_found", "page not found")
 		return
 	}
 	writeErr(w, http.StatusInternalServerError, "query_failed", err.Error())

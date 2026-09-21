@@ -3,7 +3,7 @@
 <h1>{{$d.Page.Title}}</h1>
 <div class="meta">
   <a href="/wiki/{{$d.Page.Slug}}/history">v{{$d.Page.Version}}</a> ·
-  更新 {{shortTime $d.Page.UpdatedAt}} · 作成 {{shortTime $d.Page.CreatedAt}}
+  {{t "page.updated"}} {{shortTime $d.Page.UpdatedAt}} · {{t "page.created"}} {{shortTime $d.Page.CreatedAt}}
   {{range $d.Page.Tags}} <a class="tag" href="/tags/{{.}}">{{.}}</a>{{end}}
 </div>
 
@@ -11,7 +11,7 @@
 
 {{if $d.Aliases}}
 <section class="panel">
-  <h2>別名</h2>
+  <h2>{{t "page.aliases"}}</h2>
   <div class="meta">{{range $d.Aliases}}<span class="tag">{{.Title}}</span> {{end}}</div>
 </section>
 {{end}}
@@ -19,7 +19,7 @@
 <div class="cols">
 {{if $d.Backlinks}}
 <section class="panel">
-  <h2>このページへのリンク</h2>
+  <h2>{{t "page.backlinks"}}</h2>
   <ul class="rows">
   {{range $d.Backlinks}}
     <li><span class="badge {{.Kind}}">{{kindLabel .Kind}}</span>
@@ -32,12 +32,12 @@
 
 {{if $d.Links}}
 <section class="panel">
-  <h2>このページから出るリンク</h2>
+  <h2>{{t "page.outlinks"}}</h2>
   <ul class="rows">
   {{range $d.Links}}
     <li>{{if .Resolved}}<a href="/wiki/{{.Slug}}">{{.Title}}</a>
         {{else}}<a class="wikilink-new" href="/wiki/new?title={{.Title}}">{{.Title}}</a>
-        <span class="meta">未作成</span>{{end}}</li>
+        <span class="meta">{{t "page.not_created"}}</span>{{end}}</li>
   {{end}}
   </ul>
 </section>
@@ -45,12 +45,12 @@
 </div>
 
 <div class="actions">
-  <a class="btn" href="/wiki/{{$d.Page.Slug}}/edit" data-key="edit">編集 <span class="kbd">e</span></a>
-  <a class="btn" href="/wiki/{{$d.Page.Slug}}/history">履歴</a>
+  <a class="btn" href="/wiki/{{$d.Page.Slug}}/edit" data-key="edit">{{t "common.edit"}} <span class="kbd">e</span></a>
+  <a class="btn" href="/wiki/{{$d.Page.Slug}}/history">{{t "page.history"}}</a>
   <span class="spacer"></span>
   <form method="post" action="/ui/pages/{{$d.Page.Slug}}/delete"
-        onsubmit="return confirm('このページを削除します。参照しているリンクは未解決リンクとして残ります。よろしいですか?')">
-    <button type="submit" class="danger">削除</button>
+        onsubmit="return confirm('{{t "page.delete_confirm"}}')">
+    <button type="submit" class="danger">{{t "common.delete"}}</button>
   </form>
 </div>
 {{template "foot" .}}

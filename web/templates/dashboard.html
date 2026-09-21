@@ -1,11 +1,11 @@
 {{template "head" .}}
 {{$d := .Data}}
 
-<h1>ダッシュボード</h1>
+<h1>{{t "dash.title"}}</h1>
 
 {{/* 上段 — GTD。使っていなければ自然に空になる。登録を強く促す UI にはしない(DESIGN 5) */}}
 <section class="panel">
-  <h2>GTD</h2>
+  <h2>{{t "dash.gtd"}}</h2>
   {{if $d.GTD.Enabled}}
     <div class="meta">
       {{if $d.GTD.InboxCount}}
@@ -21,27 +21,27 @@
     <div class="cols" style="margin-top:18px">
       <div>
         <div class="col-block">
-          <div class="subhead">今日</div>
+          <div class="subhead">{{t "dash.today"}}</div>
           {{if $d.GTD.Today}}
           <ul class="rows">
             {{range $d.GTD.Today}}
             <li><a href="/gtd/clarify/{{.ID}}">{{.Title}}</a>
-                {{if .DeadlineOn}}<span class="tag" style="color:var(--warn)">締切 {{.DeadlineOn}}</span>{{end}}
+                {{if .DeadlineOn}}<span class="tag" style="color:var(--warn)">{{t "gtd.deadline" .DeadlineOn}}</span>{{end}}
                 {{if .ContextName}}<span class="tag">{{.ContextName}}</span>{{end}}
                 <span class="when">{{.State}}</span></li>
             {{end}}
           </ul>
-          {{else}}<div class="empty">今日やるものはありません</div>{{end}}
+          {{else}}<div class="empty">{{t "dash.today_empty"}}</div>{{end}}
         </div>
 
         {{if $d.GTD.WaitingOverdue}}
         <div class="col-block">
-          <div class="subhead">待ちが長いもの</div>
+          <div class="subhead">{{t "dash.waiting_long"}}</div>
           <ul class="rows">
             {{range $d.GTD.WaitingOverdue}}
             <li><a href="/gtd/clarify/{{.ID}}">{{.Title}}</a>
                 <span class="tag">{{.WaitingFor}}</span>
-                <span class="when">{{.WaitingDays}} 日</span></li>
+                <span class="when">{{t "gtd.days" .WaitingDays}}</span></li>
             {{end}}
           </ul>
         </div>
@@ -50,21 +50,21 @@
 
       <div>
         <div class="col-block">
-          <div class="subhead">停滞プロジェクト</div>
+          <div class="subhead">{{t "dash.stalled"}}</div>
           {{if $d.GTD.StalledProjects}}
           <ul class="rows">
             {{range $d.GTD.StalledProjects}}
             <li><a href="/gtd/project/{{.ID}}">{{.Title}}</a>
-                <span class="when">未処理 {{.OpenTasks}}</span></li>
+                <span class="when">{{t "gtd.unprocessed" .OpenTasks}}</span></li>
             {{end}}
           </ul>
-          <div class="meta">Next Action が1つも無いアクティブなプロジェクト。</div>
-          {{else}}<div class="empty">ありません</div>{{end}}
+          <div class="meta">{{t "dash.stalled_note"}}</div>
+          {{else}}<div class="empty">{{t "common.empty"}}</div>{{end}}
         </div>
 
         {{if $d.GTD.SomedayDueReview}}
         <div class="col-block">
-          <div class="subhead">再検討の時期が来た Someday</div>
+          <div class="subhead">{{t "dash.someday_due"}}</div>
           <ul class="rows">
             {{range $d.GTD.SomedayDueReview}}
             <li><a href="/gtd/project/{{.ID}}">{{.Title}}</a>
@@ -76,17 +76,17 @@
       </div>
     </div>
   {{else}}
-    <div class="empty">まだ何もありません</div>
+    <div class="empty">{{t "dash.gtd_empty"}}</div>
   {{end}}
 </section>
 
 {{/* 下段 — Wiki */}}
 <section class="panel">
-  <h2>記事</h2>
+  <h2>{{t "dash.articles"}}</h2>
   <div class="cols">
     <div>
       <div class="col-block">
-        <div class="subhead">最近更新したもの</div>
+        <div class="subhead">{{t "dash.recent_updated"}}</div>
         {{if $d.Wiki.RecentUpdate}}
           <ul class="rows">
           {{range $d.Wiki.RecentUpdate}}
@@ -98,14 +98,14 @@
           {{end}}
           </ul>
         {{else}}
-          <div class="empty">まだ記事がありません。<a href="/wiki/new">最初の1件を書く</a></div>
+          <div class="empty">{{t "dash.no_articles"}} <a href="/wiki/new">{{t "dash.write_first"}}</a></div>
         {{end}}
       </div>
     </div>
 
     <div>
       <div class="col-block">
-        <div class="subhead">最近作ったもの</div>
+        <div class="subhead">{{t "dash.recent_created"}}</div>
         {{if $d.Wiki.RecentCreate}}
           <ul class="rows">
           {{range $d.Wiki.RecentCreate}}
@@ -113,31 +113,31 @@
                 <span class="when">{{shortTime .CreatedAt}}</span></li>
           {{end}}
           </ul>
-        {{else}}<div class="empty">—</div>{{end}}
+        {{else}}<div class="empty">{{t "common.none"}}</div>{{end}}
       </div>
 
       <div class="col-block">
-        <div class="subhead">未解決リンク</div>
+        <div class="subhead">{{t "dash.unresolved"}}</div>
         {{if $d.Wiki.Unresolved}}
           <ul class="rows">
           {{range $d.Wiki.Unresolved}}
             <li><a href="/wiki/new?title={{.Title}}">{{.Title}}</a>
-                <span class="when">{{.Count}}件から参照</span></li>
+                <span class="when">{{t "dash.referenced_by" .Count}}</span></li>
           {{end}}
           </ul>
-          <div class="meta">参照されているが、まだ書かれていない記事。</div>
-        {{else}}<div class="empty">—</div>{{end}}
+          <div class="meta">{{t "dash.unresolved_note"}}</div>
+        {{else}}<div class="empty">{{t "common.none"}}</div>{{end}}
       </div>
     </div>
   </div>
 </section>
 
 <section class="panel">
-  <h2>全体</h2>
-  <div class="meta">記事 {{$d.Wiki.TotalPages}} 件 / タグ {{len $d.Wiki.Tags}} 種</div>
+  <h2>{{t "dash.overall"}}</h2>
+  <div class="meta">{{t "dash.summary" $d.Wiki.TotalPages (len $d.Wiki.Tags)}}</div>
   <div class="actions">
-    <a class="btn" href="/wiki/new">新しい記事</a>
-    <form method="post" action="/ui/export"><button type="submit">Markdown にエクスポート</button></form>
+    <a class="btn" href="/wiki/new">{{t "dash.new_article"}}</a>
+    <form method="post" action="/ui/export"><button type="submit">{{t "dash.export"}}</button></form>
   </div>
 </section>
 

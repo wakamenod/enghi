@@ -15,6 +15,7 @@ import (
 	"github.com/wakamenod/enghi/internal/config"
 	filestore "github.com/wakamenod/enghi/internal/files"
 	"github.com/wakamenod/enghi/internal/gtd"
+	"github.com/wakamenod/enghi/internal/i18n"
 	"github.com/wakamenod/enghi/internal/search"
 	"github.com/wakamenod/enghi/internal/store"
 	"github.com/wakamenod/enghi/internal/wiki"
@@ -29,16 +30,22 @@ type Server struct {
 	files  *filestore.Store
 	search *search.Service
 	hub    *Hub
-	tmpl   *template.Template
-	mux    *http.ServeMux
+	// tmpl は言語ごとに1組。**テンプレートの関数は解析時に束縛されるので、
+	// リクエストごとに差し替えられない。**言語の数だけ作っておく。
+	tmpl map[i18n.Lang]*template.Template
+	mux  *http.ServeMux
 }
 
 // New はサーバを組み立てる。
 // files は画像などの保管庫(本体 DB とは別ファイル)。
 func New(cfg config.Config, db *store.DB, files *filestore.Store) (*Server, error) {
-	tmpl, err := parseTemplates()
-	if err != nil {
-		return nil, err
+	tmpl := map[i18n.Lang]*template.Template{}
+	for _, lang := range i18n.All {
+		t, err := parseTemplates(lang)
+		if err != nil {
+			return nil, err
+		}
+		tmpl[lang] = t
 	}
 	s := &Server{
 		cfg:    cfg,
@@ -55,16 +62,21 @@ func New(cfg config.Config, db *store.DB, files *filestore.Store) (*Server, erro
 	return s, nil
 }
 
-func parseTemplates() (*template.Template, error) {
+func parseTemplates(lang i18n.Lang) (*template.Template, error) {
 	funcs := template.FuncMap{
 		"shortTime": shortTime,
 		"join":      strings.Join,
 		"add":       func(a, b int) int { return a + b },
-		"kindLabel": kindLabel,
 		"snippet":   search.SnippetHTML,
 		"list":      func(vals ...string) []string { return vals },
 		// eqID は *int64 と int64 を比べる。テンプレートの eq は型が違うと実行時エラーになる。
 		"eqID": func(p *int64, id int64) bool { return p != nil && *p == id },
+		// t は文言を引く。解析時に言語が決まる。
+		"t":         func(key string, args ...any) string { return i18n.T(lang, key, args...) },
+		"kindLabel": func(kind string) string { return i18n.T(lang, "kind."+kind) },
+		"lang":      func() string { return string(lang) },
+		"langs":     func() []i18n.Lang { return i18n.All },
+		"langName":  func(l i18n.Lang) string { return i18n.Name[l] },
 	}
 	return template.New("").Funcs(funcs).ParseFS(enghi.TemplatesFS, "web/templates/*.html")
 }
@@ -123,6 +135,7 @@ func (s *Server) routes() {
 	m.HandleFunc("POST /ui/contexts", s.uiCreateContext)
 	m.HandleFunc("POST /ui/review/{id}/check", s.uiReviewCheck)
 	m.HandleFunc("POST /ui/review/{id}/complete", s.uiReviewComplete)
+	m.HandleFunc("GET /ui/lang", s.handleSetLang)
 	m.HandleFunc("GET /ui/search", s.uiSearchFragment) // 打鍵ごとのインクリメンタル検索
 	m.HandleFunc("POST /ui/preview", s.uiPreview)      // 編集画面のプレビュー
 
@@ -195,19 +208,19 @@ func writeErr(w http.ResponseWriter, code int, errCode, msg string) {
 // **error は機械可読なコードで2種を区別すること**(DESIGN 4.2):
 //   - version_conflict … 楽観ロックの版不一致。差分を提示してマージさせる。入力は捨てない
 //   - title_conflict   … タイトル衝突。別のタイトルを入力させる。本文は保持したまま
-func writeConflict(w http.ResponseWriter, err error) bool {
+func (s *Server) writeConflict(w http.ResponseWriter, r *http.Request, err error) bool {
 	switch e := err.(type) {
 	case *wiki.VersionConflictError:
 		writeJSON(w, http.StatusConflict, map[string]any{
 			"error":   "version_conflict",
-			"message": "このページは他の経路で更新されています。現行データと突き合わせてください",
+			"message": s.tr(r, "err.version_conflict"),
 			"current": e.Current,
 		})
 		return true
 	case *wiki.TitleConflictError:
 		writeJSON(w, http.StatusConflict, map[string]any{
 			"error":   "title_conflict",
-			"message": "同名(大小を区別しない)のページが既に存在します",
+			"message": s.tr(r, "err.title_conflict"),
 			// 衝突相手を必ず返す。無いと利用者は該当ページへ行けない(DESIGN 4.2)。
 			"conflicting_page": map[string]any{
 				"id": e.Conflicting.ID, "slug": e.Conflicting.Slug, "title": e.Conflicting.Title,
@@ -218,18 +231,77 @@ func writeConflict(w http.ResponseWriter, err error) bool {
 	return false
 }
 
-func (s *Server) render(w http.ResponseWriter, name string, data any) {
+// langOf はこのリクエストで使う言語。
+func (s *Server) langOf(r *http.Request) i18n.Lang { return i18n.FromRequest(r) }
+
+// tr はハンドラから文言を引く。
+func (s *Server) tr(r *http.Request, key string, args ...any) string {
+	return i18n.T(s.langOf(r), key, args...)
+}
+
+func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, data any) {
+	// 言語と現在地は全画面で要るので、ここでまとめて埋める。
+	// 各ハンドラに書かせると必ずどこかで漏れる。
+	if vd, ok := data.(viewData); ok {
+		lang := s.langOf(r)
+		vd.LangCode = string(lang)
+		vd.Path = r.URL.RequestURI()
+		vd.Strings = template.JS(jsStrings(lang))
+		data = vd
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := s.tmpl.ExecuteTemplate(w, name, data); err != nil {
+	if err := s.tmpl[s.langOf(r)].ExecuteTemplate(w, name, data); err != nil {
 		http.Error(w, "template: "+err.Error(), http.StatusInternalServerError)
 	}
 }
 
-func (s *Server) renderFragment(w http.ResponseWriter, name string, data any) {
+func (s *Server) renderFragment(w http.ResponseWriter, r *http.Request, name string, data any) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := s.tmpl.ExecuteTemplate(w, name, data); err != nil {
+	if err := s.tmpl[s.langOf(r)].ExecuteTemplate(w, name, data); err != nil {
 		http.Error(w, "template: "+err.Error(), http.StatusInternalServerError)
 	}
+}
+
+// jsStrings は JS 側で使う文言を JSON にする。
+// **JS の中に文言を直書きしない。**片方だけ翻訳が漏れる。
+func jsStrings(lang i18n.Lang) string {
+	keys := []string{
+		"theme.auto", "theme.light", "theme.dark", "theme.toggle", "gtd.capture_short",
+		"capture.title", "capture.hint", "capture.added", "capture.failed",
+		"capture.uploading", "capture.upload_failed",
+	}
+	m := make(map[string]string, len(keys))
+	for _, k := range keys {
+		m[k] = i18n.T(lang, k)
+	}
+	b, err := json.Marshal(m)
+	if err != nil {
+		return "{}"
+	}
+	return string(b)
+}
+
+// handleSetLang は言語の選択を cookie に覚えさせる。
+// **サーバ側で描画するので、選択はブラウザではなくリクエストと一緒に来る必要がある。**
+func (s *Server) handleSetLang(w http.ResponseWriter, r *http.Request) {
+	l := r.URL.Query().Get("set")
+	if !i18n.Valid(l) {
+		http.Error(w, "unknown language", http.StatusBadRequest)
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     i18n.CookieName,
+		Value:    l,
+		Path:     "/",
+		MaxAge:   400 * 24 * 60 * 60,
+		HttpOnly: false,
+		SameSite: http.SameSiteLaxMode,
+	})
+	dest := r.URL.Query().Get("return_to")
+	if dest == "" || !strings.HasPrefix(dest, "/") {
+		dest = "/"
+	}
+	http.Redirect(w, r, dest, http.StatusSeeOther)
 }
 
 func shortTime(s string) string {
@@ -242,20 +314,6 @@ func shortTime(s string) string {
 		return t.Format("01/02 15:04")
 	}
 	return t.Format("2006/01/02")
-}
-
-func kindLabel(kind string) string {
-	switch kind {
-	case "page":
-		return "記事"
-	case "project":
-		return "Project"
-	case "task":
-		return "Task"
-	case "area":
-		return "Area"
-	}
-	return kind
 }
 
 func atoiDefault(s string, def int) int {

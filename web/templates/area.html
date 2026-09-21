@@ -5,7 +5,7 @@
 {{if $a.Description}}<div class="meta">{{$a.Description}}</div>{{end}}
 
 <section class="panel">
-  <h2>プロジェクト</h2>
+  <h2>{{t "gtd.projects"}}</h2>
   {{if $d.Projects}}
   <ul class="rows">
     {{range $d.Projects}}
@@ -14,36 +14,36 @@
         <span class="when">{{.NextCount}} / {{.OpenTasks}}</span></li>
     {{end}}
   </ul>
-  {{else}}<div class="empty">—</div>{{end}}
+  {{else}}<div class="empty">{{t "common.none"}}</div>{{end}}
 </section>
 
 <section class="panel">
-  <h2>この Area に直接紐づく行動</h2>
-  <div class="meta">プロジェクト化するほどでない単発行動。</div>
+  <h2>{{t "area.direct_tasks"}}</h2>
+  <div class="meta">{{t "area.direct_note"}}</div>
   {{if $d.Tasks}}
   <ul class="rows">{{range $d.Tasks}}{{template "task_row" .}}{{end}}</ul>
-  {{else}}<div class="empty">—</div>{{end}}
+  {{else}}<div class="empty">{{t "common.none"}}</div>{{end}}
 </section>
 
 {{if $d.NoteHTML}}
 <section class="panel">
-  <h2>メモ</h2>
+  <h2>{{t "area.memo"}}</h2>
   <div class="meta"><a href="/wiki/{{$a.NotePageSlug}}">{{$a.NotePageSlug}}</a></div>
   <article class="prose">{{$d.NoteHTML}}</article>
 </section>
 {{end}}
 
 <section class="panel">
-  <h2>設定</h2>
+  <h2>{{t "project.settings"}}</h2>
   <form method="post" action="/ui/areas/{{$a.ID}}">
     <input type="hidden" name="return_to" value="/gtd/area/{{$a.ID}}">
-    <label for="name">名前</label>
+    <label for="name">{{t "area.name"}}</label>
     <input type="text" id="name" name="name" value="{{$a.Name}}">
-    <label for="description">説明</label>
+    <label for="description">{{t "area.description"}}</label>
     <input type="text" id="description" name="description" value="{{$a.Description}}">
-    <label for="note_page">メモにする記事タイトル</label>
+    <label for="note_page">{{t "area.memo_label"}}</label>
     <input type="text" id="note_page" name="note_page" value="{{$a.NotePageSlug}}">
-    <div class="actions"><button type="submit" class="primary">保存</button></div>
+    <div class="actions"><button type="submit" class="primary">{{t "common.save"}}</button></div>
   </form>
 </section>
 {{template "foot" .}}

@@ -1,54 +1,54 @@
 {{template "head" .}}
 {{$d := .Data}}
-<h1>GTD</h1>
+<h1>{{t "gtd.title"}}</h1>
 
 <form method="post" action="/ui/tasks" class="actions">
   <input type="hidden" name="return_to" value="/gtd">
-  <input type="text" name="title" placeholder="頭の中を空にする — 1行で投げ込む" required>
-  <button type="submit" class="primary">Inbox へ</button>
+  <input type="text" name="title" placeholder="{{t "gtd.capture"}}" required>
+  <button type="submit" class="primary">{{t "gtd.to_inbox"}}</button>
 </form>
 
 <div class="cols">
   <section class="panel">
-    <h2>リスト</h2>
+    <h2>{{t "gtd.lists"}}</h2>
     <ul class="rows">
-      <li><a href="/gtd/inbox">Inbox</a><span class="when">{{$d.InboxCount}}</span></li>
-      <li><a href="/gtd/next">Next Actions</a><span class="when">{{$d.NextCount}}</span></li>
-      <li><a href="/gtd/waiting">Waiting For</a><span class="when">{{$d.WaitingCnt}}</span></li>
-      <li><a href="/gtd/scheduled">日付付き</a><span class="when">{{$d.SchedCount}}</span></li>
-      <li><a href="/gtd/someday">Someday / Maybe</a><span class="when">{{$d.SomedayCnt}}</span></li>
-      <li><a href="/gtd/projects">プロジェクト</a><span class="when">{{len $d.Projects}}</span></li>
-      <li><a href="/gtd/areas">Areas</a><span class="when">{{len $d.Areas}}</span></li>
-      <li><a href="/gtd/review">Weekly Review</a></li>
+      <li><a href="/gtd/inbox">{{t "gtd.inbox"}}</a><span class="when">{{$d.InboxCount}}</span></li>
+      <li><a href="/gtd/next">{{t "gtd.next"}}</a><span class="when">{{$d.NextCount}}</span></li>
+      <li><a href="/gtd/waiting">{{t "gtd.waiting"}}</a><span class="when">{{$d.WaitingCnt}}</span></li>
+      <li><a href="/gtd/scheduled">{{t "gtd.scheduled"}}</a><span class="when">{{$d.SchedCount}}</span></li>
+      <li><a href="/gtd/someday">{{t "gtd.someday"}}</a><span class="when">{{$d.SomedayCnt}}</span></li>
+      <li><a href="/gtd/projects">{{t "gtd.projects"}}</a><span class="when">{{len $d.Projects}}</span></li>
+      <li><a href="/gtd/areas">{{t "gtd.areas"}}</a><span class="when">{{len $d.Areas}}</span></li>
+      <li><a href="/gtd/review">{{t "gtd.review"}}</a></li>
     </ul>
   </section>
 
   <section class="panel">
-    <h2>コンテキスト</h2>
+    <h2>{{t "gtd.contexts"}}</h2>
     {{if $d.Contexts}}
     <ul class="rows">
       {{range $d.Contexts}}
       <li><a href="/gtd/next?context={{.Name}}">{{.Name}}</a><span class="when">{{.Count}}</span></li>
       {{end}}
     </ul>
-    {{else}}<div class="empty">まだありません</div>{{end}}
+    {{else}}<div class="empty">{{t "area.none"}}</div>{{end}}
     <form method="post" action="/ui/contexts" class="actions">
       <input type="hidden" name="return_to" value="/gtd">
-      <input type="text" name="name" placeholder="@電話 など">
-      <button type="submit">追加</button>
+      <input type="text" name="name" placeholder="{{t "gtd.context_placeholder"}}">
+      <button type="submit">{{t "common.add"}}</button>
     </form>
   </section>
 </div>
 
 {{if $d.Stalled}}
 <section class="panel">
-  <h2>停滞プロジェクト</h2>
-  <div class="meta">Next Action が1つも無いアクティブなプロジェクト。次の一手を決める。</div>
+  <h2>{{t "dash.stalled"}}</h2>
+  <div class="meta">{{t "dash.stalled_note"}}</div>
   <ul class="rows">
     {{range $d.Stalled}}
     <li><a href="/gtd/project/{{.ID}}">{{.Title}}</a>
         {{if .AreaName}}<span class="tag">{{.AreaName}}</span>{{end}}
-        <span class="when">未処理 {{.OpenTasks}}</span></li>
+        <span class="when">{{t "gtd.unprocessed" .OpenTasks}}</span></li>
     {{end}}
   </ul>
 </section>

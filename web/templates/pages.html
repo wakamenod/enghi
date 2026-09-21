@@ -1,12 +1,12 @@
 {{template "head" .}}
 {{$d := .Data}}
-<h1>記事一覧 <span class="count">{{$d.Total}}</span></h1>
+<h1>{{t "page.list_title"}} <span class="count">{{$d.Total}}</span></h1>
 <div class="meta">
-  並び:
-  <a href="/wiki?sort=updated">更新順</a> ·
-  <a href="/wiki?sort=created">作成順</a> ·
-  <a href="/wiki?sort=title">タイトル順</a>
-  · <span class="kbd">j</span><span class="kbd">k</span> で移動 <span class="kbd">Enter</span> で開く
+  {{t "page.sort"}}
+  <a href="/wiki?sort=updated">{{t "page.sort_updated"}}</a> ·
+  <a href="/wiki?sort=created">{{t "page.sort_created"}}</a> ·
+  <a href="/wiki?sort=title">{{t "page.sort_title"}}</a>
+  · {{t "page.keyhint" "j" "k" "Enter"}}
 </div>
 
 {{if $d.Pages}}
@@ -20,8 +20,8 @@
 {{end}}
 </ul>
 {{else}}
-<div class="empty">まだ記事がありません。<a href="/wiki/new">最初の1件を書く</a></div>
+<div class="empty">{{t "page.none"}} <a href="/wiki/new">{{t "dash.write_first"}}</a></div>
 {{end}}
 
-<div class="actions"><a class="btn" href="/wiki/new">新しい記事</a></div>
+<div class="actions"><a class="btn" href="/wiki/new">{{t "dash.new_article"}}</a></div>
 {{template "foot" .}}

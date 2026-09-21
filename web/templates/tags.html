@@ -1,10 +1,10 @@
 {{template "head" .}}
-<h1>タグ一覧</h1>
+<h1>{{t "tag.list_title"}}</h1>
 {{if .Data}}
 <ul class="rows">
 {{range .Data}}
   <li><a href="/tags/{{.Name}}">{{.Name}}</a><span class="when">{{.Count}}</span></li>
 {{end}}
 </ul>
-{{else}}<div class="empty">まだタグがありません</div>{{end}}
+{{else}}<div class="empty">{{t "tag.none"}}</div>{{end}}
 {{template "foot" .}}

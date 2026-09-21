@@ -5,7 +5,7 @@
 
 {{if $d.Contexts}}
 <div class="meta" style="margin-top:8px">
-  <a href="/gtd/next">すべて</a>
+  <a href="/gtd/next">{{t "gtd.all"}}</a>
   {{range $d.Contexts}} · <a href="/gtd/next?context={{.Name}}">{{.Name}} ({{.Count}})</a>{{end}}
 </div>
 {{end}}
@@ -13,8 +13,8 @@
 {{if eq $d.Kind "inbox"}}
 <form method="post" action="/ui/tasks" class="actions">
   <input type="hidden" name="return_to" value="/gtd/inbox">
-  <input type="text" name="title" placeholder="1行で投げ込む" required>
-  <button type="submit" class="primary">追加</button>
+  <input type="text" name="title" placeholder="{{t "gtd.capture_short"}}" required>
+  <button type="submit" class="primary">{{t "common.add"}}</button>
 </form>
 {{end}}
 
@@ -23,6 +23,6 @@
   {{range $d.Tasks}}{{template "task_row" .}}{{end}}
 </ul>
 {{else}}
-<div class="empty">ありません</div>
+<div class="empty">{{t "common.empty"}}</div>
 {{end}}
 {{template "foot" .}}

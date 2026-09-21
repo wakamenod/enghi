@@ -1,13 +1,12 @@
 {{template "head" .}}
 {{$d := .Data}}
-<h1>Weekly Review</h1>
+<h1>{{t "review.title"}}</h1>
 <div class="meta">
-  開始 {{shortTime $d.Review.StartedAt}} ·
-  判断材料はすべてこの画面にある。別の画面に移動しなくてよい。
+  {{t "review.started" (shortTime $d.Review.StartedAt)}} · {{t "review.note"}}
 </div>
 
 <section class="panel">
-  <h2>チェックリスト</h2>
+  <h2>{{t "review.checklist"}}</h2>
   <ul class="rows">
     {{range $d.Checklist}}
     <li>
@@ -26,33 +25,33 @@
 
 {{/* この2項目がこのシステムの存在理由に直結する。他を削ってもこの2つは削らない(DESIGN 2.3) */}}
 <section class="panel" id="review_projects">
-  <h2>停滞プロジェクト — Next Action が1つも無いもの</h2>
+  <h2>{{t "review.stalled"}}</h2>
   {{if $d.Stalled}}
   <ul class="rows">
     {{range $d.Stalled}}
     <li><a href="/gtd/project/{{.ID}}">{{.Title}}</a>
         {{if .AreaName}}<span class="tag">{{.AreaName}}</span>{{end}}
-        {{if not .Outcome}}<span class="tag" style="color:var(--warn)">完了状態が未記入</span>{{end}}
-        <span class="when">未処理 {{.OpenTasks}}</span></li>
+        {{if not .Outcome}}<span class="tag" style="color:var(--warn)">{{t "review.outcome_missing"}}</span>{{end}}
+        <span class="when">{{t "gtd.unprocessed" .OpenTasks}}</span></li>
     {{end}}
   </ul>
-  {{else}}<div class="empty">停滞しているプロジェクトはありません</div>{{end}}
+  {{else}}<div class="empty">{{t "review.stalled_empty"}}</div>{{end}}
 </section>
 
 <section class="panel" id="review_someday">
-  <h2>再検討日が到来した Someday</h2>
+  <h2>{{t "review.someday_due"}}</h2>
   {{if $d.SomedayDue}}
   <ul class="rows">
     {{range $d.SomedayDue}}
     <li><a href="/gtd/project/{{.ID}}">{{.Title}}</a>
-        <span class="when">再検討 {{.ReviewOn}}</span></li>
+        <span class="when">{{t "project.review_on" .ReviewOn}}</span></li>
     {{end}}
   </ul>
-  {{else}}<div class="empty">ありません</div>{{end}}
+  {{else}}<div class="empty">{{t "common.empty"}}</div>{{end}}
 </section>
 
 <section class="panel" id="inbox_zero">
-  <h2>Inbox <span class="count">{{len $d.Inbox}}</span></h2>
+  <h2>{{t "gtd.inbox"}} <span class="count">{{len $d.Inbox}}</span></h2>
   {{if $d.Inbox}}
   <ul class="rows">
     {{range $d.Inbox}}
@@ -60,44 +59,44 @@
         <span class="when">{{shortTime .CreatedAt}}</span></li>
     {{end}}
   </ul>
-  {{else}}<div class="empty">空です</div>{{end}}
+  {{else}}<div class="empty">{{t "review.inbox_empty"}}</div>{{end}}
 </section>
 
 <section class="panel" id="empty_head">
-  <h2>頭の中を空にする</h2>
+  <h2>{{t "review.empty_head"}}</h2>
   <form method="post" action="/ui/tasks" class="actions">
     <input type="hidden" name="return_to" value="/gtd/review#empty_head">
-    <input type="text" name="title" placeholder="思いついたことを1行ずつ" required>
-    <button type="submit" class="primary">Inbox へ</button>
+    <input type="text" name="title" placeholder="{{t "review.capture"}}" required>
+    <button type="submit" class="primary">{{t "gtd.to_inbox"}}</button>
   </form>
 </section>
 
 <section class="panel" id="review_next_actions">
-  <h2>Next Actions <span class="count">{{len $d.NextActions}}</span></h2>
+  <h2>{{t "gtd.next"}} <span class="count">{{len $d.NextActions}}</span></h2>
   <div class="meta">
     {{range $d.Contexts}}<a class="tag" href="/gtd/next?context={{.Name}}">{{.Name}} {{.Count}}</a> {{end}}
   </div>
   {{if $d.NextActions}}
   <ul class="rows">{{range $d.NextActions}}{{template "task_row" .}}{{end}}</ul>
-  {{else}}<div class="empty">ありません</div>{{end}}
+  {{else}}<div class="empty">{{t "common.empty"}}</div>{{end}}
 </section>
 
 <section class="panel" id="review_waiting_for">
-  <h2>Waiting For</h2>
+  <h2>{{t "gtd.waiting"}}</h2>
   {{if $d.Waiting}}
   <ul class="rows">
     {{range $d.Waiting}}
     <li><a href="/gtd/clarify/{{.ID}}">{{.Title}}</a>
         <span class="tag">{{.WaitingFor}}</span>
-        <span class="when">{{.WaitingDays}} 日経過</span></li>
+        <span class="when">{{t "gtd.days_elapsed" .WaitingDays}}</span></li>
     {{end}}
   </ul>
-  {{else}}<div class="empty">ありません</div>{{end}}
+  {{else}}<div class="empty">{{t "common.empty"}}</div>{{end}}
 </section>
 
 <div class="cols">
 <section class="panel" id="review_past_calendar">
-  <h2>先週完了したもの</h2>
+  <h2>{{t "review.last_week"}}</h2>
   {{if $d.CompletedLastWeek}}
   <ul class="rows">
     {{range $d.CompletedLastWeek}}
@@ -108,12 +107,12 @@
 </section>
 
 <section class="panel" id="review_upcoming_calendar">
-  <h2>今後2週間</h2>
+  <h2>{{t "review.upcoming"}}</h2>
   {{if $d.Upcoming}}
   <ul class="rows">
     {{range $d.Upcoming}}
     <li><a href="/gtd/clarify/{{.ID}}">{{.Title}}</a>
-        <span class="when">{{if .DeadlineOn}}締切 {{.DeadlineOn}}{{else}}{{.ScheduledOn}}{{end}}</span></li>
+        <span class="when">{{if .DeadlineOn}}{{t "gtd.deadline" .DeadlineOn}}{{else}}{{.ScheduledOn}}{{end}}</span></li>
     {{end}}
   </ul>
   {{else}}<div class="empty">—</div>{{end}}
@@ -122,36 +121,36 @@
 
 {{/* 惰性で回り続けているだけの系列を棚卸しする。ここは必ず設ける(DESIGN 2.6) */}}
 <section class="panel" id="review_recurring">
-  <h2>定期タスクの系列</h2>
-  <div class="meta">惰性で回り続けているだけのものが無いか確かめる。</div>
+  <h2>{{t "review.series"}}</h2>
+  <div class="meta">{{t "review.series_note"}}</div>
   {{if $d.Series}}
   <ul class="rows">
     {{range $d.Series}}
     <li>
       {{if .OpenTaskID}}<a href="/gtd/clarify/{{.OpenTaskID}}">{{.Title}}</a>{{else}}{{.Title}}{{end}}
       <span class="tag">↻ {{.Recurrence}}</span>
-      {{if .NextOn}}<span class="tag">次 {{.NextOn}}</span>{{end}}
-      {{if .EndsOn}}<span class="tag">終了 {{.EndsOn}}</span>{{end}}
+      {{if .NextOn}}<span class="tag">{{t "review.series_next" .NextOn}}</span>{{end}}
+      {{if .EndsOn}}<span class="tag">{{t "review.series_ends" .EndsOn}}</span>{{end}}
       {{if .OpenTaskID}}
       <form method="post" action="/ui/tasks/{{.OpenTaskID}}/end-series" style="display:inline"
-            onsubmit="return confirm('この系列を終わらせます。次のインスタンスは生成されなくなります。')">
+            onsubmit="return confirm('{{t "review.series_confirm"}}')">
         <input type="hidden" name="return_to" value="/gtd/review#review_recurring">
-        <button type="submit">やめる</button>
+        <button type="submit">{{t "review.series_stop"}}</button>
       </form>
       {{end}}
-      <span class="when">{{.DoneCount}} 回</span>
+      <span class="when">{{t "review.series_done" .DoneCount}}</span>
     </li>
     {{end}}
   </ul>
-  {{else}}<div class="empty">定期タスクはありません</div>{{end}}
+  {{else}}<div class="empty">{{t "review.series_none"}}</div>{{end}}
 </section>
 
 <section class="panel">
-  <h2>このレビューを終える</h2>
+  <h2>{{t "review.finish"}}</h2>
   <form method="post" action="/ui/review/{{$d.Review.ID}}/complete">
-    <label for="note">メモ</label>
-    <input type="text" id="note" name="note" placeholder="気づいたこと">
-    <div class="actions"><button type="submit" class="primary">完了にする</button></div>
+    <label for="note">{{t "clarify.note"}}</label>
+    <input type="text" id="note" name="note" placeholder="{{t "review.finish_note"}}">
+    <div class="actions"><button type="submit" class="primary">{{t "review.finish_button"}}</button></div>
   </form>
 </section>
 {{template "foot" .}}

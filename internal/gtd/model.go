@@ -117,23 +117,25 @@ type Review struct {
 	Note        string          `json:"note"`
 }
 
-// ChecklistKeys は標準チェックリスト。**実装者が項目を思いつきで決めないこと**(DESIGN 2.3)。
+// ChecklistKeys は標準チェックリスト(DESIGN 2.3)。
+// **実装者が項目を思いつきで決めないこと。**
 // review_projects と review_someday がこのシステムの存在理由に直結する2項目。
+//
+// 表示の文言は i18n が `checklist.<key>` と `checklist.data.<key>` で持つ。
+// ここに文言を置くと言語を切り替えられなくなる。
 var ChecklistKeys = []struct {
-	Key   string
-	Label string
-	Data  string // 同じ画面に出すデータの説明
+	Key string
 }{
-	{"collect_loose_papers", "散らばった紙を集める", ""},
-	{"inbox_zero", "Inbox を空にする", "Inbox 一覧(その場で clarify できる)"},
-	{"empty_head", "頭の中を空にする", "クイックキャプチャ欄"},
-	{"review_next_actions", "Next Actions を見直す", "コンテキスト別 Next 一覧"},
-	{"review_past_calendar", "先週のカレンダーを振り返る", "先週完了したタスク"},
-	{"review_upcoming_calendar", "今後の予定を確認する", "今後2週間の予定/締切"},
-	{"review_waiting_for", "Waiting For を見直す", "委譲からの経過日数付き一覧"},
-	{"review_projects", "プロジェクトリストを見直す", "停滞プロジェクトの検出結果"},
-	{"review_someday", "Someday/Maybe を見直す", "再検討日が到来した someday"},
-	{"review_recurring", "定期タスクを棚卸しする", "定期タスク系列の一覧"},
+	{"collect_loose_papers"},
+	{"inbox_zero"},
+	{"empty_head"},
+	{"review_next_actions"},
+	{"review_past_calendar"},
+	{"review_upcoming_calendar"},
+	{"review_waiting_for"},
+	{"review_projects"},
+	{"review_someday"},
+	{"review_recurring"},
 }
 
 // 状態。

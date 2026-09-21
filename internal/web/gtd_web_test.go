@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -173,5 +174,110 @@ func mustJSON(t *testing.T, h http.Handler, method, path, body string) {
 	w := do(h, req(method, path, body))
 	if w.Code >= 400 {
 		t.Fatalf("%s %s → %d: %s", method, path, w.Code, w.Body.String())
+	}
+}
+
+// 英語でも全画面が最後まで描画され、日本語が残っていないこと。
+func TestEnglishScreensHaveNoJapanese(t *testing.T) {
+	h := newServer(t)
+	mustJSON(t, h, "POST", "/api/pages", `{"title":"Article","body":"body"}`)
+	mustJSON(t, h, "POST", "/api/contexts", `{"name":"@phone"}`)
+	mustJSON(t, h, "POST", "/api/areas", `{"name":"Finances"}`)
+	mustJSON(t, h, "POST", "/api/projects", `{"title":"Office move","outcome":"Moved in"}`)
+	mustJSON(t, h, "POST", "/api/tasks", `{"title":"Call the agent"}`)
+
+	japanese := regexp.MustCompile(`[ぁ-んァ-ヶ一-龠]`)
+	screens := []string{
+		"/", "/wiki", "/wiki/article", "/wiki/article/edit", "/wiki/article/history",
+		"/wiki/new", "/tags", "/search?q=Article", "/gtd", "/gtd/inbox", "/gtd/next",
+		"/gtd/waiting", "/gtd/scheduled", "/gtd/someday", "/gtd/projects",
+		"/gtd/project/1", "/gtd/areas", "/gtd/area/1", "/gtd/review", "/gtd/clarify/1",
+	}
+	for _, path := range screens {
+		r := req("GET", path, "")
+		r.Header.Set("Accept-Language", "en-US,en;q=0.9")
+		w := do(h, r)
+		if w.Code != http.StatusOK {
+			t.Errorf("GET %s → %d", path, w.Code)
+			continue
+		}
+		body := w.Body.String()
+		if !strings.Contains(body, "</html>") {
+			t.Errorf("GET %s: HTML が途中で切れている", path)
+			continue
+		}
+		// 言語切り替えのリンクは、切り替え先の言語名をその言語で出すので除く
+		body = regexp.MustCompile(`(?s)<div class="lang-switch".*?</div>`).ReplaceAllString(body, "")
+		if m := japanese.FindString(body); m != "" {
+			// 記事の中身に日本語があるのは正常なので、画面の骨格だけを見る
+			idx := japanese.FindStringIndex(body)
+			from := idx[0] - 60
+			if from < 0 {
+				from = 0
+			}
+			t.Errorf("GET %s: 英語表示に日本語が残っている: …%s…", path, body[from:idx[1]+20])
+		}
+	}
+}
+
+// Accept-Language と cookie で言語が決まること。cookie が優先されること。
+func TestLanguageSelection(t *testing.T) {
+	h := newServer(t)
+
+	r := req("GET", "/", "")
+	r.Header.Set("Accept-Language", "en")
+	if body := do(h, r).Body.String(); !strings.Contains(body, "Dashboard") {
+		t.Error("Accept-Language: en が効いていない")
+	}
+
+	r = req("GET", "/", "")
+	r.Header.Set("Accept-Language", "ja")
+	if body := do(h, r).Body.String(); !strings.Contains(body, "ダッシュボード") {
+		t.Error("Accept-Language: ja が効いていない")
+	}
+
+	// 明示的な選択(cookie)は Accept-Language より優先する
+	r = req("GET", "/", "")
+	r.Header.Set("Accept-Language", "ja")
+	r.AddCookie(&http.Cookie{Name: "enghi-lang", Value: "en"})
+	if body := do(h, r).Body.String(); !strings.Contains(body, "Dashboard") {
+		t.Error("cookie の選択が Accept-Language より優先されていない")
+	}
+
+	// 切り替えの導線
+	w := do(h, req("GET", "/ui/lang?set=en&return_to=/wiki", ""))
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("言語切り替え → %d", w.Code)
+	}
+	var found bool
+	for _, c := range w.Result().Cookies() {
+		if c.Name == "enghi-lang" && c.Value == "en" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("cookie が設定されていない")
+	}
+	if loc := w.Header().Get("Location"); loc != "/wiki" {
+		t.Errorf("戻り先 = %q", loc)
+	}
+}
+
+// エラーメッセージも言語に従うこと。
+func TestErrorMessagesAreLocalized(t *testing.T) {
+	h := newServer(t)
+	mustJSON(t, h, "POST", "/api/pages", `{"title":"Conflict","body":"x"}`)
+
+	r := req("PUT", "/api/pages/conflict", `{"title":"Conflict","body":"y","version":99}`)
+	r.Header.Set("Accept-Language", "en")
+	w := do(h, r)
+	if w.Code != http.StatusConflict {
+		t.Fatalf("→ %d", w.Code)
+	}
+	var res map[string]any
+	json.Unmarshal(w.Body.Bytes(), &res)
+	msg, _ := res["message"].(string)
+	if regexp.MustCompile(`[ぁ-んァ-ヶ一-龠]`).MatchString(msg) {
+		t.Errorf("英語のはずが日本語: %q", msg)
 	}
 }

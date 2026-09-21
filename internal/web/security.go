@@ -18,7 +18,7 @@ func (s *Server) secure(next http.Handler) http.Handler {
 		//    **これが本丸であり、DNS rebinding に対する唯一有効な防御である。**
 		//    rebinding が成立するとブラウザから見て同一オリジンになるため Origin 検査では防げない。
 		if !s.allowedHost(r.Host) {
-			forbid(w, "Host ヘッダが許可されていません: "+r.Host)
+			forbid(w, s.tr(r, "err.forbidden_host", r.Host))
 			return
 		}
 
@@ -28,13 +28,13 @@ func (s *Server) secure(next http.Handler) http.Handler {
 		//    「存在しなければ拒否」にすると Emacs 層が動かなくなる。
 		if site := r.Header.Get("Sec-Fetch-Site"); site != "" {
 			if site != "same-origin" && site != "none" {
-				forbid(w, "Sec-Fetch-Site が同一オリジンではありません: "+site)
+				forbid(w, s.tr(r, "err.forbidden_site", site))
 				return
 			}
 		}
 		if origin := r.Header.Get("Origin"); origin != "" {
 			if !s.allowedOrigin(origin) {
-				forbid(w, "Origin が許可されていません: "+origin)
+				forbid(w, s.tr(r, "err.forbidden_origin", origin))
 				return
 			}
 		}
@@ -50,7 +50,7 @@ func (s *Server) secure(next http.Handler) http.Handler {
 				w.Header().Set("Content-Type", "application/json; charset=utf-8")
 				w.WriteHeader(http.StatusUnsupportedMediaType)
 				fmt.Fprintf(w, `{"error":"unsupported_media_type","message":%q}`,
-					"書き込み系 API は application/json のみ受け付けます")
+					s.tr(r, "err.unsupported_media"))
 				return
 			}
 		}

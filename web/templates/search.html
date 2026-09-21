@@ -1,8 +1,8 @@
 {{template "head" .}}
 {{$d := .Data}}
-<h1>検索</h1>
+<h1>{{t "search.title"}}</h1>
 {{if $d.Query}}
-  <div class="meta">「{{$d.Query}}」 {{len $d.Results}} 件</div>
+  <div class="meta">{{t "search.results" $d.Query (len $d.Results)}}</div>
   {{if $d.Results}}
   <ul class="rows">
   {{range $d.Results}}
@@ -16,9 +16,9 @@
   {{end}}
   </ul>
   {{else}}
-  <div class="empty">見つかりませんでした</div>
+  <div class="empty">{{t "search.not_found"}}</div>
   {{end}}
 {{else}}
-  <div class="empty">上の検索窓に入力してください(<span class="kbd">/</span> でフォーカス)</div>
+  <div class="empty">{{t "search.prompt" "/"}}</div>
 {{end}}
 {{template "foot" .}}

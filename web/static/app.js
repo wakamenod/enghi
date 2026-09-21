@@ -1,5 +1,21 @@
 // enghi — 少量の vanilla JS。キーボード操作と focus チャネルの受信だけを担う。
 
+// ---------------------------------------------------------------- 文言
+//
+// **JS の中に文言を直書きしない。**サーバがその言語の文言を body の
+// data-strings に入れて渡すので、そこから引く。
+
+var S = (function () {
+  try {
+    return JSON.parse(document.body.getAttribute("data-strings") || "{}");
+  } catch (e) { return {}; }
+})();
+
+function t(key, arg) {
+  var s = S[key] || key;
+  return arg === undefined ? s : s.replace(/%[sd]/, arg);
+}
+
 // ---------------------------------------------------------------- focus チャネル
 //
 // DESIGN 4.3: Emacs で検索・選択 → 別ディスプレイに開きっぱなしのブラウザが追従する。
@@ -192,7 +208,7 @@
 (function () {
   var KEY = "enghi-theme";
   var ORDER = ["auto", "light", "dark"];
-  var LABEL = { auto: "OS の設定に従う", light: "明るい", dark: "暗い" };
+  var LABEL = { auto: "theme.auto", light: "theme.light", dark: "theme.dark" };
 
   function current() {
     try {
@@ -212,7 +228,7 @@
       else localStorage.setItem(KEY, theme);
     } catch (e) {}
     var btn = document.getElementById("theme-toggle");
-    if (btn) btn.title = "テーマ: " + LABEL[theme];
+    if (btn) btn.title = t("theme.toggle") + ": " + t(LABEL[theme]);
   }
 
   var btn = document.getElementById("theme-toggle");
@@ -241,15 +257,15 @@ function openCapture() {
 
   var label = document.createElement('div');
   label.className = 'modal-label';
-  label.textContent = 'Inbox に追加';
+  label.textContent = t("capture.title");
 
   var input = document.createElement('input');
   input.type = 'text';
-  input.placeholder = '1行で投げ込む';
+  input.placeholder = t("gtd.capture_short");
 
   var hint = document.createElement('div');
   hint.className = 'modal-hint';
-  hint.textContent = 'Enter で追加 · Esc で閉じる';
+  hint.textContent = t("capture.hint");
 
   box.appendChild(label);
   box.appendChild(input);
@@ -274,11 +290,11 @@ function openCapture() {
       body: JSON.stringify({ title: title }),
     }).then(function (r) {
       if (!r.ok) throw new Error('capture failed');
-      label.textContent = '追加した';
+      label.textContent = t("capture.added");
       input.value = '';
       setTimeout(close, 400);
     }).catch(function () {
-      label.textContent = '追加できなかった';
+      label.textContent = t("capture.failed");
     });
   });
 }
@@ -312,7 +328,7 @@ function openCapture() {
       ta.value = ta.value.replace(placeholder, res.markdown);
       ta.dispatchEvent(new Event('input', { bubbles: true }));
     }).catch(function (err) {
-      ta.value = ta.value.replace(placeholder, '<!-- アップロードに失敗: ' + err.message + ' -->');
+      ta.value = ta.value.replace(placeholder, '<!-- ' + t("capture.upload_failed", err.message) + ' -->');
     });
   }
 
@@ -323,7 +339,7 @@ function openCapture() {
     if (!files.length) return false;
     files.forEach(function (file, i) {
       // 応答が返るまでの間、どこに入るかが分かるようにしておく
-      var placeholder = '![アップロード中…' + Date.now() + '-' + i + ']()';
+      var placeholder = '![' + t("capture.uploading") + Date.now() + '-' + i + ']()';
       insertAtCursor(placeholder + '\n');
       upload(file, placeholder);
     });

@@ -49,7 +49,7 @@ func (s *Server) viewGTDTop(w http.ResponseWriter, r *http.Request) {
 	d.Stalled, _ = s.gtd.StalledProjects(ctx)
 	d.Contexts, _ = s.gtd.Contexts(ctx)
 	d.Areas, _ = s.gtd.Areas(ctx)
-	s.render(w, "gtd.html", viewData{Title: "GTD", Nav: "gtd", Data: d})
+	s.render(w, r, "gtd.html", viewData{Title: s.tr(r, "gtd.title"), Nav: "gtd", Data: d})
 }
 
 type taskListData struct {
@@ -68,9 +68,9 @@ func (s *Server) viewInbox(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	s.render(w, "tasks.html", viewData{Title: "Inbox", Nav: "gtd",
-		Data: taskListData{Heading: "Inbox", Kind: "inbox", Tasks: tasks,
-			Note: "1件ずつ開いて、行動か資料かを決める"}})
+	s.render(w, r, "tasks.html", viewData{Title: s.tr(r, "gtd.inbox"), Nav: "gtd",
+		Data: taskListData{Heading: s.tr(r, "gtd.inbox"), Kind: "inbox", Tasks: tasks,
+			Note: s.tr(r, "gtd.inbox_note")}})
 }
 
 func (s *Server) viewNextActions(w http.ResponseWriter, r *http.Request) {
@@ -95,14 +95,14 @@ func (s *Server) viewNextActions(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	heading := "Next Actions"
+	heading := s.tr(r, "gtd.next")
 	if cur != nil {
 		heading += " — " + cur.Name
 	}
-	s.render(w, "tasks.html", viewData{Title: heading, Nav: "gtd",
+	s.render(w, r, "tasks.html", viewData{Title: heading, Nav: "gtd",
 		Data: taskListData{Heading: heading, Kind: "next", Tasks: tasks,
 			Contexts: contexts, Current: cur,
-			Note: "今すぐ物理的に実行できる単一行動だけが並ぶ。予定日が到来した scheduled もここに出る"}})
+			Note: s.tr(r, "gtd.next_note")}})
 }
 
 func (s *Server) viewWaiting(w http.ResponseWriter, r *http.Request) {
@@ -111,9 +111,9 @@ func (s *Server) viewWaiting(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	s.render(w, "tasks.html", viewData{Title: "Waiting For", Nav: "gtd",
-		Data: taskListData{Heading: "Waiting For", Kind: "waiting", Tasks: tasks,
-			Note: "他者待ち。委譲からの経過日数を併記する"}})
+	s.render(w, r, "tasks.html", viewData{Title: s.tr(r, "gtd.waiting"), Nav: "gtd",
+		Data: taskListData{Heading: s.tr(r, "gtd.waiting"), Kind: "waiting", Tasks: tasks,
+			Note: s.tr(r, "gtd.waiting_note")}})
 }
 
 func (s *Server) viewScheduled(w http.ResponseWriter, r *http.Request) {
@@ -122,9 +122,9 @@ func (s *Server) viewScheduled(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	s.render(w, "tasks.html", viewData{Title: "日付付き", Nav: "gtd",
-		Data: taskListData{Heading: "日付付き (tickler)", Kind: "scheduled", Tasks: tasks,
-			Note: "予定日が到来すると Next Actions に現れる。state は書き換えない"}})
+	s.render(w, r, "tasks.html", viewData{Title: s.tr(r, "gtd.scheduled"), Nav: "gtd",
+		Data: taskListData{Heading: s.tr(r, "gtd.scheduled_title"), Kind: "scheduled", Tasks: tasks,
+			Note: s.tr(r, "gtd.scheduled_note")}})
 }
 
 func (s *Server) viewSomeday(w http.ResponseWriter, r *http.Request) {
@@ -133,8 +133,8 @@ func (s *Server) viewSomeday(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	s.render(w, "tasks.html", viewData{Title: "Someday/Maybe", Nav: "gtd",
-		Data: taskListData{Heading: "Someday / Maybe", Kind: "someday", Tasks: tasks}})
+	s.render(w, r, "tasks.html", viewData{Title: s.tr(r, "gtd.someday"), Nav: "gtd",
+		Data: taskListData{Heading: s.tr(r, "gtd.someday"), Kind: "someday", Tasks: tasks}})
 }
 
 type projectsData struct {
@@ -158,7 +158,7 @@ func (s *Server) viewProjects(w http.ResponseWriter, r *http.Request) {
 		m[p.ID] = true
 	}
 	areas, _ := s.gtd.Areas(ctx)
-	s.render(w, "projects.html", viewData{Title: "プロジェクト", Nav: "gtd",
+	s.render(w, r, "projects.html", viewData{Title: s.tr(r, "gtd.projects"), Nav: "gtd",
 		Data: projectsData{Projects: ps, Stalled: m, Areas: areas, Status: status}})
 }
 
@@ -197,7 +197,7 @@ func (s *Server) viewProject(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	s.render(w, "project.html", viewData{Title: p.Title, Nav: "gtd", Data: d})
+	s.render(w, r, "project.html", viewData{Title: p.Title, Nav: "gtd", Data: d})
 }
 
 type areasData struct {
@@ -210,7 +210,7 @@ func (s *Server) viewAreas(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	s.render(w, "areas.html", viewData{Title: "Areas of Responsibility", Nav: "gtd",
+	s.render(w, r, "areas.html", viewData{Title: s.tr(r, "area.title"), Nav: "gtd",
 		Data: areasData{Areas: areas}})
 }
 
@@ -243,16 +243,16 @@ func (s *Server) viewArea(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	s.render(w, "area.html", viewData{Title: a.Name, Nav: "gtd", Data: d})
+	s.render(w, r, "area.html", viewData{Title: a.Name, Nav: "gtd", Data: d})
 }
 
 func (s *Server) viewReview(w http.ResponseWriter, r *http.Request) {
-	d, err := s.reviewData(ctxOf(r))
+	d, err := s.reviewData(ctxOf(r), s.langOf(r))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	s.render(w, "review.html", viewData{Title: "Weekly Review", Nav: "gtd", Data: d})
+	s.render(w, r, "review.html", viewData{Title: s.tr(r, "review.title"), Nav: "gtd", Data: d})
 }
 
 type clarifyData struct {
@@ -279,7 +279,7 @@ func (s *Server) viewClarify(w http.ResponseWriter, r *http.Request) {
 	d.Projects, _ = s.gtd.Projects(ctx, "active")
 	d.Contexts, _ = s.gtd.Contexts(ctx)
 	d.Areas, _ = s.gtd.Areas(ctx)
-	s.render(w, "clarify.html", viewData{Title: "処理: " + t.Title, Nav: "gtd", Data: d})
+	s.render(w, r, "clarify.html", viewData{Title: s.tr(r, "clarify.title", t.Title), Nav: "gtd", Data: d})
 }
 
 // ---------------------------------------------------------------- form 送信

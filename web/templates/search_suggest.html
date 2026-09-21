@@ -4,4 +4,4 @@
   {{if .Snippet}}<div class="s">{{snippet .Snippet}}</div>{{end}}
 </a>
 {{end}}
-{{if .Results}}<a href="/search?q={{.Query}}"><div class="s">すべての結果を見る →</div></a>{{end}}
+{{if .Results}}<a href="/search?q={{.Query}}"><div class="s">{{t "search.all_results"}}</div></a>{{end}}

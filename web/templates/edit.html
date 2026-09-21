@@ -1,26 +1,25 @@
 {{template "head" .}}
 {{$d := .Data}}
-<h1>{{if $d.IsNew}}新しい記事{{else}}{{$d.Page.Title}} を編集{{end}}</h1>
+<h1>{{if $d.IsNew}}{{t "edit.new"}}{{else}}{{t "edit.editing" $d.Page.Title}}{{end}}</h1>
 
 <form method="post" action="{{if $d.IsNew}}/ui/pages{{else}}/ui/pages/{{$d.Page.Slug}}{{end}}">
   {{if not $d.IsNew}}<input type="hidden" name="version" value="{{$d.Page.Version}}">{{end}}
 
-  <label for="title">タイトル</label>
+  <label for="title">{{t "edit.title"}}</label>
   <input type="text" id="title" name="title" value="{{$d.Page.Title}}" required autofocus>
 
-  <label for="tags">タグ(カンマ区切り)</label>
+  <label for="tags">{{t "edit.tags"}}</label>
   <input type="text" id="tags" name="tags" value="{{$d.TagText}}">
 
-  <label for="body">本文 — Markdown。<code>[[タイトル]]</code> で他の記事へリンクできる(存在しなくてよい)。
-    画像は貼り付け(<span class="kbd">⌘V</span>)かドラッグで入る</label>
+  <label for="body">{{t "edit.body" "[[...]]"}}</label>
   <textarea id="body" name="body" spellcheck="false">{{$d.Page.Body}}</textarea>
 
   <div class="actions">
-    <button type="submit" class="primary">保存</button>
-    <button type="button" id="preview-toggle">プレビュー</button>
+    <button type="submit" class="primary">{{t "common.save"}}</button>
+    <button type="button" id="preview-toggle">{{t "edit.preview"}}</button>
     <span class="spacer"></span>
-    {{if not $d.IsNew}}<a class="btn" href="/wiki/{{$d.Page.Slug}}">やめる</a>
-    {{else}}<a class="btn" href="/wiki">やめる</a>{{end}}
+    {{if not $d.IsNew}}<a class="btn" href="/wiki/{{$d.Page.Slug}}">{{t "common.cancel"}}</a>
+    {{else}}<a class="btn" href="/wiki">{{t "common.cancel"}}</a>{{end}}
   </div>
 </form>
 

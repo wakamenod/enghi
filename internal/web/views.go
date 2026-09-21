@@ -20,6 +20,11 @@ type viewData struct {
 	Flash string
 	Err   string
 	Data  any
+
+	// 以下は render がまとめて埋める(各ハンドラに書かせると必ずどこかで漏れる)
+	LangCode string      // 現在の言語
+	Path     string      // 言語を切り替えた後に戻る先
+	Strings  template.JS // JS 側で使う文言(JSON)
 }
 
 func (s *Server) viewDashboard(w http.ResponseWriter, r *http.Request) {
@@ -28,7 +33,7 @@ func (s *Server) viewDashboard(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	s.render(w, "dashboard.html", viewData{Title: "ダッシュボード", Nav: "dashboard", Data: d})
+	s.render(w, r, "dashboard.html", viewData{Title: s.tr(r, "dash.title"), Nav: "dashboard", Data: d})
 }
 
 type pageListData struct {
@@ -47,7 +52,7 @@ func (s *Server) viewPageList(w http.ResponseWriter, r *http.Request) {
 	}
 	total, _ := s.pages.CountPages(ctxOf(r))
 	tags, _ := s.pages.Tags(ctxOf(r))
-	s.render(w, "pages.html", viewData{Title: "記事一覧", Nav: "wiki",
+	s.render(w, r, "pages.html", viewData{Title: s.tr(r, "page.list_title"), Nav: "wiki",
 		Data: pageListData{Pages: pages, Sort: sort, Total: total, Tags: tags}})
 }
 
@@ -69,7 +74,7 @@ func (s *Server) viewPage(w http.ResponseWriter, r *http.Request) {
 				http.Redirect(w, r, "/wiki/"+p2.Slug, http.StatusSeeOther)
 				return
 			}
-			s.renderNotFound(w, slug)
+			s.renderNotFound(w, r, slug)
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -83,7 +88,7 @@ func (s *Server) viewPage(w http.ResponseWriter, r *http.Request) {
 	links, _ := s.pages.Links(ctxOf(r), p.ID)
 	backlinks, _ := s.pages.Backlinks(ctxOf(r), p.ID)
 	aliases, _ := s.pages.Aliases(ctxOf(r), p.ID)
-	s.render(w, "page.html", viewData{Title: p.Title, Nav: "wiki",
+	s.render(w, r, "page.html", viewData{Title: p.Title, Nav: "wiki",
 		Data: pageViewData{Page: p, HTML: html, Links: links, Backlinks: backlinks, Aliases: aliases}})
 }
 
@@ -96,9 +101,10 @@ func (s *Server) renderBody(r *http.Request, body string) (template.HTML, error)
 	return template.HTML(out), nil
 }
 
-func (s *Server) renderNotFound(w http.ResponseWriter, slug string) {
+func (s *Server) renderNotFound(w http.ResponseWriter, r *http.Request, slug string) {
 	w.WriteHeader(http.StatusNotFound)
-	s.render(w, "notfound.html", viewData{Title: "見つかりません", Nav: "wiki", Data: slug})
+	s.render(w, r, "notfound.html", viewData{
+		Title: s.tr(r, "page.not_found_title"), Nav: "wiki", Data: slug})
 }
 
 type editData struct {
@@ -110,17 +116,17 @@ type editData struct {
 func (s *Server) viewPageNew(w http.ResponseWriter, r *http.Request) {
 	title := r.URL.Query().Get("title")
 	p := &wiki.Page{Title: title, Version: 0}
-	s.render(w, "edit.html", viewData{Title: "新規作成", Nav: "wiki",
+	s.render(w, r, "edit.html", viewData{Title: s.tr(r, "edit.new"), Nav: "wiki",
 		Data: editData{Page: p, IsNew: true}})
 }
 
 func (s *Server) viewPageEdit(w http.ResponseWriter, r *http.Request) {
 	p, err := s.pages.BySlug(ctxOf(r), r.PathValue("slug"))
 	if err != nil {
-		s.renderNotFound(w, r.PathValue("slug"))
+		s.renderNotFound(w, r, r.PathValue("slug"))
 		return
 	}
-	s.render(w, "edit.html", viewData{Title: p.Title + " を編集", Nav: "wiki",
+	s.render(w, r, "edit.html", viewData{Title: s.tr(r, "edit.editing", p.Title), Nav: "wiki",
 		Data: editData{Page: p, TagText: strings.Join(p.Tags, ", ")}})
 }
 
@@ -133,12 +139,12 @@ type historyData struct {
 func (s *Server) viewPageHistory(w http.ResponseWriter, r *http.Request) {
 	p, err := s.pages.BySlug(ctxOf(r), r.PathValue("slug"))
 	if err != nil {
-		s.renderNotFound(w, r.PathValue("slug"))
+		s.renderNotFound(w, r, r.PathValue("slug"))
 		return
 	}
 	revs, _ := s.pages.Revisions(ctxOf(r), p.ID)
 	aliases, _ := s.pages.Aliases(ctxOf(r), p.ID)
-	s.render(w, "history.html", viewData{Title: p.Title + " の履歴", Nav: "wiki",
+	s.render(w, r, "history.html", viewData{Title: s.tr(r, "history.title", p.Title), Nav: "wiki",
 		Data: historyData{Page: p, Revisions: revs, Aliases: aliases}})
 }
 
@@ -154,7 +160,7 @@ func (s *Server) viewTag(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	s.render(w, "tag.html", viewData{Title: "タグ: " + name, Nav: "wiki",
+	s.render(w, r, "tag.html", viewData{Title: s.tr(r, "tag.title", name), Nav: "wiki",
 		Data: tagData{Tag: name, Pages: pages}})
 }
 
@@ -164,7 +170,7 @@ func (s *Server) viewTagList(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	s.render(w, "tags.html", viewData{Title: "タグ一覧", Nav: "wiki", Data: tags})
+	s.render(w, r, "tags.html", viewData{Title: s.tr(r, "tag.list_title"), Nav: "wiki", Data: tags})
 }
 
 type searchData struct {
@@ -183,7 +189,7 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	s.render(w, "search.html", viewData{Title: "検索", Nav: "search", Query: q,
+	s.render(w, r, "search.html", viewData{Title: s.tr(r, "search.title"), Nav: "search", Query: q,
 		Data: searchData{Query: q, Results: results}})
 }
 
@@ -199,7 +205,7 @@ func (s *Server) uiSearchFragment(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	s.renderFragment(w, "search_suggest.html", searchData{Query: q, Results: results})
+	s.renderFragment(w, r, "search_suggest.html", searchData{Query: q, Results: results})
 }
 
 // ---------------------------------------------------------------- form 送信
@@ -216,7 +222,7 @@ func (s *Server) uiCreatePage(w http.ResponseWriter, r *http.Request) {
 	}
 	p, err := s.pages.Create(ctxOf(r), in)
 	if err != nil {
-		s.renderEditError(w, err, &wiki.Page{Title: in.Title, Body: in.Body, Tags: in.Tags}, true)
+		s.renderEditError(w, r, err, &wiki.Page{Title: in.Title, Body: in.Body, Tags: in.Tags}, true)
 		return
 	}
 	s.hub.Broadcast(Event{Type: "updated", Kind: "page", Slug: p.Slug})
@@ -238,7 +244,7 @@ func (s *Server) uiUpdatePage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		cur := &wiki.Page{Slug: r.PathValue("slug"), Title: in.Title, Body: in.Body,
 			Tags: in.Tags, Version: in.Version}
-		s.renderEditError(w, err, cur, false)
+		s.renderEditError(w, r, err, cur, false)
 		return
 	}
 	s.hub.Broadcast(Event{Type: "updated", Kind: "page", Slug: p.Slug})
@@ -246,21 +252,22 @@ func (s *Server) uiUpdatePage(w http.ResponseWriter, r *http.Request) {
 }
 
 // renderEditError は編集画面に戻す。**入力は絶対に捨てない**(DESIGN 4.2)。
-func (s *Server) renderEditError(w http.ResponseWriter, err error, cur *wiki.Page, isNew bool) {
+func (s *Server) renderEditError(w http.ResponseWriter, r *http.Request, err error,
+	cur *wiki.Page, isNew bool) {
+
 	msg := err.Error()
 	var vc *wiki.VersionConflictError
 	var tc *wiki.TitleConflictError
 	switch {
 	case errors.As(err, &vc):
-		msg = "このページは他の経路で更新されています(現行の版: " +
-			itoa(vc.Current.Version) + ")。内容を確認してから保存し直してください。" +
-			"入力はこの画面に保持されています"
+		msg = s.tr(r, "edit.version_conflict", vc.Current.Version)
 	case errors.As(err, &tc):
-		msg = "同名(大小を区別しない)のページが既に存在します: " + tc.Conflicting.Title +
-			" (/wiki/" + tc.Conflicting.Slug + ")"
+		msg = s.tr(r, "edit.title_conflict",
+			tc.Conflicting.Title+" (/wiki/"+tc.Conflicting.Slug+")")
 	}
 	w.WriteHeader(http.StatusConflict)
-	s.render(w, "edit.html", viewData{Title: "保存できませんでした", Nav: "wiki", Err: msg,
+	s.render(w, r, "edit.html", viewData{
+		Title: s.tr(r, "edit.save_failed"), Nav: "wiki", Err: msg,
 		Data: editData{Page: cur, IsNew: isNew, TagText: strings.Join(cur.Tags, ", ")}})
 }
 
@@ -277,7 +284,7 @@ func (s *Server) uiDeletePage(w http.ResponseWriter, r *http.Request) {
 func (s *Server) uiAddAlias(w http.ResponseWriter, r *http.Request) {
 	p, err := s.pages.BySlug(ctxOf(r), r.PathValue("slug"))
 	if err != nil {
-		s.renderNotFound(w, r.PathValue("slug"))
+		s.renderNotFound(w, r, r.PathValue("slug"))
 		return
 	}
 	if err := s.pages.AddAlias(ctxOf(r), p.ID, r.FormValue("alias")); err != nil {
@@ -290,7 +297,7 @@ func (s *Server) uiAddAlias(w http.ResponseWriter, r *http.Request) {
 func (s *Server) uiDeleteAlias(w http.ResponseWriter, r *http.Request) {
 	p, err := s.pages.BySlug(ctxOf(r), r.PathValue("slug"))
 	if err != nil {
-		s.renderNotFound(w, r.PathValue("slug"))
+		s.renderNotFound(w, r, r.PathValue("slug"))
 		return
 	}
 	if err := s.pages.DeleteAlias(ctxOf(r), p.ID, r.FormValue("alias")); err != nil {
@@ -305,7 +312,7 @@ func (s *Server) uiDeleteAlias(w http.ResponseWriter, r *http.Request) {
 func (s *Server) uiRewriteReferences(w http.ResponseWriter, r *http.Request) {
 	p, err := s.pages.BySlug(ctxOf(r), r.PathValue("slug"))
 	if err != nil {
-		s.renderNotFound(w, r.PathValue("slug"))
+		s.renderNotFound(w, r, r.PathValue("slug"))
 		return
 	}
 	n, err := s.pages.RewriteReferences(ctxOf(r), r.FormValue("from"), p.Title)

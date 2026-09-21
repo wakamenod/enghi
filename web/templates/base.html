@@ -1,5 +1,5 @@
 {{define "head"}}<!DOCTYPE html>
-<html lang="ja">
+<html lang="{{lang}}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -16,25 +16,28 @@
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/htmx.min.js" defer></script>
 </head>
-<body>
+<body data-strings='{{.Strings}}'>
 <header class="top">
   <div class="inner">
     <a class="brand{{if eq .Nav "dashboard"}} on{{end}}" href="/">enghi</a>
     <nav class="main">
-      <a href="/wiki"  class="{{if eq .Nav "wiki"}}on{{end}}">記事</a>
-      <a href="/tags"  class="{{if eq .Nav "tags"}}on{{end}}">タグ</a>
-      <a href="/gtd"   class="{{if eq .Nav "gtd"}}on{{end}}">GTD</a>
+      <a href="/wiki"  class="{{if eq .Nav "wiki"}}on{{end}}">{{t "nav.articles"}}</a>
+      <a href="/tags"  class="{{if eq .Nav "tags"}}on{{end}}">{{t "nav.tags"}}</a>
+      <a href="/gtd"   class="{{if eq .Nav "gtd"}}on{{end}}">{{t "nav.gtd"}}</a>
     </nav>
     <div class="searchbox">
       <form action="/search" method="get" autocomplete="off">
-        <input type="text" id="q" name="q" value="{{.Query}}" placeholder="検索  /"
+        <input type="text" id="q" name="q" value="{{.Query}}" placeholder="{{t "search.placeholder"}}"
                hx-get="/ui/search" hx-trigger="keyup changed delay:100ms"
                hx-target="#suggest" hx-swap="innerHTML">
       </form>
       <div class="suggest" id="suggest"></div>
     </div>
     <button type="button" id="theme-toggle" class="theme-toggle"
-            title="テーマを切り替える" aria-label="テーマを切り替える"></button>
+            title="{{t "theme.toggle"}}" aria-label="{{t "theme.toggle"}}"></button>
+    <div class="lang-switch" title="{{t "lang.switch"}}">
+      {{range langs}}{{if ne (printf "%s" .) $.LangCode}}<a href="/ui/lang?set={{.}}&return_to={{$.Path}}">{{. | langName}}</a>{{end}}{{end}}
+    </div>
   </div>
 </header>
 <main class="wrap">
