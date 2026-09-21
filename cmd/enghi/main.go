@@ -6,6 +6,7 @@
 //	enghi serve
 //	enghi export [--dir]  Markdown に全件エクスポート
 //	enghi doctor          整合性検査(DESIGN 2.5)
+//	enghi backup          DB のバックアップ(1日1回、常駐中にも自動で取る)
 //	enghi install-agent   launchd の plist を書き出す
 package main
 
@@ -45,6 +46,8 @@ func main() {
 		err = cmdExport(args)
 	case "doctor":
 		err = cmdDoctor(args)
+	case "backup":
+		err = cmdBackup(args)
 	case "install-agent":
 		err = cmdInstallAgent(args)
 	case "help", "-h", "--help":
@@ -65,6 +68,7 @@ func usage() {
   enghi [serve]          常駐サーバを起動する
   enghi export [--dir D] Markdown に全件エクスポート
   enghi doctor           整合性検査
+  enghi backup [--dir D] DB のバックアップを取る
   enghi install-agent    launchd の plist を書き出す
 
 設定: `+config.Path()+`
@@ -119,6 +123,22 @@ func cmdServe(args []string) error {
 	srv, err := web.New(cfg, db)
 	if err != nil {
 		return err
+	}
+
+	// 常駐中は1日1回バックアップを取る。
+	// 決まった時刻ではなく「その日のファイルが無ければ取る」で判断するので、
+	// サーバが止まっていた日があっても次に起きたときに取り返せる。
+	backupCtx, stopBackup := context.WithCancel(context.Background())
+	defer stopBackup()
+	if cfg.BackupOn() {
+		go store.BackupDaemon(backupCtx, db, cfg.BackupDir, cfg.BackupKeep,
+			func(b *store.Backup, err error) {
+				if err != nil {
+					log.Printf("警告: バックアップに失敗した: %v", err)
+					return
+				}
+				log.Printf("バックアップを取った: %s (%.1f MB)", b.Path, float64(b.Bytes)/(1<<20))
+			})
 	}
 
 	// **0.0.0.0 には bind できないようにする**(設定で指定されても拒否する。DESIGN 4.4)。
@@ -187,6 +207,58 @@ func cmdExport(args []string) error {
 		return err
 	}
 	fmt.Printf("%s に %d 件の記事を含む %d ファイルを書き出した\n", res.Dir, res.Pages, res.Files)
+	return nil
+}
+
+func cmdBackup(args []string) error {
+	fs := flag.NewFlagSet("backup", flag.ExitOnError)
+	configPath := fs.String("config", "", "設定ファイルのパス")
+	// --dir を許すのは CLI だけ。POST /api/backup はパスを受け取らない。
+	dir := fs.String("dir", "", "出力先(既定は設定の backup_dir)")
+	keep := fs.Int("keep", 0, "残す世代数(既定は設定の backup_keep)")
+	list := fs.Bool("list", false, "現存するバックアップを一覧する")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	cfg, db, err := openDB(*configPath)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	out := cfg.BackupDir
+	if *dir != "" {
+		out = *dir
+	}
+	n := cfg.BackupKeep
+	if *keep > 0 {
+		n = *keep
+	}
+
+	if *list {
+		backups, err := store.Backups(out)
+		if err != nil {
+			return err
+		}
+		if len(backups) == 0 {
+			fmt.Printf("%s にバックアップはまだ無い\n", out)
+			return nil
+		}
+		for _, b := range backups {
+			fmt.Printf("%s  %6.1f MB  %s\n",
+				b.CreatedAt, float64(b.Bytes)/(1<<20), b.Path)
+		}
+		return nil
+	}
+
+	b, err := store.RunBackup(context.Background(), db, out, n)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%s (%.1f MB)\n", b.Path, float64(b.Bytes)/(1<<20))
+	if b.Removed > 0 {
+		fmt.Printf("古いバックアップを %d 件消した(%d 世代を残す)\n", b.Removed, n)
+	}
 	return nil
 }
 

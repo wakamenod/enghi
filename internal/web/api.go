@@ -198,6 +198,30 @@ func (s *Server) apiExport(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, res)
 }
 
+// apiBackup は DB のバックアップを取る。
+// **出力先はリクエストから受け取らない。**設定ファイルの値に固定する(export と同じ)。
+func (s *Server) apiBackup(w http.ResponseWriter, r *http.Request) {
+	b, err := store.RunBackup(ctxOf(r), s.db, s.cfg.BackupDir, s.cfg.BackupKeep)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "backup_failed", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, b)
+}
+
+// apiBackups は現存するバックアップを新しい順に返す。
+func (s *Server) apiBackups(w http.ResponseWriter, r *http.Request) {
+	list, err := store.Backups(s.cfg.BackupDir)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "query_failed", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"dir": s.cfg.BackupDir, "keep": s.cfg.BackupKeep,
+		"enabled": s.cfg.BackupOn(), "backups": list,
+	})
+}
+
 func (s *Server) apiNotFound(w http.ResponseWriter, err error) {
 	if errors.Is(err, wiki.ErrNotFound) {
 		writeErr(w, http.StatusNotFound, "not_found", "ページが見つかりません")

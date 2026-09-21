@@ -17,7 +17,15 @@ type Config struct {
 	ExportDir string `toml:"export_dir"`
 	// RevisionCompactMinutes: 直前のリビジョンがこの分数以内なら上書きする(DESIGN 4.2)
 	RevisionCompactMinutes int `toml:"revision_compact_minutes"`
+
+	// バックアップ。常駐中に1日1回、VACUUM INTO で取る。
+	BackupDir     string `toml:"backup_dir"`
+	BackupKeep    int    `toml:"backup_keep"`    // 残す世代数
+	BackupEnabled *bool  `toml:"backup_enabled"` // 既定は有効
 }
+
+// BackupOn はバックアップが有効かを返す(未設定なら有効)。
+func (c Config) BackupOn() bool { return c.BackupEnabled == nil || *c.BackupEnabled }
 
 func dataHome() string {
 	if v := os.Getenv("XDG_DATA_HOME"); v != "" {
@@ -46,6 +54,8 @@ func Default() Config {
 		DBPath:                 filepath.Join(dataHome(), "enghi", "enghi.db"),
 		ExportDir:              filepath.Join(dataHome(), "enghi", "export"),
 		RevisionCompactMinutes: 10,
+		BackupDir:              filepath.Join(dataHome(), "enghi", "backup"),
+		BackupKeep:             7,
 	}
 }
 
@@ -80,8 +90,15 @@ func Load(path string) (Config, error) {
 	if c.RevisionCompactMinutes == 0 {
 		c.RevisionCompactMinutes = 10
 	}
+	if c.BackupDir == "" {
+		c.BackupDir = Default().BackupDir
+	}
+	if c.BackupKeep == 0 {
+		c.BackupKeep = 7
+	}
 	c.DBPath = expand(c.DBPath)
 	c.ExportDir = expand(c.ExportDir)
+	c.BackupDir = expand(c.BackupDir)
 	return c, c.validate()
 }
 

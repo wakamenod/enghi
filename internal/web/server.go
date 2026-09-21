@@ -138,6 +138,8 @@ func (s *Server) routes() {
 	m.HandleFunc("GET /api/events", s.handleEvents)
 	m.HandleFunc("GET /api/status", s.handleStatus)
 	m.HandleFunc("POST /api/export", s.apiExport)
+	m.HandleFunc("POST /api/backup", s.apiBackup)
+	m.HandleFunc("GET /api/backups", s.apiBackups)
 
 	m.HandleFunc("GET /api/tasks", s.apiListTasks)
 	m.HandleFunc("POST /api/tasks", s.apiCreateTask)

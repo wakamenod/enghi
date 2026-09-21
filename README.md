@@ -38,9 +38,36 @@ make test
 
 ```toml
 port = 7777
-db_path  = "~/.local/share/enghi/enghi.db"
+db_path    = "~/.local/share/enghi/enghi.db"
 export_dir = "~/.local/share/enghi/export"
 revision_compact_minutes = 10
+
+backup_dir     = "~/.local/share/enghi/backup"
+backup_keep    = 7       # 残す世代数
+backup_enabled = true
+```
+
+## バックアップ
+
+常駐中に1日1回、`VACUUM INTO` で一貫したスナップショットを取る。
+**決まった時刻に実行するのではなく「その日のファイルが無ければ取る」で判断する**ので、
+サーバが止まっていた日があっても次に起きたときに取り返せる。
+
+単なるファイルコピーでは WAL の内容を取りこぼし、書き込みの途中を掴むと壊れた複製になる。
+`VACUUM INTO` は読み取りトランザクションの中で書き出すので、その心配がない。
+
+```sh
+./bin/enghi backup           # 手動で取る
+./bin/enghi backup --list    # 一覧
+```
+
+戻すときは、サーバを止めてファイルを置き換えるだけでよい:
+
+```sh
+launchctl bootout gui/$(id -u)/dev.enghi.server
+cp ~/.local/share/enghi/backup/enghi-2026-09-21.db ~/.local/share/enghi/enghi.db
+rm -f ~/.local/share/enghi/enghi.db-wal ~/.local/share/enghi/enghi.db-shm
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dev.enghi.server.plist
 ```
 
 常駐させる:
