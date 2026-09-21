@@ -77,38 +77,21 @@ revision_compact_minutes = 10
 
 ## Emacs から使う
 
-```elisp
-(add-to-list 'load-path "~/Projects/SideProjects/enghi/elisp")
-(require 'enghi)
-(enghi-setup)          ; C-c n にキーマップを置く
+クライアントは別プロジェクト **[`../enghi.el`](../enghi.el)** にある。設定方法はそちらの
+README を参照すること。サーバ側は何も設定しなくてよい(Emacs 用の設定項目は無い)。
+
+Emacs 層が依存しているのは以下の API だけで、**これらは JSON で独立に成立させてある**:
+
 ```
-
-| キー | コマンド | |
-|---|---|---|
-| `C-c n s` | `enghi-search-command` | 横断検索(consult があれば打鍵ごと) |
-| `C-c n f` | `enghi-find-page` | 記事を選んでバッファで開く |
-| `C-c n n` | `enghi-new-page` | 新しい記事を作って開く |
-| `C-c n c` | `enghi-capture` | どこからでも1行を Inbox へ |
-| `C-c n a` | `enghi-agenda` | GTD の一覧 |
-| `C-c n o` | `enghi-focus-page` | **開いているブラウザタブをその記事へ飛ばす** |
-| `C-c n b` | `enghi-open-in-browser` | ブラウザで開く |
-
-記事バッファ(`enghi-page-mode`)では `C-c C-c` 保存 / `C-c C-r` 改題 /
-`C-c C-t` タグ / `C-c C-l` リンク挿入 / `C-c C-o` ブラウザで開く。
-
-agenda バッファでは `n` 次の行動 / `w` 他者待ち / `s` 日付 / `d` 完了 /
-`k` 今回は飛ばす / `f` 資料にする(記事化) / `p` プロジェクト / `C` コンテキスト。
-
-表示関数は差し替えられる:
-
-```elisp
-(setq enghi-browse-function #'xwidget-webkit-browse-url)  ; 既定は #'browse-url
+GET    /api/search?q=&kind=&limit=
+GET    /api/pages ; POST /api/pages
+GET    /api/pages/:slug ; PUT /api/pages/:slug ; DELETE /api/pages/:slug
+GET    /api/tasks ; POST /api/tasks ; PATCH /api/tasks/:id
+POST   /api/tasks/:id/complete ; POST /api/tasks/:id/file
+GET    /api/projects ; GET /api/projects/stalled ; GET /api/contexts
+POST   /api/focus              開いているブラウザタブを遷移させる
+GET    /api/status             接続確認
 ```
-
-**保存時の 409 は2種類あり、対応が違う**(DESIGN.md 4.2):
-
-- `version_conflict` … `ediff` でサーバ側と手元の差分を出す。**手元の入力は捨てない**
-- `title_conflict` … 衝突相手を示して別のタイトルを聞き直す。**本文は保持したまま**
 
 ## キーボード操作(ブラウザ側)
 
@@ -160,13 +143,5 @@ DESIGN.md が「壊れやすい」と名指ししている箇所を中心に書�
 npx playwright install chromium webkit   # ブラウザ本体
 ```
 
-elisp のテストは動いているサーバに対して実行する:
-
-```sh
-./bin/enghi serve --config /tmp/enghi-test.toml &   # ポート 7799
-make test-elisp
-```
-
-内容: 日本語の往復、楽観ロックの競合で**入力が消えないこと**、
-`title_conflict` が衝突相手を返すこと、capture、agenda の状態変更、
-consult の候補がサーバの順序をそのまま使うこと(Elisp 側で並べ替えない)。
+Emacs クライアント側のテストは [`../enghi.el`](../enghi.el) にある
+(動いているサーバに対して実行する)。
