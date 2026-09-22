@@ -59,8 +59,6 @@ func init() {
 		"dash.unresolved_note": "リンクされているものの、まだ作成されていない記事。",
 		"dash.no_articles":     "まだ記事がありません。",
 		"dash.write_first":     "最初の1件を作成する",
-		"dash.overall":         "全体",
-		"dash.summary":         "記事 %d 件 / タグ %d 種",
 		"dash.new_article":     "新しい記事",
 		"dash.export":          "Markdown にエクスポート",
 		"dash.referenced_by":   "%d 件から参照",

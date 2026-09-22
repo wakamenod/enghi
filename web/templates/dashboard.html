@@ -83,7 +83,8 @@
 
 {{/* Lower half: the wiki */}}
 <section class="panel card">
-  <h2><a href="/wiki">{{t "dash.articles"}}</a></h2>
+  <h2><a href="/wiki">{{t "dash.articles"}}</a>
+      <a class="btn" href="/wiki/new">{{t "dash.new_article"}}</a></h2>
 
   {{/* Created and updated appear in one stream. version == 1 means it has not
        been edited since it was created, i.e. it is new */}}
@@ -119,15 +120,6 @@
     <div class="meta">{{t "dash.unresolved_note"}}</div>
   </div>
   {{end}}
-</section>
-
-<section class="panel card">
-  <h2>{{t "dash.overall"}}</h2>
-  <div class="meta">{{t "dash.summary" $d.Wiki.TotalPages (len $d.Wiki.Tags)}}</div>
-  <div class="actions">
-    <a class="btn" href="/wiki/new">{{t "dash.new_article"}}</a>
-    <a class="btn" href="/wiki">{{t "page.list_title"}}</a>
-  </div>
 </section>
 
 {{template "foot" .}}

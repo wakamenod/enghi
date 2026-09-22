@@ -447,6 +447,13 @@ section.panel > h2::before {
 }
 section.panel .cols { margin-top: var(--sp-4); }
 
+/* The one action a panel carries rides in its heading row, on the right.
+   The heading is uppercase with wide tracking; a button in it is not. */
+section.panel > h2 > .btn {
+  margin-left: auto; text-transform: none; letter-spacing: normal;
+  font-size: var(--fs-2); padding: var(--sp-1) var(--sp-3);
+}
+
 /* A subheading inside a section, such as within cols. No rule; tracking alone
    carries the hierarchy */
 .subhead {

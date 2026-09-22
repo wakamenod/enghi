@@ -59,8 +59,6 @@ func init() {
 		"dash.unresolved_note": "Articles linked to but not yet created.",
 		"dash.no_articles":     "No articles yet.",
 		"dash.write_first":     "Create your first article",
-		"dash.overall":         "Overview",
-		"dash.summary":         "Articles: %d · Tags: %d",
 		"dash.new_article":     "New article",
 		"dash.export":          "Export to Markdown",
 		"dash.referenced_by":   "Referenced by %d",
