@@ -1,5 +1,6 @@
-// Package export は全件を Markdown に書き出す。
-// DB 単一正本の唯一の代償を消すための機能であり、第1段階から持つ(DESIGN 7)。
+// Package export writes everything out as Markdown.
+// It exists to remove the one cost of keeping the database as the single source
+// of truth, and has been there since stage one (DESIGN 7).
 package export
 
 import (
@@ -15,7 +16,7 @@ import (
 	"github.com/wakamenod/enghi/internal/store"
 )
 
-// Result は書き出しの結果。
+// Result is the outcome of an export.
 type Result struct {
 	Dir    string `json:"dir"`
 	Pages  int    `json:"pages"`
@@ -23,11 +24,12 @@ type Result struct {
 	Images int    `json:"images"`
 }
 
-// fileRefRe は本文中の /files/<hash> を拾う。
+// fileRefRe picks /files/<hash> out of a body.
 var fileRefRe = regexp.MustCompile(`/files/([0-9a-f]{64})`)
 
-// Sanitize はファイル名に使える形に slug を直す。
-// **/ 、.. 、制御文字、先頭のドットを除去してからファイル名にすること**(DESIGN 7)。
+// Sanitize turns a slug into something usable as a file name.
+// **Strip /, .., control characters and a leading dot before using it as a file
+// name** (DESIGN 7).
 func Sanitize(slug string) string {
 	var b strings.Builder
 	for _, r := range slug {
@@ -56,12 +58,13 @@ func Sanitize(slug string) string {
 	return out
 }
 
-// Run は dir へ全件を書き出す。
-// **dir はリクエストから受け取らないこと**(設定ファイルの値に固定する。DESIGN 4.4)。
+// Run writes everything into dir.
+// **dir never comes from a request**; it is fixed to the value in the
+// configuration file (DESIGN 4.4).
 //
-// blobs が非 nil なら、本文から参照されている画像も `files/` に書き出し、
-// 本文中の `/files/<hash>` を相対パスに書き換える。書き出したものだけで
-// 完結した Markdown になるようにするため。
+// When blobs is non-nil, images referenced from bodies are written into
+// `files/` and `/files/<hash>` in the text is rewritten to a relative path, so
+// that what was exported is self-contained Markdown.
 func Run(ctx context.Context, db *store.DB, blobs *filestore.Store, dir string) (*Result, error) {
 	res := &Result{Dir: dir}
 	wikiDir := filepath.Join(dir, "wiki")
@@ -81,7 +84,7 @@ func Run(ctx context.Context, db *store.DB, blobs *filestore.Store, dir string) 
 	defer rows.Close()
 
 	used := map[string]int{}
-	written := map[string]string{} // hash -> 拡張子(重複して書き出さない)
+	written := map[string]string{} // hash -> extension, so nothing is written twice
 	for rows.Next() {
 		var id int64
 		var slug, title, body, created, updated string
@@ -97,15 +100,16 @@ func Run(ctx context.Context, db *store.DB, blobs *filestore.Store, dir string) 
 			return nil, err
 		}
 		name := Sanitize(slug)
-		// slug は小文字に正規化して保存しているので APFS 上での大小衝突は起きないが、
-		// サニタイズの結果として衝突しうるので番号を付ける。
+		// Slugs are stored lower-cased, so case collisions cannot happen on APFS,
+		// but sanitizing can still produce a collision; number those.
 		key := strings.ToLower(name)
 		if n := used[key]; n > 0 {
 			name = fmt.Sprintf("%s-%d", name, n+1)
 		}
 		used[key]++
 
-		// 本文から参照されている画像を書き出し、相対パスに直す
+		// Write out the images referenced by the body and rewrite them as relative
+		// paths
 		if blobs != nil {
 			var werr error
 			body = fileRefRe.ReplaceAllStringFunc(body, func(m string) string {
@@ -160,7 +164,8 @@ func Run(ctx context.Context, db *store.DB, blobs *filestore.Store, dir string) 
 	res.Images = len(written)
 	res.Files += len(written)
 
-	// GTD 側。第1段階では空でもファイルは作る(エクスポートの形を固定しておくため)。
+	// The GTD side. The files are created even when empty, so the shape of an
+	// export stays fixed.
 	for name, fn := range map[string]func(context.Context, *store.DB) (string, error){
 		"projects.md": exportProjects,
 		"tasks.md":    exportTasks,
@@ -178,7 +183,8 @@ func Run(ctx context.Context, db *store.DB, blobs *filestore.Store, dir string) 
 	return res, nil
 }
 
-// writeBlob は画像を1つ書き出し、拡張子を返す。既に書いてあれば何もしない。
+// writeBlob writes one image out and returns its extension, doing nothing if
+// it was written already.
 func writeBlob(ctx context.Context, blobs *filestore.Store, dir, hash string,
 	written map[string]string) (string, error) {
 
@@ -187,7 +193,7 @@ func writeBlob(ctx context.Context, blobs *filestore.Store, dir, hash string,
 	}
 	data, meta, err := blobs.Get(ctx, hash)
 	if err != nil {
-		// 本体が無い参照は、本文をそのままにして飛ばす
+		// A reference with no file behind it is skipped, leaving the body as is
 		return "", nil
 	}
 	if err := os.MkdirAll(dir, 0o700); err != nil {
@@ -361,7 +367,7 @@ func exportAreas(ctx context.Context, db *store.DB) (string, error) {
 	return b.String(), rows.Err()
 }
 
-// yamlString は YAML frontmatter の値として安全な形にする。
+// yamlString makes a value safe to use in the YAML frontmatter.
 func yamlString(s string) string {
 	if s == "" {
 		return `""`

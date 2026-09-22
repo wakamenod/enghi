@@ -51,13 +51,13 @@ func (s *Service) projects(ctx context.Context, where string, args ...any) ([]*P
 	return out, rows.Err()
 }
 
-// Project は1件。
+// Project returns one project.
 func (s *Service) Project(ctx context.Context, id int64) (*Project, error) {
 	return scanProject(s.db.QueryRowContext(ctx,
 		`SELECT `+projectCols+` `+projectFrom+` WHERE p.id = ?`, id))
 }
 
-// Projects は status で絞り込める一覧。
+// Projects lists projects, optionally filtered by status.
 func (s *Service) Projects(ctx context.Context, status string) ([]*Project, error) {
 	if status == "" {
 		return s.projects(ctx, `ORDER BY
@@ -67,10 +67,10 @@ func (s *Service) Projects(ctx context.Context, status string) ([]*Project, erro
 	return s.projects(ctx, `WHERE p.status = ? ORDER BY p.sort_order, p.id`, status)
 }
 
-// StalledProjects は **「Next Action が1つも無いアクティブなプロジェクト」**。
+// StalledProjects are **the active projects with no next action at all**.
 //
-// **これがシステムの価値の半分を担う**(DESIGN 2.4)。
-// ダッシュボードと Weekly Review 画面の両方に必ず出すこと。
+// **This carries half the value of the system** (DESIGN 2.4).
+// It must appear on both the dashboard and the Weekly Review screen.
 func (s *Service) StalledProjects(ctx context.Context) ([]*Project, error) {
 	return s.projects(ctx,
 		`WHERE p.status = 'active'
@@ -81,15 +81,15 @@ func (s *Service) StalledProjects(ctx context.Context) ([]*Project, error) {
 		 ORDER BY p.sort_order, p.id`)
 }
 
-// SomedayDueReview は再検討日が到来した Someday プロジェクト。
-// **これが無いと Someday は事実上のゴミ箱になる**(DESIGN 2.2)。
+// SomedayDueReview are someday projects whose review date has come.
+// **Without this, someday is effectively a bin** (DESIGN 2.2).
 func (s *Service) SomedayDueReview(ctx context.Context) ([]*Project, error) {
 	return s.projects(ctx,
 		`WHERE p.status = 'someday' AND p.review_on IS NOT NULL AND p.review_on <= date('now')
 		 ORDER BY p.review_on`)
 }
 
-// ProjectInput は作成/更新の入力。
+// ProjectInput is the input for create and update.
 type ProjectInput struct {
 	Title      string `json:"title"`
 	Outcome    string `json:"outcome"`
@@ -105,22 +105,22 @@ type ProjectInput struct {
 
 var validProjectStatus = map[string]bool{"active": true, "someday": true, "done": true, "dropped": true}
 
-// CreateProject はプロジェクトを作る。
+// CreateProject creates a project.
 func (s *Service) CreateProject(ctx context.Context, in ProjectInput) (*Project, error) {
 	title := strings.TrimSpace(in.Title)
 	if title == "" {
-		return nil, errors.New("タイトルが空です")
+		return nil, errors.New("the title is empty")
 	}
 	status := in.Status
 	if status == "" {
 		status = "active"
 	}
 	if !validProjectStatus[status] {
-		return nil, fmt.Errorf("status が不正です: %q", status)
+		return nil, fmt.Errorf("invalid status: %q", status)
 	}
 	if in.ReviewOn != "" {
 		if _, err := ParseDate(in.ReviewOn); err != nil {
-			return nil, fmt.Errorf("review_on は YYYY-MM-DD 形式です: %q", in.ReviewOn)
+			return nil, fmt.Errorf("review_on must be YYYY-MM-DD: %q", in.ReviewOn)
 		}
 	}
 	res, err := s.db.ExecContext(ctx,
@@ -137,7 +137,7 @@ func (s *Service) CreateProject(ctx context.Context, in ProjectInput) (*Project,
 	return s.Project(ctx, id)
 }
 
-// PatchProject は部分更新。
+// PatchProject applies a partial update.
 func (s *Service) PatchProject(ctx context.Context, id int64, in ProjectInput) (*Project, error) {
 	var out *Project
 	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
@@ -155,7 +155,7 @@ func (s *Service) PatchProject(ctx context.Context, id int64, in ProjectInput) (
 		}
 		if in.Status != "" {
 			if !validProjectStatus[in.Status] {
-				return fmt.Errorf("status が不正です: %q", in.Status)
+				return fmt.Errorf("invalid status: %q", in.Status)
 			}
 			b.Set("status", in.Status)
 			if (in.Status == "done" || in.Status == "dropped") && cur.CompletedAt == "" {
@@ -173,7 +173,7 @@ func (s *Service) PatchProject(ctx context.Context, id int64, in ProjectInput) (
 			b.Raw("note_page_id = NULL")
 		}
 		if in.ReviewOn != "" || in.Status == "active" {
-			// active に戻したら再検討日は不要になる
+			// Back to active: the review date is no longer needed
 			if in.ReviewOn != "" {
 				if err := b.Date("review_on", in.ReviewOn); err != nil {
 					return err
@@ -204,7 +204,8 @@ func (s *Service) PatchProject(ctx context.Context, id int64, in ProjectInput) (
 	return out, nil
 }
 
-// DeleteProject は消す。links のライフサイクルはアプリ側で管理する(DESIGN 2.1)。
+// DeleteProject deletes a project. Link lifecycle is managed here, not by the
+// database (DESIGN 2.1).
 func (s *Service) DeleteProject(ctx context.Context, id int64) error {
 	return s.db.Tx(ctx, func(tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx,

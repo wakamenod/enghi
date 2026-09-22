@@ -42,12 +42,12 @@ const plistTemplate = `<?xml version="1.0" encoding="UTF-8"?>
 </plist>
 `
 
-// cmdInstallAgent は launchd の plist を書き出す(DESIGN 8-11)。
-// 常駐させ、常にブラウザから開ける状態を保つため。
+// cmdInstallAgent writes out a launchd plist (DESIGN 8-11), so that enghi stays
+// resident and is always there when the browser asks for it.
 func cmdInstallAgent(args []string) error {
 	fs := flag.NewFlagSet("install-agent", flag.ExitOnError)
-	label := fs.String("label", "dev.enghi.server", "launchd のラベル")
-	load := fs.Bool("load", false, "書き出した後に launchctl bootstrap まで実行する")
+	label := fs.String("label", "dev.enghi.server", "launchd label")
+	load := fs.Bool("load", false, "run launchctl bootstrap after writing the plist")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -81,25 +81,25 @@ func cmdInstallAgent(args []string) error {
 	if err := os.WriteFile(plistPath, []byte(content), 0o600); err != nil {
 		return err
 	}
-	fmt.Printf("書き出した: %s\n", plistPath)
-	fmt.Printf("  実行ファイル: %s\n", exe)
-	fmt.Printf("  ログ: %s\n", outLog)
-	fmt.Printf("  設定: %s\n", config.Path())
+	fmt.Printf("wrote: %s\n", plistPath)
+	fmt.Printf("  executable: %s\n", exe)
+	fmt.Printf("  log: %s\n", outLog)
+	fmt.Printf("  config: %s\n", config.Path())
 
 	if !*load {
-		fmt.Printf("\n有効にするには:\n  launchctl bootstrap gui/$(id -u) %s\n", plistPath)
-		fmt.Printf("止めるには:\n  launchctl bootout gui/$(id -u)/%s\n", *label)
+		fmt.Printf("\nto enable it:\n  launchctl bootstrap gui/$(id -u) %s\n", plistPath)
+		fmt.Printf("to stop it:\n  launchctl bootout gui/$(id -u)/%s\n", *label)
 		return nil
 	}
 
 	uid := fmt.Sprintf("gui/%d", os.Getuid())
-	// 既に入っていれば入れ替える
+	// Replace it if it is already registered
 	_ = exec.Command("launchctl", "bootout", uid+"/"+*label).Run()
 	cmd := exec.Command("launchctl", "bootstrap", uid, plistPath)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("launchctl bootstrap: %w: %s", err, strings.TrimSpace(string(out)))
 	}
-	fmt.Println("launchd に登録した")
+	fmt.Println("registered with launchd")
 	return nil
 }

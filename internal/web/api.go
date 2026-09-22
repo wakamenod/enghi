@@ -11,8 +11,9 @@ import (
 	"github.com/wakamenod/enghi/internal/wiki"
 )
 
-// apiSearch は GET /api/search?q=&kind=&limit=&offset=
-// UI からも Emacs からも同じエンドポイントを使う。既定 50 件(DESIGN 3.7)。
+// apiSearch is GET /api/search?q=&kind=&limit=&offset=
+// The UI and Emacs use the same endpoint. The default is 50 results
+// (DESIGN 3.7).
 func (s *Server) apiSearch(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
 	var kinds []string
@@ -63,7 +64,8 @@ func (s *Server) apiCreatePage(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, p)
 }
 
-// apiGetPage は {id, slug, title, body, tags, version, links, backlinks} を返す(DESIGN 4.2)。
+// apiGetPage returns {id, slug, title, body, tags, version, links, backlinks}
+// (DESIGN 4.2).
 func (s *Server) apiGetPage(w http.ResponseWriter, r *http.Request) {
 	p, err := s.pages.BySlug(ctxOf(r), r.PathValue("slug"))
 	if err != nil {
@@ -100,7 +102,8 @@ func (s *Server) apiUpdatePage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if in.Version <= 0 {
-		// 楽観ロックは必須。version 無しの書き戻しを許すと Emacs 側の競合検出が意味を失う。
+		// The optimistic lock is mandatory. Allowing a write-back without a
+		// version would make conflict detection on the Emacs side meaningless.
 		writeErr(w, http.StatusBadRequest, "version_required", s.tr(r, "err.version_required"))
 		return
 	}
@@ -163,8 +166,8 @@ func (s *Server) apiTags(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"tags": tags})
 }
 
-// apiDashboard はダッシュボードに必要な集計を1発で返す。
-// **個別に N 本クエリを投げないこと**(DESIGN 5)。
+// apiDashboard returns everything the dashboard needs in one call.
+// **Never fire N separate queries for it** (DESIGN 5).
 func (s *Server) apiDashboard(w http.ResponseWriter, r *http.Request) {
 	d, err := s.dashboardData(ctxOf(r))
 	if err != nil {
@@ -187,8 +190,9 @@ func (s *Server) apiDoctor(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": len(problems) == 0, "problems": out})
 }
 
-// apiExport は出力先をリクエストから受け取らない。
-// **設定ファイルの値に固定する。任意パスへの書き出しを外部から起動できる状態は危険**(DESIGN 4.4)。
+// apiExport does not take the destination from the request.
+// **It is fixed to the value in the configuration file: being able to trigger a
+// write to an arbitrary path from outside is dangerous** (DESIGN 4.4).
 func (s *Server) apiExport(w http.ResponseWriter, r *http.Request) {
 	res, err := export.Run(ctxOf(r), s.db, s.files, s.cfg.ExportDir)
 	if err != nil {
@@ -198,8 +202,9 @@ func (s *Server) apiExport(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, res)
 }
 
-// apiBackup は DB のバックアップを取る。
-// **出力先はリクエストから受け取らない。**設定ファイルの値に固定する(export と同じ)。
+// apiBackup backs the database up.
+// **The destination does not come from the request**; it is fixed to the
+// configuration file, as with export.
 func (s *Server) apiBackup(w http.ResponseWriter, r *http.Request) {
 	b, err := store.RunBackup(ctxOf(r), s.db, s.files, s.cfg.BackupDir, s.cfg.BackupKeep)
 	if err != nil {
@@ -209,7 +214,7 @@ func (s *Server) apiBackup(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, b)
 }
 
-// apiBackups は現存するバックアップを新しい順に返す。
+// apiBackups returns the existing backups, newest first.
 func (s *Server) apiBackups(w http.ResponseWriter, r *http.Request) {
 	list, err := store.Backups(s.cfg.BackupDir)
 	if err != nil {
@@ -230,9 +235,10 @@ func (s *Server) apiNotFound(w http.ResponseWriter, err error) {
 	writeErr(w, http.StatusInternalServerError, "query_failed", err.Error())
 }
 
-// apiTitles は GET /api/titles?q=&limit=
-// [[...]] の補完候補。**タイトルと別名だけを引く**(本文は見ない)。
-// 候補に出たものは必ず [[ ]] で解決されることを保証したいため(DESIGN 2.5)。
+// apiTitles is GET /api/titles?q=&limit=
+// Candidates for [[...]] completion. **Only titles and aliases are searched**,
+// never bodies, so that everything offered is guaranteed to resolve inside
+// [[ ]] (DESIGN 2.5).
 func (s *Server) apiTitles(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	titles, err := s.pages.SuggestTitles(ctxOf(r), q.Get("q"), atoiDefault(q.Get("limit"), 10))

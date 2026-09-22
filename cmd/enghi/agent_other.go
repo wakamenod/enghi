@@ -4,8 +4,8 @@ package main
 
 import "fmt"
 
-// 常駐の仕組みは OS ごとに違う。対応しているのは launchd(macOS)と
-// systemd(Linux)だけで、それ以外では自前で常駐させてもらう。
+// Running as a service differs per OS. We support launchd (macOS) and systemd
+// (Linux) only; anywhere else, set it up yourself.
 func cmdInstallAgent([]string) error {
-	return fmt.Errorf("install-agent は macOS(launchd)と Linux(systemd)のみ対応している")
+	return fmt.Errorf("install-agent supports macOS (launchd) and Linux (systemd) only")
 }

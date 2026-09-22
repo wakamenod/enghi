@@ -1,12 +1,14 @@
-// Package files は記事に貼る画像などのバイナリを保管する。
+// Package files stores the binaries pasted into articles, such as images.
 //
-// **本体の DB とは別の SQLite ファイルに置く。**
-// 記事もタスクも本体 DB が正本であるという原則は変えないが、バイナリを同じ
-// ファイルに混ぜると、毎日の `VACUUM INTO` が画像ごと全部コピーすることになり、
-// バックアップの費用が中身の量に比例して増えていく。分けておけば本体は数十 MB の
-// ままで、頻繁に安く取れる。
+// **They live in a SQLite file of their own, separate from the main database.**
+// The principle that the main database is the source of truth for articles and
+// tasks does not change, but mixing binaries into the same file would make the
+// daily `VACUUM INTO` copy every image too, and the cost of a backup would grow
+// with the content. Kept apart, the main database stays tens of megabytes and
+// can be backed up often and cheaply.
 //
-// 内容でアドレスする(SHA-256)。同じ画像を何度貼っても実体は1つ。
+// Storage is content-addressed (SHA-256): pasting the same image again and
+// again stores it once.
 package files
 
 import (
@@ -28,22 +30,23 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-// MaxBytes は1ファイルの上限。
+// MaxBytes is the per-file limit.
 const MaxBytes = 32 << 20 // 32 MiB
 
-// ErrNotFound は対象が無いとき。
+// ErrNotFound is returned when the target does not exist.
 var ErrNotFound = errors.New("not found")
 
-// ErrTooLarge は上限を超えたとき。
-var ErrTooLarge = errors.New("ファイルが大きすぎる")
+// ErrTooLarge is returned when the limit is exceeded.
+var ErrTooLarge = errors.New("the file is too large")
 
-// ErrUnsupportedType は受け付けない種別のとき。
-var ErrUnsupportedType = errors.New("この種別は受け付けない")
+// ErrUnsupportedType is returned for a media type that is not accepted.
+var ErrUnsupportedType = errors.New("this media type is not accepted")
 
-// allowed は受け付ける media type と拡張子。
+// allowed maps accepted media types to their extensions.
 //
-// **SVG は受け付けない。**スクリプトを含められるうえ、同一オリジンで配信するため、
-// 記事に貼った SVG から Cookie や DOM に触れる経路ができてしまう。
+// **SVG is not accepted.** It can carry script, and since files are served from
+// the same origin, an SVG pasted into an article would have a path to cookies
+// and the DOM.
 var allowed = map[string]string{
 	"image/png":       ".png",
 	"image/jpeg":      ".jpg",
@@ -53,10 +56,10 @@ var allowed = map[string]string{
 	"application/pdf": ".pdf",
 }
 
-// MediaTypeAllowed は受け付ける種別かどうか。
+// MediaTypeAllowed reports whether a media type is accepted.
 func MediaTypeAllowed(t string) bool { _, ok := allowed[t]; return ok }
 
-// Ext は media type に対応する拡張子を返す。
+// Ext returns the extension for a media type.
 func Ext(mediaType string) string {
 	if e, ok := allowed[mediaType]; ok {
 		return e
@@ -64,7 +67,7 @@ func Ext(mediaType string) string {
 	return ".bin"
 }
 
-// File はメタデータ(本体は含めない)。
+// File is the metadata, without the content itself.
 type File struct {
 	Hash         string `json:"hash"`
 	MediaType    string `json:"media_type"`
@@ -73,17 +76,17 @@ type File struct {
 	Height       int    `json:"height,omitempty"`
 	OriginalName string `json:"original_name,omitempty"`
 	CreatedAt    string `json:"created_at"`
-	// URL は記事から参照するときのパス。
+	// URL is the path an article references it by.
 	URL string `json:"url"`
 }
 
-// Store はバイナリの保管庫。
+// Store is the binary store.
 type Store struct {
 	db   *sql.DB
 	Path string
 }
 
-// Open はファイル用の DB を開き、必要ならスキーマを作る。
+// Open opens the file database, creating the schema when needed.
 func Open(path string) (*Store, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return nil, err
@@ -101,7 +104,8 @@ func Open(path string) (*Store, error) {
 	for _, p := range []string{
 		"PRAGMA journal_mode = WAL",
 		"PRAGMA synchronous = NORMAL",
-		// 大きな値を扱うので既定の 4KB より大きくする。空の DB にのみ効く。
+		// Larger than the 4KB default because the values are large. Only takes
+		// effect on an empty database.
 		"PRAGMA page_size = 8192",
 	} {
 		if _, err := db.Exec(p); err != nil {
@@ -111,7 +115,7 @@ func Open(path string) (*Store, error) {
 	}
 	if _, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS files (
-		  hash          TEXT    NOT NULL PRIMARY KEY,   -- sha256 の16進
+		  hash          TEXT    NOT NULL PRIMARY KEY,   -- sha256 in hex
 		  media_type    TEXT    NOT NULL,
 		  bytes         INTEGER NOT NULL,
 		  width         INTEGER NOT NULL DEFAULT 0,
@@ -129,13 +133,15 @@ func Open(path string) (*Store, error) {
 
 func (s *Store) Close() error { return s.db.Close() }
 
-// SourcePath は実体のファイルの場所(バックアップの要否判定に使う)。
+// SourcePath is where the file itself lives; the backup uses it to decide
+// whether a copy is needed.
 func (s *Store) SourcePath() string { return s.Path }
 
-// Put は内容を保存し、メタデータを返す。同じ内容が既にあれば何もしない。
+// Put stores the content and returns its metadata, doing nothing when the same
+// content is already there.
 func (s *Store) Put(ctx context.Context, data []byte, mediaType, originalName string) (*File, error) {
 	if len(data) == 0 {
-		return nil, errors.New("中身が空")
+		return nil, errors.New("the content is empty")
 	}
 	if len(data) > MaxBytes {
 		return nil, ErrTooLarge
@@ -147,7 +153,7 @@ func (s *Store) Put(ctx context.Context, data []byte, mediaType, originalName st
 	sum := sha256.Sum256(data)
 	hash := hex.EncodeToString(sum[:])
 
-	// 画像なら寸法を控えておく(表示のときに使う)
+	// Record the dimensions of an image, for display
 	var w, h int
 	if cfg, _, err := image.DecodeConfig(strings.NewReader(string(data))); err == nil {
 		w, h = cfg.Width, cfg.Height
@@ -163,7 +169,7 @@ func (s *Store) Put(ctx context.Context, data []byte, mediaType, originalName st
 	return s.Meta(ctx, hash)
 }
 
-// Meta はメタデータだけを返す。
+// Meta returns the metadata alone.
 func (s *Store) Meta(ctx context.Context, hash string) (*File, error) {
 	var f File
 	err := s.db.QueryRowContext(ctx,
@@ -180,7 +186,7 @@ func (s *Store) Meta(ctx context.Context, hash string) (*File, error) {
 	return &f, nil
 }
 
-// Get は本体とメタデータを返す。
+// Get returns the content together with the metadata.
 func (s *Store) Get(ctx context.Context, hash string) ([]byte, *File, error) {
 	f, err := s.Meta(ctx, hash)
 	if err != nil {
@@ -194,7 +200,7 @@ func (s *Store) Get(ctx context.Context, hash string) ([]byte, *File, error) {
 	return data, f, nil
 }
 
-// List は新しい順にメタデータを返す。
+// List returns metadata, newest first.
 func (s *Store) List(ctx context.Context, limit int) ([]File, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 100
@@ -219,7 +225,7 @@ func (s *Store) List(ctx context.Context, limit int) ([]File, error) {
 	return out, rows.Err()
 }
 
-// Hashes は保管しているすべての hash を返す(掃除に使う)。
+// Hashes returns every stored hash, for the clean-up pass.
 func (s *Store) Hashes(ctx context.Context) ([]string, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT hash FROM files`)
 	if err != nil {
@@ -237,7 +243,7 @@ func (s *Store) Hashes(ctx context.Context) ([]string, error) {
 	return out, rows.Err()
 }
 
-// Delete は1件消す。
+// Delete removes one file.
 func (s *Store) Delete(ctx context.Context, hash string) error {
 	res, err := s.db.ExecContext(ctx, `DELETE FROM files WHERE hash = ?`, hash)
 	if err != nil {
@@ -249,17 +255,17 @@ func (s *Store) Delete(ctx context.Context, hash string) error {
 	return nil
 }
 
-// Stats は件数と合計サイズ。
+// Stats returns the count and the total size.
 func (s *Store) Stats(ctx context.Context) (count int, bytes int64, err error) {
 	err = s.db.QueryRowContext(ctx,
 		`SELECT count(*), COALESCE(sum(bytes), 0) FROM files`).Scan(&count, &bytes)
 	return
 }
 
-// Vacuum はバックアップ用に一貫したスナップショットを書き出す。
+// Vacuum writes a consistent snapshot for the backup.
 func (s *Store) VacuumInto(ctx context.Context, path string) error {
 	if strings.ContainsAny(path, "'\x00") {
-		return fmt.Errorf("パスに使えない文字がある: %q", path)
+		return fmt.Errorf("the path contains characters that cannot be used: %q", path)
 	}
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return err

@@ -30,7 +30,7 @@ func scanArea(row interface{ Scan(...any) error }) (*Area, error) {
 	return &a, nil
 }
 
-// Areas は責任範囲の一覧。
+// Areas lists the areas of responsibility.
 func (s *Service) Areas(ctx context.Context) ([]*Area, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT `+areaCols+` `+areaFrom+` WHERE a.archived = 0 ORDER BY a.sort_order, a.id`)
@@ -49,12 +49,12 @@ func (s *Service) Areas(ctx context.Context) ([]*Area, error) {
 	return out, rows.Err()
 }
 
-// Area は1件。
+// Area returns one area.
 func (s *Service) Area(ctx context.Context, id int64) (*Area, error) {
 	return scanArea(s.db.QueryRowContext(ctx, `SELECT `+areaCols+` `+areaFrom+` WHERE a.id = ?`, id))
 }
 
-// AreaInput は作成/更新の入力。
+// AreaInput is the input for create and update.
 type AreaInput struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
@@ -64,11 +64,12 @@ type AreaInput struct {
 	ClearNote   bool   `json:"clear_note_page,omitempty"`
 }
 
-// CreateArea は責任範囲を作る。**Area は完了しない**(DESIGN 2.2)。
+// CreateArea creates an area of responsibility. **Areas never complete**
+// (DESIGN 2.2).
 func (s *Service) CreateArea(ctx context.Context, in AreaInput) (*Area, error) {
 	name := strings.TrimSpace(in.Name)
 	if name == "" {
-		return nil, errors.New("名前が空です")
+		return nil, errors.New("the name is empty")
 	}
 	res, err := s.db.ExecContext(ctx,
 		`INSERT INTO areas(name, description, note_page_id) VALUES (?, ?, ?)`,
@@ -83,7 +84,7 @@ func (s *Service) CreateArea(ctx context.Context, in AreaInput) (*Area, error) {
 	return s.Area(ctx, id)
 }
 
-// PatchArea は部分更新。
+// PatchArea applies a partial update.
 func (s *Service) PatchArea(ctx context.Context, id int64, in AreaInput) (*Area, error) {
 	b := &setBuilder{}
 	if in.Name != "" {
@@ -119,13 +120,14 @@ func (s *Service) PatchArea(ctx context.Context, id int64, in AreaInput) (*Area,
 	return s.Area(ctx, id)
 }
 
-// ProjectsOfArea は Area 配下のプロジェクト。
+// ProjectsOfArea are the projects under an area.
 func (s *Service) ProjectsOfArea(ctx context.Context, areaID int64) ([]*Project, error) {
 	return s.projects(ctx, `WHERE p.area_id = ? ORDER BY
 		CASE p.status WHEN 'active' THEN 0 WHEN 'someday' THEN 1 ELSE 2 END, p.sort_order`, areaID)
 }
 
-// TasksOfArea は Area に直接紐づくタスク(プロジェクト化するほどでない単発行動)。
+// TasksOfArea are the tasks attached straight to an area: one-off actions not
+// worth making a project of.
 func (s *Service) TasksOfArea(ctx context.Context, areaID int64) ([]*Task, error) {
 	return s.tasks(ctx, `WHERE t.area_id = ? AND t.state NOT IN ('done','dropped')
 		ORDER BY t.sort_order, t.id`, areaID)
@@ -133,7 +135,8 @@ func (s *Service) TasksOfArea(ctx context.Context, areaID int64) ([]*Task, error
 
 // ---------------------------------------------------------------- Context
 
-// Contexts は @電話 @オフィス などの一覧。Count は Next Action の件数。
+// Contexts lists the contexts (@phone, @office, ...). Count is the number of
+// next actions in each.
 func (s *Service) Contexts(ctx context.Context) ([]*Context, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT c.id, c.name, c.sort_order, c.archived,
@@ -156,7 +159,7 @@ func (s *Service) Contexts(ctx context.Context) ([]*Context, error) {
 	return out, rows.Err()
 }
 
-// ContextByName は名前で引く。
+// ContextByName looks a context up by name.
 func (s *Service) ContextByName(ctx context.Context, name string) (*Context, error) {
 	var c Context
 	var archived int
@@ -173,15 +176,15 @@ func (s *Service) ContextByName(ctx context.Context, name string) (*Context, err
 	return &c, nil
 }
 
-// CreateContext は実行文脈を作る。
+// CreateContext creates a context.
 func (s *Service) CreateContext(ctx context.Context, name string) (*Context, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return nil, errors.New("名前が空です")
+		return nil, errors.New("the name is empty")
 	}
 	res, err := s.db.ExecContext(ctx, `INSERT INTO contexts(name) VALUES (?)`, name)
 	if err != nil {
-		return nil, fmt.Errorf("コンテキスト %q: %w", name, err)
+		return nil, fmt.Errorf("context %q: %w", name, err)
 	}
 	id, _ := res.LastInsertId()
 	var c Context

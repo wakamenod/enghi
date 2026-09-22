@@ -1,4 +1,4 @@
-// Package wiki はページ、タイトル名前空間、タグ、リンクを扱う。
+// Package wiki handles pages, the title namespace, tags and links.
 package wiki
 
 import (
@@ -9,11 +9,12 @@ import (
 	"github.com/wakamenod/enghi/internal/textnorm"
 )
 
-// Slugify は URL 用の slug を作る。**必ず小文字に正規化する**(DESIGN 2.1)。
-// APFS は大小を区別しないため、Foo と foo を別ページにするとエクスポート時に衝突する。
+// Slugify builds the slug used in URLs. **It always lower-cases** (DESIGN 2.1).
+// APFS is case-insensitive, so Foo and foo as separate pages collide on export.
 func Slugify(s string) string {
-	// **正規化を先に行う。**macOS は「ビ」を「ヒ」+ 濁点で渡してくることがあり、
-	// 揃えないと見た目が同じ別の slug ができる(textnorm を参照)。
+	// **Normalize first.** macOS may hand us "ビ" as "ヒ" plus a combining
+	// dakuten; without normalizing, two identical-looking slugs differ (see
+	// textnorm).
 	s = textnorm.NFC(strings.ToLower(strings.TrimSpace(s)))
 	var b strings.Builder
 	prevDash := false
@@ -25,18 +26,18 @@ func Slugify(s string) string {
 				prevDash = true
 			}
 		case unicode.IsControl(r):
-			// 捨てる
+			// drop it
 		case r == '.' && b.Len() == 0:
-			// 先頭のドットは捨てる(隠しファイルになるため)
+			// drop a leading dot: it would make a hidden file
 		case strings.ContainsRune(`"'<>:|?*#%&{}$!@+`+"`", r):
-			// ファイル名と URL で面倒になる文字は捨てる
+			// drop characters that are awkward in file names and URLs
 		default:
 			b.WriteRune(r)
 			prevDash = false
 		}
 	}
 	out := strings.Trim(b.String(), "-.")
-	// ".." が残らないようにする(エクスポート時のパストラバーサル防止)
+	// Make sure no ".." survives (path traversal on export)
 	for strings.Contains(out, "..") {
 		out = strings.ReplaceAll(out, "..", ".")
 	}
@@ -52,16 +53,17 @@ var (
 	wikilinkRe = regexp.MustCompile(`\[\[([^\[\]|\n]+)(?:\|([^\[\]\n]*))?\]\]`)
 )
 
-// Wikilink は本文中の [[...]] 1件。
+// Wikilink is one [[...]] in a body.
 type Wikilink struct {
-	Title string // [[ と ]] の間に書かれたタイトル(生の文字列)
-	Label string // [[Title|Label]] の Label。無ければ空
+	Title string // the title written between [[ and ]], raw
+	Label string // the Label of [[Title|Label]]; empty when absent
 }
 
-// ParseLinks は本文から [[...]] を抽出する。コードブロックとインラインコードは除外する。
-// 同じタイトルの重複は1件にまとめる(links の UNIQUE 制約と対応させるため)。
+// ParseLinks extracts [[...]] from a body, skipping code blocks and inline
+// code. Duplicates of the same title collapse into one, to match the UNIQUE
+// constraint on links.
 func ParseLinks(body string) []Wikilink {
-	// コード部分は同じ長さの空白に置換して位置を保つ
+	// Blank out code spans with spaces of the same length to keep offsets
 	blank := func(s string) string {
 		return strings.Map(func(r rune) rune {
 			if r == '\n' {
@@ -80,7 +82,7 @@ func ParseLinks(body string) []Wikilink {
 		if title == "" {
 			continue
 		}
-		// タイトルは NOCASE なので重複判定も大小を無視する
+		// Titles are NOCASE, so duplicate detection ignores case too
 		key := strings.ToLower(title)
 		if seen[key] {
 			continue
@@ -91,12 +93,14 @@ func ParseLinks(body string) []Wikilink {
 	return out
 }
 
-// Bigrams は文字列を bigram に分割する。titles_fts への格納と、
-// 2 文字クエリの検索の両方で **同じ関数を通すこと**(DESIGN 3.4)。
+// Bigrams splits a string into bigrams. Storing into titles_fts and searching
+// with a two-character query **must go through this same function**
+// (DESIGN 3.4).
 //
 //	"オフィス移転" → "オフ フィ ィス ス移 移転"
 //
-// 空白で区切られた語の境界は跨がない。1 文字の語はその文字自体を1トークンとする。
+// Bigrams never cross a whitespace-separated word boundary. A one-character
+// word becomes a single token of that character.
 func Bigrams(s string) string {
 	var toks []string
 	for _, field := range strings.Fields(textnorm.NFC(strings.ToLower(s))) {

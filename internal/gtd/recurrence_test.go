@@ -28,45 +28,46 @@ func next(t *testing.T, rule, scheduled, completed, today string) string {
 	return gtd.FormatDate(r.Next(s, d(completed), d(today)))
 }
 
-// +1w と .+1w の違いは実用上とても重要(DESIGN 2.6)。
-// ゴミ出しは曜日が固定、シーツの洗濯はやった日から2週間後。
+// The difference between +1w and .+1w matters a lot in practice (DESIGN 2.6):
+// bin day is fixed to a weekday, washing the sheets is two weeks after you last
+// did it.
 func TestFixedIntervalVsFromCompletion(t *testing.T) {
-	// 4/1 の予定を 4/5 に完了した場合
-	// +1w は **予定日** 基準 → 4/8
+	// Scheduled for 4/1, completed on 4/5
+	// +1w counts from the **scheduled date** -> 4/8
 	if got := next(t, "+1w", "2025-04-01", "2025-04-05", "2025-04-05"); got != "2025-04-08" {
-		t.Errorf("+1w = %s, want 2025-04-08(予定日基準)", got)
+		t.Errorf("+1w = %s, want 2025-04-08 (from the scheduled date)", got)
 	}
-	// .+1w は **完了日** 基準 → 4/12
+	// .+1w counts from the **completion date** -> 4/12
 	if got := next(t, ".+1w", "2025-04-01", "2025-04-05", "2025-04-05"); got != "2025-04-12" {
-		t.Errorf(".+1w = %s, want 2025-04-12(完了日基準)", got)
+		t.Errorf(".+1w = %s, want 2025-04-12 (from the completion date)", got)
 	}
 }
 
-// ++ は「溜めずに次に進む」ためのもの。長期放置を現在まで一気に追いつかせる。
+// ++ exists to move on without piling up: it catches long neglect up to now.
 func TestCatchupAdvancesPastToday(t *testing.T) {
-	// 1/1 の予定を半年放置して 7/10 に処理した
+	// Scheduled for 1/1, left for half a year, handled on 7/10
 	got := next(t, "++1w", "2025-01-01", "2025-07-10", "2025-07-10")
 	if got != "2025-07-16" {
-		t.Errorf("++1w = %s, want 2025-07-16(今日より後の最初の水曜)", got)
+		t.Errorf("++1w = %s, want 2025-07-16 (the first Wednesday after today)", got)
 	}
-	// 素の +1w は1回分しか進めない(過去のまま)
+	// Plain +1w advances once only, staying in the past
 	if got := next(t, "+1w", "2025-01-01", "2025-07-10", "2025-07-10"); got != "2025-01-08" {
-		t.Errorf("+1w = %s, want 2025-01-08(1回分だけ進める)", got)
+		t.Errorf("+1w = %s, want 2025-01-08 (advance once only)", got)
 	}
 }
 
-// 存在しない日付はその月の最終日に丸める。
+// A date that does not exist is clamped to the last day of that month.
 func TestMonthEndClamping(t *testing.T) {
 	cases := []struct{ rule, sched, want string }{
-		// 1/31 + 1ヶ月 = 2/28(3/3 に繰り上げない)
+		// 1/31 plus a month = 2/28, not 3/3
 		{"+1m", "2025-01-31", "2025-02-28"},
-		// 閏年は 2/29
+		// 2/29 in a leap year
 		{"+1m", "2024-01-31", "2024-02-29"},
-		// 3/31 + 1ヶ月 = 4/30
+		// 3/31 plus a month = 4/30
 		{"+1m", "2025-03-31", "2025-04-30"},
-		// 2/29 + 1年 = 2/28(平年)
+		// 2/29 plus a year = 2/28 in a common year
 		{"+1y", "2024-02-29", "2025-02-28"},
-		// 12月をまたぐ
+		// Crossing December
 		{"+1m", "2025-12-31", "2026-01-31"},
 		{"+2m", "2025-12-31", "2026-02-28"},
 	}
@@ -77,47 +78,47 @@ func TestMonthEndClamping(t *testing.T) {
 	}
 }
 
-// weekly:tue,fri のゴミ出し。
+// Bin day, weekly:tue,fri.
 func TestWeekly(t *testing.T) {
-	// 2025-04-01 は火曜。完了したら次は金曜
+	// 2025-04-01 is a Tuesday; completing it gives Friday next
 	if got := next(t, "weekly:tue,fri", "2025-04-01", "2025-04-01", "2025-04-01"); got != "2025-04-04" {
-		t.Errorf("火曜に完了 → %s, want 2025-04-04(金)", got)
+		t.Errorf("completed on Tuesday -> %s, want 2025-04-04 (Friday)", got)
 	}
-	// 金曜に完了したら次は火曜
+	// Completing on Friday gives Tuesday next
 	if got := next(t, "weekly:tue,fri", "2025-04-04", "2025-04-04", "2025-04-04"); got != "2025-04-08" {
-		t.Errorf("金曜に完了 → %s, want 2025-04-08(火)", got)
+		t.Errorf("completed on Friday -> %s, want 2025-04-08 (Tuesday)", got)
 	}
-	// 単一曜日
+	// A single weekday
 	if got := next(t, "weekly:mon", "2025-04-07", "2025-04-07", "2025-04-07"); got != "2025-04-14" {
 		t.Errorf("weekly:mon = %s, want 2025-04-14", got)
 	}
-	// 遅れて処理した場合も、過去の日付を返さない
+	// Handled late, it still never returns a date in the past
 	if got := next(t, "weekly:tue", "2025-04-01", "2025-04-10", "2025-04-10"); got != "2025-04-15" {
-		t.Errorf("遅れて処理 → %s, want 2025-04-15(今日より後)", got)
+		t.Errorf("handled late -> %s, want 2025-04-15 (after today)", got)
 	}
 }
 
-// monthly:25 の経費精算、monthly:last の月末。
+// Expenses on monthly:25, and month end with monthly:last.
 func TestMonthly(t *testing.T) {
 	if got := next(t, "monthly:25", "2025-04-25", "2025-04-25", "2025-04-25"); got != "2025-05-25" {
 		t.Errorf("monthly:25 = %s, want 2025-05-25", got)
 	}
-	// 月初に処理したら当月の25日
+	// Handled early in the month gives the 25th of the same month
 	if got := next(t, "monthly:25", "2025-04-01", "2025-04-01", "2025-04-01"); got != "2025-04-25" {
 		t.Errorf("monthly:25 = %s, want 2025-04-25", got)
 	}
-	// 31日指定で2月をまたぐ → 月末に丸める
+	// Asking for the 31st across February clamps to the end of the month
 	if got := next(t, "monthly:31", "2025-01-31", "2025-01-31", "2025-01-31"); got != "2025-02-28" {
 		t.Errorf("monthly:31 = %s, want 2025-02-28", got)
 	}
-	// 月末
+	// Month end
 	if got := next(t, "monthly:last", "2025-01-31", "2025-01-31", "2025-01-31"); got != "2025-02-28" {
 		t.Errorf("monthly:last = %s, want 2025-02-28", got)
 	}
 	if got := next(t, "monthly:last", "2024-01-31", "2024-01-31", "2024-01-31"); got != "2024-02-29" {
-		t.Errorf("monthly:last(閏年) = %s, want 2024-02-29", got)
+		t.Errorf("monthly:last in a leap year = %s, want 2024-02-29", got)
 	}
-	// 12月末 → 1月末
+	// End of December -> end of January
 	if got := next(t, "monthly:last", "2025-12-31", "2025-12-31", "2025-12-31"); got != "2026-01-31" {
 		t.Errorf("monthly:last = %s, want 2026-01-31", got)
 	}
@@ -127,23 +128,24 @@ func TestYearly(t *testing.T) {
 	if got := next(t, "yearly:04-01", "2025-04-01", "2025-04-01", "2025-04-01"); got != "2026-04-01" {
 		t.Errorf("yearly:04-01 = %s, want 2026-04-01", got)
 	}
-	// 年初に処理したら当年の4/1
+	// Handled at the start of the year gives 4/1 of that year
 	if got := next(t, "yearly:04-01", "2025-01-10", "2025-01-10", "2025-01-10"); got != "2025-04-01" {
 		t.Errorf("yearly:04-01 = %s, want 2025-04-01", got)
 	}
-	// 2/29 指定は平年だと 2/28 に丸める
+	// 2/29 clamps to 2/28 in a common year
 	if got := next(t, "yearly:02-29", "2024-02-29", "2024-02-29", "2024-02-29"); got != "2025-02-28" {
 		t.Errorf("yearly:02-29 = %s, want 2025-02-28", got)
 	}
 }
 
-// 予定日が無いタスク(inbox から直接 done にした等)でも壊れないこと。
+// Tasks without a scheduled date - marked done straight from the inbox, say -
+// must not break this.
 func TestNoScheduledDate(t *testing.T) {
 	if got := next(t, "+3d", "", "2025-04-05", "2025-04-05"); got != "2025-04-08" {
-		t.Errorf("予定日なし +3d = %s, want 2025-04-08", got)
+		t.Errorf("no scheduled date, +3d = %s, want 2025-04-08", got)
 	}
 	if got := next(t, "weekly:mon", "", "2025-04-01", "2025-04-01"); got != "2025-04-07" {
-		t.Errorf("予定日なし weekly:mon = %s, want 2025-04-07", got)
+		t.Errorf("no scheduled date, weekly:mon = %s, want 2025-04-07", got)
 	}
 }
 
@@ -151,7 +153,7 @@ func TestParseErrors(t *testing.T) {
 	for _, bad := range []string{"", "1w", "+w", "+0d", "+1x", "weekly:", "weekly:xxx",
 		"monthly:0", "monthly:32", "monthly:abc", "yearly:13-01", "yearly:0401", "なにか"} {
 		if _, err := gtd.ParseRecurrence(bad); err == nil {
-			t.Errorf("ParseRecurrence(%q) がエラーにならない", bad)
+			t.Errorf("ParseRecurrence(%q) did not fail", bad)
 		}
 	}
 	for _, good := range []string{"+1d", "+2w", "+1m", "+1y", "++1w", ".+3d",

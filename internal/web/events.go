@@ -11,22 +11,23 @@ import (
 	"github.com/coder/websocket/wsjson"
 )
 
-// Event は /api/events で配信するメッセージ。
+// Event is a message delivered over /api/events.
 type Event struct {
 	Type string `json:"type"`           // navigate / updated
-	Path string `json:"path,omitempty"` // navigate のとき
-	Kind string `json:"kind,omitempty"` // updated のとき
+	Path string `json:"path,omitempty"` // for navigate
+	Kind string `json:"kind,omitempty"` // for updated
 	Slug string `json:"slug,omitempty"`
 }
 
-// Hub は接続中のクライアントに配信する。
-// DESIGN 4.3 の focus チャネル: Emacs で選択 → 開きっぱなしのブラウザが追従する。
+// Hub broadcasts to the connected clients.
+// The focus channel of DESIGN 4.3: pick something in Emacs and the browser tab
+// that is already open follows along.
 //
-// **SSE ではなく WebSocket を使う**(DESIGN 4.3 が第一に挙げている方式)。
-// SSE は「終わらない HTTP リクエスト」なので、ブラウザは常に読み込み中とみなし、
-// Safari ではタブのスピナーが回り続ける(実測確認済み: readyState=complete でも
-// 未完了リクエストが 1 本残る)。WebSocket は Upgrade 後に通常のリクエストではなくなるため、
-// この問題が構造的に発生しない。
+// **WebSocket, not SSE** - the option DESIGN 4.3 lists first.
+// SSE is an HTTP request that never finishes, so the browser considers the page
+// to be still loading and Safari spins the tab spinner forever (measured: with
+// readyState=complete, one unfinished request remains). After the upgrade a
+// WebSocket is no longer an ordinary request, so the problem cannot arise.
 type Hub struct {
 	mu      sync.Mutex
 	clients map[chan Event]struct{}
@@ -51,14 +52,15 @@ func (h *Hub) remove(ch chan Event) {
 	h.mu.Unlock()
 }
 
-// Broadcast は全クライアントに配信する。詰まっているクライアントは落とさず読み飛ばす。
+// Broadcast delivers to every client, skipping - not dropping - the ones that
+// are backed up.
 func (h *Hub) Broadcast(e Event) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	for ch := range h.clients {
 		select {
 		case ch <- e:
-		default: // バッファが詰まっているクライアントは諦める(常駐を止めない)
+		default: // give up on a client whose buffer is full; never stall the server
 		}
 	}
 }
@@ -69,10 +71,11 @@ func (h *Hub) Count() int {
 	return len(h.clients)
 }
 
-// originPatterns は WebSocket で許す Origin。
-// **ここは secure ミドルウェアとは別の判定なので、allowed_hosts を足し忘れると
-// 「画面は開けるのに live 更新だけ黙って繋がらない」状態になる。**
-// app.js は指数バックオフで再接続を試み続けるため、エラーも出ない。
+// originPatterns lists the origins allowed for the WebSocket.
+// **This is a separate check from the secure middleware, so forgetting to add
+// allowed_hosts here leaves "the page opens but live updates silently never
+// connect".** app.js keeps retrying with exponential backoff, so no error is
+// shown either.
 func (s *Server) originPatterns() []string {
 	out := []string{"127.0.0.1:*", "localhost:*", "[::1]:*"}
 	for _, h := range s.cfg.NormalizedAllowedHosts() {
@@ -81,15 +84,15 @@ func (s *Server) originPatterns() []string {
 	return out
 }
 
-// handleEvents は WebSocket のエンドポイント。
+// handleEvents is the WebSocket endpoint.
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
-	// Origin の検証は secure ミドルウェアが済ませているが、
-	// ライブラリ側の既定(Host と Origin の一致を要求)もそのまま効かせる。
+	// The secure middleware has already validated Origin, but the library's own
+	// default - requiring Host and Origin to match - is left in place as well.
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		OriginPatterns: s.originPatterns(),
 	})
 	if err != nil {
-		return // Accept が既にレスポンスを書いている
+		return // Accept has already written the response
 	}
 	defer conn.CloseNow()
 
@@ -98,9 +101,9 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
-	// 読み側。クライアントからは何も送られてこないが、
-	// **読まないと close フレームも ping も処理されない。**
-	// 読みが終わったら接続が閉じたということなので、書き側を止める。
+	// The read side. The client sends nothing, but **without reading, neither
+	// close frames nor pings are processed.** When the read ends the connection
+	// is gone, so the write side stops.
 	readDone := make(chan struct{})
 	go func() {
 		defer close(readDone)
@@ -111,7 +114,7 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	// 生きているかを定期的に確かめる。半開きの接続をここで解放する。
+	// Check periodically that it is still alive, releasing half-open connections
 	ping := time.NewTicker(30 * time.Second)
 	defer ping.Stop()
 
@@ -142,8 +145,8 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleFocus は POST /api/focus {path}。
-// 接続中の全クライアントに navigate を配信し、ブラウザタブを遷移させる。
+// handleFocus is POST /api/focus {path}. It broadcasts a navigate to every
+// connected client, moving the browser tab.
 func (s *Server) handleFocus(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Path string `json:"path"`
@@ -153,16 +156,16 @@ func (s *Server) handleFocus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if in.Path == "" || in.Path[0] != '/' {
-		writeErr(w, http.StatusBadRequest, "bad_request", "path は / で始まる必要があります")
+		writeErr(w, http.StatusBadRequest, "bad_request", s.tr(r, "err.path_required"))
 		return
 	}
 	s.hub.Broadcast(Event{Type: "navigate", Path: in.Path})
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "clients": s.hub.Count()})
 }
 
-// handleStatus は副作用なしにサーバの状態を返す。
-// focus チャネルが繋がっているかを確認する手段が無いと、
-// 「なぜか focus が飛ばない」ときに切り分けができない。
+// handleStatus reports the server state without side effects. Without a way to
+// check whether the focus channel is connected, "focus does not arrive for some
+// reason" cannot be diagnosed.
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":            true,

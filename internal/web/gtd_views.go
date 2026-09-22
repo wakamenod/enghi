@@ -10,7 +10,7 @@ import (
 	"github.com/wakamenod/enghi/internal/wiki"
 )
 
-// ---------------------------------------------------------------- 画面
+// ---------------------------------------------------------------- screens
 
 type gtdTopData struct {
 	InboxCount int
@@ -189,7 +189,7 @@ func (s *Server) viewProject(w http.ResponseWriter, r *http.Request) {
 	d.Areas, _ = s.gtd.Areas(ctx)
 	d.Contexts, _ = s.gtd.Contexts(ctx)
 	d.Links, _ = s.gtd.LinkedPages(ctx, "project", id)
-	// note_page_id による Wiki ページの埋め込み(DESIGN 8-19)
+	// The wiki page embedded through note_page_id (DESIGN 8-19)
 	if p.NotePageID != nil {
 		if page, err := s.pages.BySlug(ctx, p.NotePageSlug); err == nil {
 			if html, err := s.renderBody(r, page.Body); err == nil {
@@ -270,7 +270,8 @@ type clarifyData struct {
 	Areas    []*gtd.Area
 }
 
-// viewClarify は Inbox の1件を開いて「行動か資料か」を決める導線(DESIGN 8-13)。
+// viewClarify opens one inbox item to decide "action or reference"
+// (DESIGN 8-13).
 func (s *Server) viewClarify(w http.ResponseWriter, r *http.Request) {
 	ctx := ctxOf(r)
 	id, err := pathID(r)
@@ -290,7 +291,7 @@ func (s *Server) viewClarify(w http.ResponseWriter, r *http.Request) {
 	s.render(w, r, "clarify.html", viewData{Title: s.tr(r, "clarify.title", t.Title), Nav: "gtd", Data: d})
 }
 
-// ---------------------------------------------------------------- form 送信
+// ---------------------------------------------------------------- form posts
 
 func redirectBack(w http.ResponseWriter, r *http.Request, fallback string) {
 	dest := r.FormValue("return_to")
@@ -407,7 +408,7 @@ func (s *Server) completeOrSkip(w http.ResponseWriter, r *http.Request, skip boo
 	redirectBack(w, r, "/gtd/next")
 }
 
-// uiEndSeries は「この系列全体を終わらせる」。
+// uiEndSeries ends the whole series.
 func (s *Server) uiEndSeries(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r)
 	if err != nil {

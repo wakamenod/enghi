@@ -11,11 +11,12 @@ import (
 	"github.com/wakamenod/enghi/internal/textnorm"
 )
 
-// Service はページに関するすべての書き込み経路。
-// **すべての書き込みは単一トランザクションで行う**(DESIGN 10)。
+// Service is the single path for every page write.
+// **Every write happens in one transaction** (DESIGN 10).
 type Service struct {
 	db *store.DB
-	// RevisionCompactMinutes: 直前のリビジョンがこの分数以内なら上書きする(DESIGN 4.2)。
+	// RevisionCompactMinutes: overwrite the previous revision when it is newer
+	// than this many minutes (DESIGN 4.2).
 	RevisionCompactMinutes int
 }
 
@@ -28,7 +29,7 @@ func New(db *store.DB, compactMinutes int) *Service {
 
 func (s *Service) DB() *store.DB { return s.db }
 
-// ---------------------------------------------------------------- 読み取り
+// ---------------------------------------------------------------- reads
 
 const pageCols = `p.id, p.slug, p.title, p.body, p.version, p.archived, p.created_at, p.updated_at`
 
@@ -45,7 +46,7 @@ func scanPage(row interface{ Scan(...any) error }) (*Page, error) {
 	return &p, nil
 }
 
-// BySlug はページを1件返す(タグ込み)。
+// BySlug returns one page, tags included.
 func (s *Service) BySlug(ctx context.Context, slug string) (*Page, error) {
 	row := s.db.QueryRowContext(ctx,
 		`SELECT `+pageCols+` FROM pages p WHERE p.slug = ? COLLATE NOCASE`, textnorm.NFC(slug))
@@ -59,7 +60,8 @@ func (s *Service) BySlug(ctx context.Context, slug string) (*Page, error) {
 	return p, nil
 }
 
-// ByTitle は正式名・別名を区別せず1クエリで解決する(DESIGN 2.5)。
+// ByTitle resolves canonical titles and aliases alike, in one query
+// (DESIGN 2.5).
 func (s *Service) ByTitle(ctx context.Context, title string) (*Page, error) {
 	row := s.db.QueryRowContext(ctx,
 		`SELECT `+pageCols+` FROM pages p
@@ -94,7 +96,7 @@ func (s *Service) tagsOf(ctx context.Context, pageID int64) ([]string, error) {
 	return tags, rows.Err()
 }
 
-// List はページ一覧。sort は "updated" / "created" / "title"。
+// List lists pages. sort is "updated", "created" or "title".
 func (s *Service) List(ctx context.Context, sort string, limit, offset int) ([]*Page, error) {
 	order := "p.updated_at DESC"
 	switch sort {
@@ -138,14 +140,15 @@ func (s *Service) collect(ctx context.Context, rows *sql.Rows) ([]*Page, error) 
 	return out, nil
 }
 
-// CountPages は記事の総数。
+// CountPages is the total number of articles.
 func (s *Service) CountPages(ctx context.Context) (int, error) {
 	var n int
 	err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM pages WHERE archived = 0`).Scan(&n)
 	return n, err
 }
 
-// ByTag はタグでの絞り込み一覧(完全一致 JOIN。FTS には載せない。DESIGN 3.1)。
+// ByTag filters by tag, as an exact-match join. Tags are not in the FTS index
+// (DESIGN 3.1).
 func (s *Service) ByTag(ctx context.Context, tag string, limit, offset int) ([]*Page, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 100
@@ -163,7 +166,7 @@ func (s *Service) ByTag(ctx context.Context, tag string, limit, offset int) ([]*
 	return s.collect(ctx, rows)
 }
 
-// Tags は使用中のタグと件数。
+// Tags returns the tags in use with their counts.
 func (s *Service) Tags(ctx context.Context) ([]TagCount, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT t.name, count(pt.page_id) c FROM tags t
@@ -184,7 +187,7 @@ func (s *Service) Tags(ctx context.Context) ([]TagCount, error) {
 	return out, rows.Err()
 }
 
-// Links はページ本文から出ているリンク(未解決を含む)。
+// Links are the links going out of a page body, unresolved ones included.
 func (s *Service) Links(ctx context.Context, pageID int64) ([]Link, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT l.dst_kind, l.dst_id, l.dst_title, COALESCE(p.slug, ''), COALESCE(p.title, '')
@@ -212,7 +215,8 @@ func (s *Service) Links(ctx context.Context, pageID int64) ([]Link, error) {
 	return out, rows.Err()
 }
 
-// Backlinks は「このページを指している行」の逆引き1本(DESIGN 2.1)。
+// Backlinks is a single reverse lookup of the rows pointing at this page
+// (DESIGN 2.1).
 func (s *Service) Backlinks(ctx context.Context, pageID int64) ([]Backlink, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT l.src_kind, l.src_id, l.dst_title,
@@ -236,7 +240,8 @@ func (s *Service) Backlinks(ctx context.Context, pageID int64) ([]Backlink, erro
 	return out, rows.Err()
 }
 
-// UnresolvedLinks は「参照されているが実体の無いページ」。書くべき記事の示唆になる(DESIGN 5)。
+// UnresolvedLinks are pages that are referenced but do not exist - a hint at
+// what is worth writing (DESIGN 5).
 func (s *Service) UnresolvedLinks(ctx context.Context, limit int) ([]Unresolved, error) {
 	if limit <= 0 {
 		limit = 20
@@ -260,7 +265,7 @@ func (s *Service) UnresolvedLinks(ctx context.Context, limit int) ([]Unresolved,
 	return out, rows.Err()
 }
 
-// Revisions は履歴一覧(本文は含めない)。
+// Revisions lists the history without the bodies.
 func (s *Service) Revisions(ctx context.Context, pageID int64) ([]Revision, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, page_id, title, version, created_at FROM page_revisions
@@ -280,7 +285,7 @@ func (s *Service) Revisions(ctx context.Context, pageID int64) ([]Revision, erro
 	return out, rows.Err()
 }
 
-// Revision は履歴1件(本文込み)。
+// Revision is one history entry, body included.
 func (s *Service) Revision(ctx context.Context, id int64) (*Revision, error) {
 	var r Revision
 	err := s.db.QueryRowContext(ctx,
@@ -292,7 +297,8 @@ func (s *Service) Revision(ctx context.Context, id int64) (*Revision, error) {
 	return &r, err
 }
 
-// Aliases はページの別名一覧(/wiki/:slug/history の「別名」セクション。DESIGN 2.5)。
+// Aliases lists a page's aliases (the "aliases" section of
+// /wiki/:slug/history; DESIGN 2.5).
 func (s *Service) Aliases(ctx context.Context, pageID int64) ([]Alias, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT title, created_at FROM page_titles
@@ -312,7 +318,8 @@ func (s *Service) Aliases(ctx context.Context, pageID int64) ([]Alias, error) {
 	return out, rows.Err()
 }
 
-// RecentlyCreated は最近作成した記事(ダッシュボード下段)。
+// RecentlyCreated are the most recently created articles (lower half of the
+// dashboard).
 func (s *Service) RecentlyCreated(ctx context.Context, limit int) ([]*Page, error) {
 	return s.List(ctx, "created", limit, 0)
 }

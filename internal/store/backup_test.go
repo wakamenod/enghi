@@ -23,9 +23,9 @@ func openTestDB(t *testing.T) *store.DB {
 	return db
 }
 
-// バックアップが中身のある一貫した DB になっていること。
-// **単なるファイルコピーでは WAL の内容を取りこぼす**ので、
-// 「書き込んだ直後の行がバックアップから読めること」まで確かめる。
+// A backup must be a consistent database with the data in it.
+// **A plain file copy misses the contents of the WAL**, so the test goes as far
+// as reading a just-written row back out of the backup.
 func TestBackupContainsCommittedData(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()
@@ -41,10 +41,10 @@ func TestBackupContainsCommittedData(t *testing.T) {
 		t.Fatal(err)
 	}
 	if b.Bytes == 0 {
-		t.Fatal("バックアップが空")
+		t.Fatal("backup is empty")
 	}
 
-	// 取ったファイルを開いて中身を確かめる
+	// Open the file that was written and check its contents
 	copied, err := sql.Open("sqlite3", b.Path)
 	if err != nil {
 		t.Fatal(err)
@@ -53,23 +53,23 @@ func TestBackupContainsCommittedData(t *testing.T) {
 	var title string
 	if err := copied.QueryRow(
 		`SELECT title FROM pages WHERE slug = 'backup-test'`).Scan(&title); err != nil {
-		t.Fatalf("バックアップから読めない: %v", err)
+		t.Fatalf("cannot read from the backup: %v", err)
 	}
 	if title != "バックアップ対象" {
 		t.Fatalf("title = %q", title)
 	}
-	// FTS の索引も一緒に来ていること
+	// The FTS index must come along too
 	var n int
 	if err := copied.QueryRow(
 		`SELECT count(*) FROM pages_fts WHERE pages_fts MATCH '"バックアップ"'`).Scan(&n); err != nil {
-		t.Fatalf("バックアップ側で FTS が引けない: %v", err)
+		t.Fatalf("FTS is not queryable in the backup: %v", err)
 	}
 	if n != 1 {
-		t.Fatalf("FTS のヒット = %d, want 1", n)
+		t.Fatalf("FTS hits = %d, want 1", n)
 	}
 }
 
-// 同じ日に何度走っても増えないこと(名前が日付で決まる)。
+// Running several times in one day must not add files (the name is the date).
 func TestBackupIsIdempotentPerDay(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()
@@ -85,50 +85,51 @@ func TestBackupIsIdempotentPerDay(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(list) != 1 {
-		t.Fatalf("バックアップ = %d 件, want 1", len(list))
+		t.Fatalf("backups = %d, want 1", len(list))
 	}
 }
 
-// 世代の上限を超えたら古いものから消えること。
+// Beyond the generation limit, the oldest ones are deleted.
 func TestBackupRotation(t *testing.T) {
 	db := openTestDB(t)
 	dir := t.TempDir()
 
-	// 過去の日付のファイルを作って世代を用意する
+	// Create files with past dates to have generations to prune
 	for _, day := range []string{"01", "02", "03", "04", "05"} {
 		p := filepath.Join(dir, fmt.Sprintf("enghi-2026-01-%s.db", day))
 		if err := os.WriteFile(p, []byte("x"), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
-	// 今日の分を取ると 6 件になり、3 世代に切り詰められる
+	// Taking today's backup makes six, which is then trimmed to three
 	b, err := store.RunBackup(context.Background(), db, nil, dir, 3)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if b.Removed != 3 {
-		t.Errorf("削除数 = %d, want 3", b.Removed)
+		t.Errorf("removed = %d, want 3", b.Removed)
 	}
 	list, err := store.Backups(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(list) != 3 {
-		t.Fatalf("残った数 = %d, want 3", len(list))
+		t.Fatalf("remaining = %d, want 3", len(list))
 	}
-	// 新しい順に残っていること(今日の分が先頭)
+	// They stay newest first (today at the head)
 	if filepath.Base(list[0].Path) != filepath.Base(b.Path) {
-		t.Errorf("先頭 = %s, want %s", list[0].Path, b.Path)
+		t.Errorf("head = %s, want %s", list[0].Path, b.Path)
 	}
 	for _, x := range list[1:] {
 		name := filepath.Base(x.Path)
 		if name == "enghi-2026-01-01.db" || name == "enghi-2026-01-02.db" {
-			t.Errorf("古いものが残っている: %s", name)
+			t.Errorf("an old backup is still there: %s", name)
 		}
 	}
 }
 
-// 画像用 DB も一緒に控えること。分けた以上、両方無いと復旧できない。
+// The image database is copied as well: having split them, one without the
+// other cannot restore anything.
 func TestBackupIncludesFilesDB(t *testing.T) {
 	db := openTestDB(t)
 	dir := t.TempDir()
@@ -146,23 +147,23 @@ func TestBackupIncludesFilesDB(t *testing.T) {
 		t.Fatal(err)
 	}
 	if b.FilesPath == "" || b.FilesBytes == 0 {
-		t.Fatalf("画像の控えが取られていない: %+v", b)
+		t.Fatalf("the image copy was not taken: %+v", b)
 	}
 	if _, err := os.Stat(b.FilesPath); err != nil {
-		t.Fatalf("画像の控えが無い: %v", err)
+		t.Fatalf("the image copy is missing: %v", err)
 	}
 
-	// 2回目は変わっていないので取り直さない
+	// The second run changes nothing, so it must not be retaken
 	b2, err := store.RunBackup(context.Background(), db, blobs, dir, 7)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !b2.FilesSkip {
-		t.Error("変わっていないのに取り直している")
+		t.Error("retaken even though nothing changed")
 	}
 }
 
-// バックアップ先が無くても作られること。
+// The backup directory is created when it does not exist.
 func TestBackupCreatesDir(t *testing.T) {
 	db := openTestDB(t)
 	dir := filepath.Join(t.TempDir(), "まだ無い", "階層")
@@ -170,6 +171,6 @@ func TestBackupCreatesDir(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(dir); err != nil {
-		t.Fatalf("ディレクトリが作られていない: %v", err)
+		t.Fatalf("directory was not created: %v", err)
 	}
 }

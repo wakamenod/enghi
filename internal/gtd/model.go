@@ -5,7 +5,8 @@ import (
 	"fmt"
 )
 
-// Area は責任範囲(20,000ft)。**完了しない**(DESIGN 2.2)。
+// Area is an area of responsibility (20,000ft). **It never completes**
+// (DESIGN 2.2).
 type Area struct {
 	ID           int64  `json:"id"`
 	Name         string `json:"name"`
@@ -18,19 +19,22 @@ type Area struct {
 	UpdatedAt    string `json:"updated_at"`
 }
 
-// Project は GTD の中核。「1年以内に完了でき、2つ以上の行動ステップを要する、望ましい結果」。
+// Project is the core of GTD: a desired outcome that can be finished within a
+// year and takes more than one action step.
 type Project struct {
 	ID    int64  `json:"id"`
 	Title string `json:"title"`
-	// Outcome は**完了状態の記述**。GTD の作法として必須。任意入力だが UI で促す。
+	// Outcome **describes the finished state**. GTD treats it as required; the
+	// field is optional but the UI asks for it.
 	Outcome      string `json:"outcome"`
 	Status       string `json:"status"` // active / someday / done / dropped
 	AreaID       *int64 `json:"area_id,omitempty"`
 	AreaName     string `json:"area_name,omitempty"`
 	NotePageID   *int64 `json:"note_page_id,omitempty"` // Project Support Material
 	NotePageSlug string `json:"note_page_slug,omitempty"`
-	// ReviewOn は再検討日。**someday にしたプロジェクトが二度と浮上しないのを防ぐ tickler**。
-	// これが無いと Someday は事実上のゴミ箱になる(DESIGN 2.2)。
+	// ReviewOn is the review date: **the tickler that keeps a project parked in
+	// someday from never resurfacing**. Without it, someday is effectively a bin
+	// (DESIGN 2.2).
 	ReviewOn    string `json:"review_on,omitempty"`
 	SortOrder   int    `json:"sort_order"`
 	Version     int    `json:"version"`
@@ -38,25 +42,26 @@ type Project struct {
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
 
-	// 集計(一覧表示用)
+	// Aggregates, for list views
 	OpenTasks int `json:"open_tasks"`
 	NextCount int `json:"next_count"`
 }
 
-// Stalled は「Next Action が1つも無いアクティブなプロジェクト」か。
-// **これがシステムの価値の半分を担う**(DESIGN 2.4)。
+// Stalled reports whether this is an active project with no next action.
+// **This carries half the value of the system** (DESIGN 2.4).
 func (p *Project) Stalled() bool { return p.Status == "active" && p.NextCount == 0 }
 
-// Context は @電話 @オフィス などの実行文脈。
+// Context is where an action can be done: @phone, @office and so on.
 type Context struct {
 	ID        int64  `json:"id"`
 	Name      string `json:"name"`
 	SortOrder int    `json:"sort_order"`
 	Archived  bool   `json:"archived"`
-	Count     int    `json:"count"` // Next Action の件数(一覧用)。0 も意味を持つので omitempty にしない
+	Count     int    `json:"count"` // next actions in this context; 0 is meaningful, so no omitempty
 }
 
-// Task は行動。**Next Action リストに載るのは「今すぐ物理的に実行できる単一行動」だけ**。
+// Task is an action. **Only "a single action you can physically do right now"
+// belongs on the next-action list.**
 type Task struct {
 	ID    int64  `json:"id"`
 	Title string `json:"title"`
@@ -89,14 +94,14 @@ type Task struct {
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
 
-	// WaitingDays は state='waiting' のとき delegated_at からの経過日数。
+	// WaitingDays is the days since delegated_at when state='waiting'.
 	WaitingDays int `json:"waiting_days"`
 }
 
-// Recurring は定期タスクかどうか。
+// Recurring reports whether this is a recurring task.
 func (t *Task) Recurring() bool { return t.Recurrence != "" }
 
-// Series は定期タスク系列1本(Weekly Review の棚卸し用。DESIGN 2.6)。
+// Series is one recurring series, for the Weekly Review inventory (DESIGN 2.6).
 type Series struct {
 	SeriesID   int64  `json:"series_id"`
 	Title      string `json:"title"`
@@ -108,7 +113,7 @@ type Series struct {
 	LastDoneOn string `json:"last_done_on,omitempty"`
 }
 
-// Review は週次レビュー1回分。
+// Review is a single weekly review.
 type Review struct {
 	ID          int64           `json:"id"`
 	StartedAt   string          `json:"started_at"`
@@ -117,12 +122,13 @@ type Review struct {
 	Note        string          `json:"note"`
 }
 
-// ChecklistKeys は標準チェックリスト(DESIGN 2.3)。
-// **実装者が項目を思いつきで決めないこと。**
-// review_projects と review_someday がこのシステムの存在理由に直結する2項目。
+// ChecklistKeys is the standard checklist (DESIGN 2.3).
+// **Implementers do not get to invent these items.**
+// review_projects and review_someday are the two tied directly to why this
+// system exists.
 //
-// 表示の文言は i18n が `checklist.<key>` と `checklist.data.<key>` で持つ。
-// ここに文言を置くと言語を切り替えられなくなる。
+// The labels live in i18n under `checklist.<key>` and `checklist.data.<key>`.
+// Putting text here would make the language impossible to switch.
 var ChecklistKeys = []struct {
 	Key string
 }{
@@ -138,7 +144,7 @@ var ChecklistKeys = []struct {
 	{"review_recurring"},
 }
 
-// 状態。
+// States.
 const (
 	StateInbox     = "inbox"
 	StateNext      = "next"
@@ -146,8 +152,9 @@ const (
 	StateWaiting   = "waiting"
 	StateScheduled = "scheduled"
 	StateSomeday   = "someday"
-	// StateFiled は「Inbox の項目が行動ではなく参照資料と判断され、Wiki ページになった」状態。
-	// GTD 的には完了でも破棄でもないため独立した状態として持つ(DESIGN 2.2)。
+	// StateFiled means an inbox item was judged to be reference material rather
+	// than an action and became a wiki page. In GTD terms that is neither done
+	// nor dropped, hence a state of its own (DESIGN 2.2).
 	StateFiled   = "filed"
 	StateDone    = "done"
 	StateDropped = "dropped"
@@ -159,14 +166,14 @@ var validStates = map[string]bool{
 	StateDone: true, StateDropped: true,
 }
 
-// ErrNotFound は対象が無いとき。
+// ErrNotFound is returned when the target does not exist.
 var ErrNotFound = errors.New("not found")
 
-// VersionConflictError は楽観ロックの版不一致(pages と同じ扱い)。
+// VersionConflictError is an optimistic-lock mismatch, as with pages.
 type VersionConflictError struct {
 	Current *Task `json:"current"`
 }
 
 func (e *VersionConflictError) Error() string {
-	return fmt.Sprintf("version conflict: 現行の版は %d", e.Current.Version)
+	return fmt.Sprintf("version conflict: the current version is %d", e.Current.Version)
 }

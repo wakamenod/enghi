@@ -45,7 +45,7 @@ func newServer(t *testing.T) http.Handler {
 	return srv.Handler()
 }
 
-// req は既定でローカルの正しいヘッダを付ける。
+// req sets the correct local headers by default.
 func req(method, path string, body string) *http.Request {
 	var r *http.Request
 	if body == "" {
@@ -64,7 +64,8 @@ func do(h http.Handler, r *http.Request) *httptest.ResponseRecorder {
 	return w
 }
 
-// 4.4-1: Host ヘッダの検証。**DNS rebinding に対する唯一有効な防御。**
+// 4.4-1: validating the Host header. **The only effective defense against DNS
+// rebinding.**
 func TestHostHeaderIsValidated(t *testing.T) {
 	h := newServer(t)
 	for _, host := range []string{"evil.example.com", "attacker.test:7777", "192.168.1.10:7777"} {
@@ -83,37 +84,37 @@ func TestHostHeaderIsValidated(t *testing.T) {
 	}
 }
 
-// 4.4-2: Sec-Fetch-Site は**存在する場合にのみ**判定する。
-// 「存在しなければ拒否」にすると Emacs 層(url-retrieve)や curl が動かなくなる。
+// 4.4-2: Sec-Fetch-Site is judged **only when present**.
+// "Reject when absent" would break the Emacs layer (url-retrieve) and curl.
 func TestSecFetchSiteOnlyCheckedWhenPresent(t *testing.T) {
 	h := newServer(t)
 
-	// ヘッダ無し(curl / Emacs)は通る
+	// No header at all (curl / Emacs) is accepted
 	if got := do(h, req("GET", "/api/pages", "")).Code; got != http.StatusOK {
-		t.Errorf("ヘッダ無し → %d, want 200(Emacs 層が動かなくなる)", got)
+		t.Errorf("no header -> %d, want 200 (this would break the Emacs layer)", got)
 	}
-	// same-origin は通る
+	// same-origin is accepted
 	r := req("GET", "/api/pages", "")
 	r.Header.Set("Sec-Fetch-Site", "same-origin")
 	if got := do(h, r).Code; got != http.StatusOK {
 		t.Errorf("same-origin → %d, want 200", got)
 	}
-	// cross-site は弾く
+	// cross-site is rejected
 	r = req("GET", "/api/pages", "")
 	r.Header.Set("Sec-Fetch-Site", "cross-site")
 	if got := do(h, r).Code; got != http.StatusForbidden {
 		t.Errorf("cross-site → %d, want 403", got)
 	}
-	// 外部オリジンは弾く
+	// An external origin is rejected
 	r = req("GET", "/api/pages", "")
 	r.Header.Set("Origin", "https://evil.example.com")
 	if got := do(h, r).Code; got != http.StatusForbidden {
-		t.Errorf("外部 Origin → %d, want 403", got)
+		t.Errorf("external Origin -> %d, want 403", got)
 	}
 }
 
-// 4.4-3: 書き込み系は application/json のみ。
-// preflight を回避できる simple request(text/plain / form-urlencoded)経路を塞ぐ。
+// 4.4-3: writes accept application/json only, closing the simple-request paths
+// (text/plain, form-urlencoded) that avoid a preflight.
 func TestWriteRequiresJSONContentType(t *testing.T) {
 	h := newServer(t)
 	body := `{"title":"攻撃","body":"x"}`
@@ -132,21 +133,23 @@ func TestWriteRequiresJSONContentType(t *testing.T) {
 		t.Errorf("application/json → %d, want 201", got)
 	}
 
-	// 本文の無い POST も塞ぐ(/api/export のような本文不要の経路が simple request で叩かれるため)
+	// A body-less POST is closed too: paths like /api/export need no body and
+	// could otherwise be hit as a simple request
 	r := httptest.NewRequest("POST", "/api/export", nil)
 	r.Host = "127.0.0.1:7777"
 	if got := do(h, r).Code; got != http.StatusUnsupportedMediaType {
-		t.Errorf("本文の無い POST → %d, want 415", got)
+		t.Errorf("body-less POST -> %d, want 415", got)
 	}
 }
 
-// 4.2: 409 は2つの異なる意味を持つ。**機械可読なコードで区別すること。**
+// 4.2: a 409 carries two different meanings. **They are told apart by a
+// machine-readable code.**
 func TestConflictCodesAreDistinguishable(t *testing.T) {
 	h := newServer(t)
 	mustCreate := func(title string) map[string]any {
 		w := do(h, req("POST", "/api/pages", `{"title":"`+title+`","body":"x"}`))
 		if w.Code != http.StatusCreated {
-			t.Fatalf("作成に失敗 %d: %s", w.Code, w.Body.String())
+			t.Fatalf("creation failed %d: %s", w.Code, w.Body.String())
 		}
 		var p map[string]any
 		if err := json.Unmarshal(w.Body.Bytes(), &p); err != nil {
@@ -157,11 +160,11 @@ func TestConflictCodesAreDistinguishable(t *testing.T) {
 	a := mustCreate("Emacs")
 	b := mustCreate("Vim")
 
-	// version_conflict — 入力は捨てず、現行データを返す
+	// version_conflict - the input is kept and the current data returned
 	w := do(h, req("PUT", "/api/pages/"+b["slug"].(string),
 		`{"title":"Vim","body":"新しい本文","version":99}`))
 	if w.Code != http.StatusConflict {
-		t.Fatalf("version 不一致 → %d, want 409", w.Code)
+		t.Fatalf("version mismatch -> %d, want 409", w.Code)
 	}
 	var vc map[string]any
 	json.Unmarshal(w.Body.Bytes(), &vc)
@@ -169,14 +172,14 @@ func TestConflictCodesAreDistinguishable(t *testing.T) {
 		t.Errorf("error = %v, want version_conflict", vc["error"])
 	}
 	if vc["current"] == nil {
-		t.Error("current(現行データ)が返っていない。マージできない")
+		t.Error("current data was not returned, so nothing can be merged")
 	}
 
-	// title_conflict — 衝突相手のページを返す
+	// title_conflict - the colliding page is returned
 	w = do(h, req("PUT", "/api/pages/"+b["slug"].(string),
 		`{"title":"Emacs","body":"x","version":1}`))
 	if w.Code != http.StatusConflict {
-		t.Fatalf("タイトル衝突 → %d, want 409", w.Code)
+		t.Fatalf("title collision -> %d, want 409", w.Code)
 	}
 	var tc map[string]any
 	json.Unmarshal(w.Body.Bytes(), &tc)
@@ -185,21 +188,22 @@ func TestConflictCodesAreDistinguishable(t *testing.T) {
 	}
 	cp, ok := tc["conflicting_page"].(map[string]any)
 	if !ok || cp["slug"] != a["slug"] {
-		t.Errorf("衝突相手のページが返っていない: %v", tc["conflicting_page"])
+		t.Errorf("the colliding page was not returned: %v", tc["conflicting_page"])
 	}
 }
 
-// PUT は version 必須。無しを許すと Emacs 側の競合検出が意味を失う。
+// PUT requires a version. Allowing it to be omitted would make conflict
+// detection on the Emacs side meaningless.
 func TestUpdateRequiresVersion(t *testing.T) {
 	h := newServer(t)
 	do(h, req("POST", "/api/pages", `{"title":"記事","body":"x"}`))
 	w := do(h, req("PUT", "/api/pages/記事", `{"title":"記事","body":"y"}`))
 	if w.Code != http.StatusBadRequest {
-		t.Fatalf("version 無し → %d, want 400", w.Code)
+		t.Fatalf("without a version -> %d, want 400", w.Code)
 	}
 }
 
-// 4.3: POST /api/focus → 接続中のクライアントへ navigate を配信する。
+// 4.3: POST /api/focus broadcasts a navigate to the connected clients.
 func TestFocusChannelDeliversNavigate(t *testing.T) {
 	dir := t.TempDir()
 	db, err := store.Open(filepath.Join(dir, "test.db"))
@@ -226,17 +230,17 @@ func TestFocusChannelDeliversNavigate(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(ts.URL, "http") + "/api/events"
 	conn, _, err := websocket.Dial(ctx, wsURL, nil)
 	if err != nil {
-		t.Fatalf("WebSocket に接続できない: %v", err)
+		t.Fatalf("cannot connect the WebSocket: %v", err)
 	}
 	defer conn.CloseNow()
 
-	// 接続が登録されるまで待つ
+	// Wait until the connection is registered
 	deadline := time.Now().Add(3 * time.Second)
 	for srv.Hub().Count() == 0 && time.Now().Before(deadline) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	if srv.Hub().Count() != 1 {
-		t.Fatalf("接続数 = %d, want 1", srv.Hub().Count())
+		t.Fatalf("connections = %d, want 1", srv.Hub().Count())
 	}
 
 	post, _ := http.NewRequest("POST", ts.URL+"/api/focus",
@@ -253,24 +257,24 @@ func TestFocusChannelDeliversNavigate(t *testing.T) {
 
 	var got web.Event
 	if err := wsjson.Read(ctx, conn, &got); err != nil {
-		t.Fatalf("navigate が届かない: %v", err)
+		t.Fatalf("the navigate never arrived: %v", err)
 	}
 	if got.Type != "navigate" || got.Path != "/wiki/foo" {
-		t.Fatalf("受信した内容が違う: %+v", got)
+		t.Fatalf("wrong payload received: %+v", got)
 	}
 
-	// 切断したら解放されること(掴んだままの接続を残さない)
+	// Disconnecting releases it; no connection is left held
 	conn.Close(websocket.StatusNormalClosure, "")
 	deadline = time.Now().Add(3 * time.Second)
 	for srv.Hub().Count() > 0 && time.Now().Before(deadline) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	if n := srv.Hub().Count(); n != 0 {
-		t.Fatalf("切断後も接続数が %d", n)
+		t.Fatalf("still %d connection(s) after disconnect", n)
 	}
 }
 
-// クロスオリジンからの WebSocket 接続は弾く。
+// A WebSocket connection from another origin is rejected.
 func TestWebSocketRejectsCrossOrigin(t *testing.T) {
 	dir := t.TempDir()
 	db, err := store.Open(filepath.Join(dir, "test.db"))
@@ -298,11 +302,11 @@ func TestWebSocketRejectsCrossOrigin(t *testing.T) {
 	})
 	if err == nil {
 		conn.CloseNow()
-		t.Fatal("外部オリジンからの WebSocket 接続が通ってしまった")
+		t.Fatal("a WebSocket connection from an external origin was accepted")
 	}
 }
 
-// 4.4: POST /api/export は出力先を受け取らない。設定の値に固定される。
+// 4.4: POST /api/export takes no destination; it is fixed to the configuration.
 func TestExportIgnoresRequestPath(t *testing.T) {
 	h := newServer(t)
 	do(h, req("POST", "/api/pages", `{"title":"記事","body":"本文"}`))
@@ -314,7 +318,7 @@ func TestExportIgnoresRequestPath(t *testing.T) {
 	var res map[string]any
 	json.Unmarshal(w.Body.Bytes(), &res)
 	if strings.Contains(res["dir"].(string), "attacker-controlled") {
-		t.Fatalf("リクエストの出力先が使われた: %v", res["dir"])
+		t.Fatalf("the destination from the request was used: %v", res["dir"])
 	}
 }
 
@@ -323,18 +327,18 @@ func TestPagesAPIRoundTrip(t *testing.T) {
 	w := do(h, req("POST", "/api/pages",
 		`{"title":"Emacs","body":"[[Vim]] への言及","tags":["技術","メモ"]}`))
 	if w.Code != http.StatusCreated {
-		t.Fatalf("作成 → %d: %s", w.Code, w.Body.String())
+		t.Fatalf("create -> %d: %s", w.Code, w.Body.String())
 	}
 
 	w = do(h, req("GET", "/api/pages/emacs", ""))
 	if w.Code != http.StatusOK {
-		t.Fatalf("取得 → %d", w.Code)
+		t.Fatalf("fetch -> %d", w.Code)
 	}
 	var p map[string]any
 	json.Unmarshal(w.Body.Bytes(), &p)
 	for _, key := range []string{"id", "slug", "title", "body", "tags", "version", "links", "backlinks"} {
 		if _, ok := p[key]; !ok {
-			t.Errorf("レスポンスに %q が無い", key)
+			t.Errorf("the response has no %q", key)
 		}
 	}
 	links := p["links"].([]any)
@@ -342,16 +346,17 @@ func TestPagesAPIRoundTrip(t *testing.T) {
 		t.Fatalf("links = %v", links)
 	}
 	if links[0].(map[string]any)["resolved"] != false {
-		t.Error("[[Vim]] は未解決リンクのはず")
+		t.Error("[[Vim]] should be an unresolved link")
 	}
 
-	// 本文の無い DELETE に Content-Type を要求しない(Emacs 層と curl を壊さない)
+	// A body-less DELETE is not required to carry a Content-Type, so the Emacs
+	// layer and curl keep working
 	w = do(h, req("DELETE", "/api/pages/emacs", ""))
 	if w.Code != http.StatusOK {
-		t.Fatalf("削除 → %d", w.Code)
+		t.Fatalf("delete -> %d", w.Code)
 	}
 	if got := do(h, req("GET", "/api/pages/emacs", "")).Code; got != http.StatusNotFound {
-		t.Fatalf("削除後の取得 → %d, want 404", got)
+		t.Fatalf("fetch after delete -> %d, want 404", got)
 	}
 }
 
@@ -373,7 +378,8 @@ func TestHTMLPagesRender(t *testing.T) {
 	}
 }
 
-// wikilink のレンダリング: 解決済みはリンク、未解決は作成画面へ。
+// Rendering wikilinks: resolved ones become links, unresolved ones point at
+// the create screen.
 func TestWikilinkRendering(t *testing.T) {
 	h := newServer(t)
 	do(h, req("POST", "/api/pages", `{"title":"Vim","body":"エディタ"}`))
@@ -382,17 +388,18 @@ func TestWikilinkRendering(t *testing.T) {
 	w := do(h, req("GET", "/wiki/emacs", ""))
 	body := w.Body.String()
 	if !strings.Contains(body, `href="/wiki/vim"`) {
-		t.Error("解決済みリンクが張られていない")
+		t.Error("no link was rendered for a resolved wikilink")
 	}
 	if !strings.Contains(body, `wikilink-new`) {
-		t.Error("未解決リンクが区別されていない")
+		t.Error("unresolved links are not distinguished")
 	}
 	if !strings.Contains(body, "別名表示") {
-		t.Error("[[Title|Label]] の Label が出ていない")
+		t.Error("the Label of [[Title|Label]] is missing")
 	}
 }
 
-// GET /api/titles は [[...]] の補完候補を返す。本文は見ない。
+// GET /api/titles returns candidates for [[...]] completion, never touching
+// bodies.
 func TestTitlesAPI(t *testing.T) {
 	h := newServer(t)
 	do(h, req("POST", "/api/pages", `{"title":"Emacs","body":"本文"}`))
@@ -410,25 +417,25 @@ func TestTitlesAPI(t *testing.T) {
 	}
 	json.Unmarshal(w.Body.Bytes(), &res)
 	if len(res.Titles) != 1 {
-		t.Fatalf("本文ヒットは候補に入れない: %+v", res.Titles)
+		t.Fatalf("body hits must not be offered: %+v", res.Titles)
 	}
 	if res.Titles[0].Title != "Emacs" || res.Titles[0].Slug != "emacs" {
-		t.Fatalf("候補: %+v", res.Titles[0])
+		t.Fatalf("candidate: %+v", res.Titles[0])
 	}
 }
 
-// 静的ファイルは内容のハッシュを ETag と ?v= に載せる。
-// embed.FS の ModTime はゼロで Last-Modified が効かないため、これが無いと
-// 「CSS を直したのに画面が変わらない」が起きる(static.go)。
+// Static files carry the content hash in the ETag and in ?v=.
+// ModTime in an embed.FS is zero so Last-Modified does nothing, and without this
+// you get "I fixed the CSS but the page looks the same" (static.go).
 func TestStaticAssetsAreFingerprinted(t *testing.T) {
 	h := newServer(t)
 
-	// テンプレートは ?v= 付きの URL を出すこと
+	// Templates must emit the URL with ?v=
 	w := do(h, req("GET", "/wiki", ""))
 	body := w.Body.String()
 	m := regexp.MustCompile(`/static/app\.css\?v=([a-f0-9]{8})`).FindStringSubmatch(body)
 	if m == nil {
-		t.Fatalf("テンプレートに ?v= 付きの app.css が無い")
+		t.Fatalf("no app.css with ?v= in the template output")
 	}
 
 	w = do(h, req("GET", "/static/app.css?v="+m[1], ""))
@@ -437,27 +444,28 @@ func TestStaticAssetsAreFingerprinted(t *testing.T) {
 	}
 	etag := w.Header().Get("ETag")
 	if etag == "" {
-		t.Fatal("ETag が無い")
+		t.Fatal("no ETag")
 	}
 	if cc := w.Header().Get("Cache-Control"); !strings.Contains(cc, "immutable") {
 		t.Fatalf("Cache-Control = %q", cc)
 	}
 
-	// 同じ ETag で問い合わせたら 304
+	// The same ETag must answer 304
 	r := req("GET", "/static/app.css?v="+m[1], "")
 	r.Header.Set("If-None-Match", etag)
 	if w := do(h, r); w.Code != http.StatusNotModified {
 		t.Fatalf("If-None-Match → %d, want 304", w.Code)
 	}
 
-	// 同梱したフォントも配れること(オフラインで動く前提)
+	// The bundled fonts must be served too, since this works offline
 	if w := do(h, req("GET", "/static/fonts/inter-latin-wght-normal.woff2", "")); w.Code != http.StatusOK {
-		t.Fatalf("フォント → %d", w.Code)
+		t.Fatalf("font -> %d", w.Code)
 	}
 }
 
-// allowed_hosts を設定すると、その名前の Host / Origin だけが追加で通る。
-// **ワイルドカードは無い。設定しなければ従来どおりループバックのみ**(DESIGN 4.4)。
+// Setting allowed_hosts additionally accepts that exact Host / Origin.
+// **There is no wildcard, and without the setting it stays loopback-only**
+// (DESIGN 4.4).
 func TestAllowedHosts(t *testing.T) {
 	dir := t.TempDir()
 	db, err := store.Open(filepath.Join(dir, "test.db"))
@@ -473,7 +481,7 @@ func TestAllowedHosts(t *testing.T) {
 
 	cfg := config.Default()
 	cfg.ExportDir, cfg.BackupDir = filepath.Join(dir, "e"), filepath.Join(dir, "b")
-	cfg.AllowedHosts = []string{"Macbook.local"} // 大小は区別しない
+	cfg.AllowedHosts = []string{"Macbook.local"} // case-insensitive
 	srv, err := web.New(cfg, db, blobs)
 	if err != nil {
 		t.Fatal(err)
@@ -488,32 +496,32 @@ func TestAllowedHosts(t *testing.T) {
 		return w.Code
 	}
 	if c := get("macbook.local"); c != http.StatusOK {
-		t.Errorf("許可した名前が通らない: %d", c)
+		t.Errorf("an allowed name was rejected: %d", c)
 	}
 	if c := get("MACBOOK.local:443"); c != http.StatusOK {
-		t.Errorf("大小とポートを無視すること: %d", c)
+		t.Errorf("case and port must be ignored: %d", c)
 	}
 	if c := get("127.0.0.1:7777"); c != http.StatusOK {
-		t.Errorf("ループバックは従来どおり通ること: %d", c)
+		t.Errorf("loopback must keep working: %d", c)
 	}
-	// 設定していない名前は今までどおり弾く
+	// A name that was not configured is rejected as before
 	for _, bad := range []string{"evil.com", "macbook.local.evil.com", "x.macbook.local"} {
 		if c := get(bad); c != http.StatusForbidden {
-			t.Errorf("%s が通ってしまった: %d", bad, c)
+			t.Errorf("%s was accepted: %d", bad, c)
 		}
 	}
-	// Origin も同じ基準で判定される(allowedOrigin が allowedHost を呼ぶ)
+	// Origin is judged by the same rule (allowedOrigin calls allowedHost)
 	r := httptest.NewRequest("GET", "/wiki", nil)
 	r.Host = "macbook.local"
 	r.Header.Set("Origin", "https://macbook.local")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	if w.Code != http.StatusOK {
-		t.Errorf("同じ名前の Origin が弾かれた: %d", w.Code)
+		t.Errorf("an Origin with the same name was rejected: %d", w.Code)
 	}
 }
 
-// 設定しなければ、これまでと何も変わらない。
+// Without the setting, nothing changes at all.
 func TestAllowedHostsEmptyByDefault(t *testing.T) {
 	h := newServer(t)
 	r := httptest.NewRequest("GET", "/wiki", nil)
@@ -521,6 +529,6 @@ func TestAllowedHostsEmptyByDefault(t *testing.T) {
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	if w.Code != http.StatusForbidden {
-		t.Fatalf("既定でループバック以外が通ってしまった: %d", w.Code)
+		t.Fatalf("something other than loopback was accepted by default: %d", w.Code)
 	}
 }

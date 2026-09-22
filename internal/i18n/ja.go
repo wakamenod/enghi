@@ -1,12 +1,12 @@
 package i18n
 
-// 日本語の文言。
+// Japanese messages.
 //
-// key の付け方: <画面や領域>.<用途>
-// 文中に値を入れる場所は %d / %s(fmt の書式)で書く。
+// Key naming: <screen or area>.<purpose>
+// Values interpolated into a message use the fmt verbs %d / %s.
 func init() {
 	register(JA, map[string]string{
-		// ---- 共通
+		// ---- common
 		"app.tagline":            "ローカル専用の Wiki + GTD",
 		"nav.articles":           "記事",
 		"nav.tags":               "タグ",
@@ -37,7 +37,7 @@ func init() {
 		"kind.task":              "Task",
 		"kind.area":              "Area",
 
-		// ---- ダッシュボード
+		// ---- dashboard
 		"keys.ask_waiting":   "誰を待っている？",
 		"keys.ask_scheduled": "いつ？ (YYYY-MM-DD)",
 		"keys.ask_title":     "新しい題名",
@@ -66,7 +66,7 @@ func init() {
 		"dash.referenced_by":   "%d 件から参照",
 		"dash.gtd_guide":       "GTD の始め方を読む →",
 
-		// ---- 記事
+		// ---- articles
 		"page.list_title":       "記事一覧",
 		"page.sort":             "並び順:",
 		"page.sort_updated":     "更新順",
@@ -87,7 +87,7 @@ func init() {
 		"page.create_with_name": "この名前で作成",
 		"page.to_list":          "記事一覧へ",
 
-		// ---- 編集
+		// ---- editing
 		"edit.new":              "新しい記事",
 		"edit.editing":          "%s を編集",
 		"edit.title":            "タイトル",
@@ -98,7 +98,7 @@ func init() {
 		"edit.version_conflict": "このページは他で更新されています（現在のバージョン: %d）。内容を確認してから再度保存してください。入力内容は保持されています。",
 		"edit.title_conflict":   "同名（大文字・小文字を区別しない）のページが既に存在します: %s",
 
-		// ---- 履歴
+		// ---- history
 		"history.title":                "%s の履歴",
 		"history.back":                 "← 記事へ戻る",
 		"history.revisions":            "リビジョン",
@@ -112,13 +112,13 @@ func init() {
 		"history.rewrite_button":       "%s を「%s」に書き換える",
 		"history.rewrite_confirm":      "参照元の記事本文を書き換えます。この操作は元に戻せません。よろしいですか？",
 
-		// ---- タグ
+		// ---- tags
 		"tag.title":      "タグ: %s",
 		"tag.list_title": "タグ一覧",
 		"tag.empty":      "このタグの記事はありません",
 		"tag.none":       "まだタグがありません",
 
-		// ---- 検索
+		// ---- search
 		"search.title":     "検索",
 		"search.results":   "「%s」 %d 件",
 		"search.not_found": "見つかりませんでした",
@@ -126,7 +126,7 @@ func init() {
 		"search.via_tag":   "（タグ一致）",
 		"search.via_alias": "（別名一致）",
 
-		// ---- GTD 共通
+		// ---- GTD shared
 		"gtd.title":               "GTD",
 		"gtd.inbox":               "Inbox",
 		"gtd.next":                "Next Actions",
@@ -250,7 +250,7 @@ func init() {
 		"review.finish_note":     "気づいたこと",
 		"review.finish_button":   "完了にする",
 
-		// ---- チェックリスト(DESIGN 2.3 の標準項目)
+		// ---- checklist (the standard items from DESIGN 2.3)
 		"checklist.collect_loose_papers":     "散らばった紙を集める",
 		"checklist.inbox_zero":               "Inbox を空にする",
 		"checklist.empty_head":               "頭の中を空にする（Mind Sweep）",
@@ -261,8 +261,9 @@ func init() {
 		"checklist.review_projects":          "Project のリストを見直す",
 		"checklist.review_someday":           "Someday / Maybe を見直す",
 		"checklist.review_recurring":         "定期タスクを棚卸しする",
-		// この行だけは画面の外の作業なので、対応する一覧が無いことを書いておく。
-		// 文言が無いと t() がキーをそのまま返し、画面にキー名が出てしまう。
+		// This one item happens away from the screen, so we say outright that it
+		// has no data to show. Without a message, t() returns the key and the key
+		// name ends up on screen.
 		"checklist.data.collect_loose_papers":     "机やカバンの中（この画面には出ません）",
 		"checklist.data.inbox_zero":               "Inbox の一覧（その場で Clarify できる）",
 		"checklist.data.empty_head":               "クイックキャプチャ欄",
@@ -274,19 +275,19 @@ func init() {
 		"checklist.data.review_someday":           "再検討期日を迎えた Someday",
 		"checklist.data.review_recurring":         "定期タスク系列の一覧",
 
-		// ---- 使い方ガイド(本文は docs/guide/<lang>/*.md)
+		// ---- guide (the prose lives in docs/guide/<lang>/*.md)
 		"guide.title": "使い方ガイド",
 		"guide.lead":  "GTD を知らなくても読めるように書いてあります。まず「GTD 入門」で考え方を、次に「enghi の使い方」で操作を確認してください。",
 		"guide.help":  "この画面の説明を読む",
 
-		// ---- 一覧が空のときに出す案内(画面ごとに書き分ける)
+		// ---- what an empty list says, worded per screen
 		"empty.inbox":     "Inbox は空です。気になっていることが残っていれば、上の欄から書き出してください。",
 		"empty.next":      "実行できる行動がありません。Project を見直して、次に取れる物理的な行動を1つ決めてください。",
 		"empty.waiting":   "人待ちの項目はありません。誰かに頼んだものは、Clarify で状態を Waiting For にすると、経過日数付きでここに並びます。",
 		"empty.scheduled": "Scheduled の項目はありません。「その日まで見たくない」ものは、Clarify で日付を入れるとここに入ります。",
 		"empty.someday":   "ありません。今はやらないが捨てたくないものを置く場所です。Weekly Review で毎週見直します。",
 
-		// ---- 設定
+		// ---- settings
 		"nav.settings":               "設定",
 		"settings.title":             "設定",
 		"settings.features":          "使う機能",
@@ -303,7 +304,9 @@ func init() {
 		"settings.feature_off_title": "この機能は off になっています",
 		"settings.feature_off_body":  "設定で on にすると、この画面と、使い方ガイドの該当する節が現れます。",
 
-		// ---- エラーと通知
+		"files.alt_default": "画像",
+
+		// ---- errors and notices
 		"err.not_found":         "見つかりません",
 		"err.page_not_found":    "ページが見つかりません",
 		"err.bad_request":       "リクエストが正しくありません",
@@ -319,7 +322,7 @@ func init() {
 		"err.empty_title":       "タイトルを入力してください",
 		"err.path_required":     "パスは / で始まる必要があります",
 
-		// ---- クイックキャプチャ(JS 側)
+		// ---- quick capture (used from JS)
 		"capture.title":         "Inbox に追加",
 		"capture.hint":          "Enter で追加 · Esc で閉じる",
 		"capture.added":         "追加しました",
@@ -327,7 +330,7 @@ func init() {
 		"capture.uploading":     "アップロード中…",
 		"capture.upload_failed": "アップロードに失敗しました: %s",
 
-		// ---- [[...]] の補完(JS 側)
+		// ---- [[...]] completion (used from JS)
 		"wikilink.alias":  "別名 → %s",
 		"wikilink.create": "新しいページとして挿入: %s",
 		"wikilink.hint":   "↑↓ 選択 · Enter/Tab 挿入 · Esc 閉じる",

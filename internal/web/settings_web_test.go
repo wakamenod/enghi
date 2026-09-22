@@ -6,61 +6,62 @@ import (
 	"testing"
 )
 
-// Context と Area は既定で off。
-// **既定を変えたら、この2つの期待も一緒に変える必要がある。**
+// Contexts and areas are off by default.
+// **Change that default and these two expectations must change with it.**
 func TestFeaturesAreOffByDefault(t *testing.T) {
 	h := newServer(t)
 	mustJSON(t, h, "POST", "/api/areas", `{"name":"経理"}`)
 	mustJSON(t, h, "POST", "/api/contexts", `{"name":"@電話"}`)
 
-	// 画面ごと無い
+	// The screens are gone entirely
 	for _, p := range []string{"/gtd/areas", "/gtd/area/1"} {
 		if got := do(h, req("GET", p, "")).Code; got != http.StatusNotFound {
 			t.Errorf("GET %s → %d, want 404", p, got)
 		}
 	}
-	// GTD トップに Context の枠と Areas の行が出ない
+	// The GTD screen shows neither the contexts panel nor the areas row
 	body := do(h, req("GET", "/gtd", "")).Body.String()
 	for _, s := range []string{"/ui/contexts", "/gtd/areas"} {
 		if strings.Contains(body, s) {
-			t.Errorf("/gtd に %q が出ている(off のはず)", s)
+			t.Errorf("/gtd shows %q although it should be off", s)
 		}
 	}
-	// Clarify に Context / Area の選択が出ない
+	// Clarify offers no context or area selector
 	mustJSON(t, h, "POST", "/api/tasks", `{"title":"何か"}`)
 	body = do(h, req("GET", "/gtd/clarify/1", "")).Body.String()
 	for _, s := range []string{`name="context_id"`, `name="area_id"`} {
 		if strings.Contains(body, s) {
-			t.Errorf("clarify に %q が出ている(off のはず)", s)
+			t.Errorf("clarify shows %q although it should be off", s)
 		}
 	}
 }
 
-// ガイドも設定に連動する。**画面から消えた機能をガイドだけが説明し続けない。**
+// The guide follows the settings too. **A feature gone from the screens must
+// not live on in the guide.**
 func TestGuideHidesSectionsOfDisabledFeatures(t *testing.T) {
 	h := newServer(t)
 
 	off := do(h, req("GET", "/guide/enghi", "")).Body.String()
 	if strings.Contains(off, `id="contexts"`) || strings.Contains(off, `id="areas"`) {
-		t.Error("off のときにガイドへ Contexts / Areas の節が出ている")
+		t.Error("the guide shows the contexts / areas sections while they are off")
 	}
 	if !strings.Contains(off, `id="states"`) {
-		t.Error("関係のない節まで落ちている")
+		t.Error("unrelated sections were dropped as well")
 	}
 
 	enableFeatures(t, h)
 	on := do(h, req("GET", "/guide/enghi", "")).Body.String()
 	if !strings.Contains(on, `id="contexts"`) || !strings.Contains(on, `id="areas"`) {
-		t.Error("on にしてもガイドに節が出てこない")
+		t.Error("the sections do not come back when turned on")
 	}
-	// 入門側(GTD そのものの説明)も同じ扱い
+	// The introduction, which explains GTD itself, behaves the same way
 	intro := do(h, req("GET", "/guide/gtd", "")).Body.String()
 	if !strings.Contains(intro, `id="context"`) {
-		t.Error("on にしても入門に Contexts の節が出てこない")
+		t.Error("the introduction does not show the contexts section when turned on")
 	}
 }
 
-// on にすると画面が戻ってくること。
+// Turning them on brings the screens back.
 func TestFeaturesCanBeEnabled(t *testing.T) {
 	h := newServer(t)
 	enableFeatures(t, h)
@@ -70,6 +71,6 @@ func TestFeaturesCanBeEnabled(t *testing.T) {
 		}
 	}
 	if !strings.Contains(do(h, req("GET", "/gtd", "")).Body.String(), "/gtd/areas") {
-		t.Error("on にしても GTD トップに Areas が出てこない")
+		t.Error("the GTD screen does not show areas when turned on")
 	}
 }

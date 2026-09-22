@@ -303,6 +303,8 @@ func init() {
 		"settings.feature_off_title": "This feature is turned off",
 		"settings.feature_off_body":  "Turn it on in Settings and this screen — along with its section of the guide — comes back.",
 
+		"files.alt_default": "image",
+
 		// ---- errors and notices
 		"err.not_found":         "Not found",
 		"err.page_not_found":    "Page not found",

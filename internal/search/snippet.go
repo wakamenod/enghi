@@ -7,33 +7,35 @@ import (
 	"strings"
 )
 
-// スニペットの強調範囲は、HTML ではなく制御文字で印を付けて持ち回る。
-// snippet() が返すのは本文そのものなので、<mark> を直接埋めると
-// 本文中の < や & がそのまま HTML として解釈される経路ができてしまう。
+// Highlight ranges in a snippet are carried as control characters, not HTML.
+// snippet() returns the body itself, so embedding <mark> directly would open a
+// path where a < or & in the body is interpreted as HTML.
 const (
 	markStart = "\x01"
 	markEnd   = "\x02"
 )
 
-// SnippetHTML はテンプレート用。本文をエスケープしてから強調だけを HTML に戻す。
+// SnippetHTML is for templates: escape the text first, then turn only the
+// highlight markers back into HTML.
 func SnippetHTML(s string) template.HTML {
 	escaped := html.EscapeString(s)
 	escaped = strings.ReplaceAll(escaped, html.EscapeString(markStart), "<mark>")
 	escaped = strings.ReplaceAll(escaped, html.EscapeString(markEnd), "</mark>")
-	// EscapeString は制御文字をそのまま通すので、素の印も置換しておく
+	// EscapeString passes control characters through, so replace bare markers too
 	escaped = strings.ReplaceAll(escaped, markStart, "<mark>")
 	escaped = strings.ReplaceAll(escaped, markEnd, "</mark>")
 	return template.HTML(escaped)
 }
 
-// SnippetPlain は印を取り除いた素のテキスト。JSON API はこちらを返す。
+// SnippetPlain is the plain text with the markers removed. The JSON API
+// returns this.
 func SnippetPlain(s string) string {
 	return strings.NewReplacer(markStart, "", markEnd, "").Replace(s)
 }
 
-// MarshalJSON は Emacs 層向けに、印を含まない素のスニペットを返す。
+// MarshalJSON returns the snippet without markers, for the Emacs layer.
 func (r Result) MarshalJSON() ([]byte, error) {
-	type alias Result // メソッドを外して無限再帰を避ける
+	type alias Result // strip the methods to avoid infinite recursion
 	a := alias(r)
 	a.Snippet = SnippetPlain(a.Snippet)
 	return json.Marshal(a)

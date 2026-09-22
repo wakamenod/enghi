@@ -8,28 +8,33 @@ import (
 	"github.com/wakamenod/enghi/internal/textnorm"
 )
 
-// TitleSuggestion は [[...]] 補完の候補1件。
+// TitleSuggestion is one candidate for [[...]] completion.
 //
-// Title は **そのまま [[ ]] の中に書ける文字列**であること。候補に別名が出たときは
-// 別名をそのまま挿入する(正式名に置き換えない)。[[...]] の解決は page_titles の
-// 1クエリで正式名と別名を区別しないため、どちらを書いても同じページに解決される。
-// 本文の表記を勝手に正式名へ寄せないのは DESIGN 2.5 の方針でもある。
+// Title must be **a string that can be written inside [[ ]] as is**. When an
+// alias is offered, the alias itself is inserted, not the canonical title.
+// Resolving [[...]] is a single page_titles query that treats canonical titles
+// and aliases alike, so either spelling resolves to the same page. Not pulling
+// body text towards the canonical title is also the policy in DESIGN 2.5.
 type TitleSuggestion struct {
-	Title     string `json:"title"`     // 挿入する文字列(正式名または別名)
-	Slug      string `json:"slug"`      // 解決先ページの slug
-	Canonical string `json:"canonical"` // 解決先ページの正式名
-	IsAlias   bool   `json:"is_alias"`  // Title が別名か
+	Title     string `json:"title"`     // the string to insert (canonical title or alias)
+	Slug      string `json:"slug"`      // slug of the page it resolves to
+	Canonical string `json:"canonical"` // canonical title of that page
+	IsAlias   bool   `json:"is_alias"`  // whether Title is an alias
 }
 
-// SuggestTitles は [[...]] 補完の候補を返す。**page_titles だけを引く**。
+// SuggestTitles returns candidates for [[...]] completion. **It queries
+// page_titles only.**
 //
-// 本文検索(pages_fts)は使わない。候補に出たものが必ず解決されることを保証したいためで、
-// 本文ヒットを混ぜると「候補から選んだのにタイトルではないので未解決リンクになる」という
-// 経路ができてしまう。
+// Body search (pages_fts) is deliberately not used: every candidate offered
+// must be guaranteed to resolve. Mixing in body hits would create a path where
+// "I picked it from the list, but it was not a title, so it became an
+// unresolved link".
 //
-// 並びは「前方一致 → タイトルが短い順 → 更新が新しい順」。打ち始めの数文字で目的の
-// ページに辿り着くのが補完の主な使い方なので、前方一致を先に出す。
-// q が空のときは最近更新されたページを返す(`[[` を打った直後に何も出ないのを避ける)。
+// The order is: prefix matches first, then shorter titles, then most recently
+// updated. Completion is mostly used to reach a page from its first few
+// characters, so prefix matches come first.
+// An empty q returns recently updated pages, so that typing `[[` does not show
+// an empty list.
 func (s *Service) SuggestTitles(ctx context.Context, q string, limit int) ([]TitleSuggestion, error) {
 	if limit <= 0 || limit > 50 {
 		limit = 10
@@ -49,7 +54,7 @@ func (s *Service) SuggestTitles(ctx context.Context, q string, limit int) ([]Tit
 			  WHERE t.is_canonical = 1
 			  ORDER BY p.updated_at DESC LIMIT ?`, limit)
 	} else {
-		// LIKE のワイルドカードは無効化する。ESCAPE '\' と必ず併用すること(DESIGN 3.6)。
+		// Neutralize LIKE wildcards. Always pair this with ESCAPE '\' (DESIGN 3.6).
 		esc := likeEscape(q)
 		rows, err = s.db.QueryContext(ctx,
 			`SELECT `+cols+` `+joins+`
@@ -76,8 +81,9 @@ func (s *Service) SuggestTitles(ctx context.Context, q string, limit int) ([]Tit
 	return out, rows.Err()
 }
 
-// likeEscape は LIKE のワイルドカードを無効化する。ESCAPE '\' と併用すること(DESIGN 3.6)。
-// search.LikeEscape と同じ処理だが、search が wiki を import するためここに持つ。
+// likeEscape neutralizes LIKE wildcards; pair it with ESCAPE '\' (DESIGN 3.6).
+// It does the same as search.LikeEscape, duplicated here because search imports
+// wiki.
 func likeEscape(q string) string {
 	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(q)
 }

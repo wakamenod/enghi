@@ -41,7 +41,7 @@ func patch(t *testing.T, s *gtd.Service, id int64, p gtd.TaskPatch) *gtd.Task {
 
 func str(s string) *string { return &s }
 
-// 4.2: capture は {title} だけで作れること。state は inbox。
+// 4.2: capture must work with {title} alone, and the state is inbox.
 func TestCaptureNeedsOnlyTitle(t *testing.T) {
 	s, _, _ := newSvc(t)
 	tk := capture(t, s, "何か思いついた")
@@ -50,13 +50,13 @@ func TestCaptureNeedsOnlyTitle(t *testing.T) {
 	}
 	inbox, _ := s.Inbox(context.Background())
 	if len(inbox) != 1 {
-		t.Fatalf("inbox = %d 件", len(inbox))
+		t.Fatalf("inbox = %d items", len(inbox))
 	}
 }
 
-// 2.6: Next Actions の抽出条件は
+// 2.6: the condition selecting next actions is
 // state='next' OR (state='scheduled' AND scheduled_on <= today)。
-// **ビューの条件で表現し、state を書き換えるバッチ処理は作らない。**
+// **a query condition; there is no batch job rewriting state.**
 func TestScheduledTaskAppearsInNextActionsWhenDue(t *testing.T) {
 	s, _, _ := newSvc(t)
 	ctx := context.Background()
@@ -82,23 +82,23 @@ func TestScheduledTaskAppearsInNextActionsWhenDue(t *testing.T) {
 		got[tk.Title] = true
 	}
 	if !got["昨日やるはずだった"] {
-		t.Error("期限を過ぎた scheduled が Next Actions に出ていない(見なかった日に消える)")
+		t.Error("an overdue scheduled task is missing from next actions (it vanishes on days nobody looked)")
 	}
 	if !got["今日やる"] {
-		t.Error("今日の scheduled が Next Actions に出ていない")
+		t.Error("today's scheduled task is missing from next actions")
 	}
 	if got["来週やる"] {
-		t.Error("未来の scheduled が Next Actions に出てしまっている")
+		t.Error("a future scheduled task showed up in next actions")
 	}
-	// state は書き換えられていないこと
+	// state must not have been rewritten
 	again, _ := s.Task(ctx, past.ID)
 	if again.State != gtd.StateScheduled {
-		t.Errorf("state が書き換えられている: %q(バッチ処理を作ってはいけない)", again.State)
+		t.Errorf("state was rewritten: %q (no batch job may do this)", again.State)
 	}
 }
 
-// 2.4: Next Action が1つも無いアクティブなプロジェクトの検出。
-// **これがシステムの価値の半分を担う。**
+// 2.4: detecting active projects with no next action.
+// **This carries half the value of the system.**
 func TestStalledProjectDetection(t *testing.T) {
 	s, _, _ := newSvc(t)
 	ctx := context.Background()
@@ -107,13 +107,14 @@ func TestStalledProjectDetection(t *testing.T) {
 	healthy, _ := s.CreateProject(ctx, gtd.ProjectInput{Title: "動いている"})
 	someday, _ := s.CreateProject(ctx, gtd.ProjectInput{Title: "いつか", Status: "someday"})
 
-	// 止まっているプロジェクトには later のタスクしかない(Next ではない)
+	// The stalled project has only later tasks, which are not next actions
 	t1 := capture(t, s, "後でやる")
 	patch(t, s, t1.ID, gtd.TaskPatch{State: str(gtd.StateLater), ProjectID: &stalled.ID})
-	// 動いているプロジェクトには next がある
+	// The moving project has a next action
 	t2 := capture(t, s, "次の行動")
 	patch(t, s, t2.ID, gtd.TaskPatch{State: str(gtd.StateNext), ProjectID: &healthy.ID})
-	// someday には何も無いが、active ではないので検出対象外
+	// The someday project has nothing, but it is not active, so it is not
+	// reported
 	_ = someday
 
 	got, err := s.StalledProjects(ctx)
@@ -125,19 +126,19 @@ func TestStalledProjectDetection(t *testing.T) {
 		for _, p := range got {
 			titles = append(titles, p.Title)
 		}
-		t.Fatalf("停滞プロジェクト = %v, want [止まっている]", titles)
+		t.Fatalf("stalled projects = %v, want [止まっている]", titles)
 	}
 
-	// waiting も scheduled も「次の行動がある」とみなす
+	// waiting and scheduled both count as "there is a next action"
 	patch(t, s, t1.ID, gtd.TaskPatch{State: str(gtd.StateWaiting), WaitingFor: str("誰か")})
 	got, _ = s.StalledProjects(ctx)
 	if len(got) != 0 {
-		t.Fatalf("waiting があるのに停滞扱い: %d 件", len(got))
+		t.Fatalf("reported as stalled despite a waiting task: %d", len(got))
 	}
 }
 
-// 2.6: 完了を契機に次の1件だけを生成する。
-// **生成される次インスタンスの state は必ず scheduled。next で作ってはいけない。**
+// 2.6: completing generates exactly one next instance.
+// **That instance is always state=scheduled, never next.**
 func TestRecurringTaskGeneratesNextAsScheduled(t *testing.T) {
 	s, _, _ := newSvc(t)
 	ctx := context.Background()
@@ -154,27 +155,28 @@ func TestRecurringTaskGeneratesNextAsScheduled(t *testing.T) {
 		t.Fatal(err)
 	}
 	if res.Completed.State != gtd.StateDone {
-		t.Errorf("現インスタンス = %q, want done", res.Completed.State)
+		t.Errorf("current instance = %q, want done", res.Completed.State)
 	}
 	if res.Next == nil {
-		t.Fatal("次インスタンスが生成されていない")
+		t.Fatal("no next instance was generated")
 	}
 	if res.Next.State != gtd.StateScheduled {
-		t.Fatalf("次インスタンス = %q, want scheduled(next で作ると Next Actions に居座る)", res.Next.State)
+		t.Fatalf("next instance = %q, want scheduled (as next it would sit in next actions forever)", res.Next.State)
 	}
 	if res.Next.ScheduledOn == "" {
-		t.Error("次インスタンスに scheduled_on が無い")
+		t.Error("the next instance has no scheduled_on")
 	}
 	if res.Next.Recurrence != "weekly:tue,fri" {
-		t.Errorf("recurrence が引き継がれていない: %q", res.Next.Recurrence)
+		t.Errorf("recurrence was not carried over: %q", res.Next.Recurrence)
 	}
-	// 系列で辿れること
+	// The series must be followable
 	if res.Next.SeriesID == nil || *res.Next.SeriesID != tk.ID {
 		t.Errorf("series_id = %v, want %d", res.Next.SeriesID, tk.ID)
 	}
 }
 
-// **同じ系列で開いているインスタンスは常に高々1件**(先回り生成をしない)。
+// **At most one open instance per series, always** - nothing is generated
+// ahead of time.
 func TestRecurringKeepsAtMostOneOpenInstance(t *testing.T) {
 	s, _, db := newSvc(t)
 	ctx := context.Background()
@@ -193,7 +195,7 @@ func TestRecurringKeepsAtMostOneOpenInstance(t *testing.T) {
 			t.Fatal(err)
 		}
 		if res.Next == nil {
-			t.Fatalf("%d 回目で次が生成されなかった", i+1)
+			t.Fatalf("round %d generated no next instance", i+1)
 		}
 		cur = res.Next.ID
 
@@ -203,12 +205,13 @@ func TestRecurringKeepsAtMostOneOpenInstance(t *testing.T) {
 			t.Fatal(err)
 		}
 		if open != 1 {
-			t.Fatalf("%d 回目: 開いているインスタンスが %d 件(常に1件であること)", i+1, open)
+			t.Fatalf("round %d: %d open instances (there must always be one)", i+1, open)
 		}
 	}
 }
 
-// skip は専用の state を設けず、dropped にして次を生成する。
+// skip has no state of its own: the instance is dropped and the next one
+// generated.
 func TestSkipDropsAndGeneratesNext(t *testing.T) {
 	s, _, _ := newSvc(t)
 	ctx := context.Background()
@@ -223,14 +226,14 @@ func TestSkipDropsAndGeneratesNext(t *testing.T) {
 		t.Fatal(err)
 	}
 	if res.Completed.State != gtd.StateDropped {
-		t.Errorf("skip 後 = %q, want dropped", res.Completed.State)
+		t.Errorf("after skip = %q, want dropped", res.Completed.State)
 	}
 	if res.Next == nil {
-		t.Fatal("skip でも次が生成されるはず")
+		t.Fatal("skip must generate a next instance too")
 	}
 }
 
-// 系列を終わらせたい場合は先に recurrence を NULL にする。
+// To end a series, recurrence is set to NULL first.
 func TestEndSeriesStopsGeneration(t *testing.T) {
 	s, _, _ := newSvc(t)
 	ctx := context.Background()
@@ -248,11 +251,11 @@ func TestEndSeriesStopsGeneration(t *testing.T) {
 		t.Fatal(err)
 	}
 	if res.Next != nil {
-		t.Fatal("系列を終わらせたのに次が生成された")
+		t.Fatal("a next instance was generated after ending the series")
 	}
 }
 
-// recurrence_ends_on を過ぎたら生成しない。
+// Past recurrence_ends_on, nothing is generated.
 func TestRecurrenceEndsOn(t *testing.T) {
 	s, _, _ := newSvc(t)
 	ctx := context.Background()
@@ -268,12 +271,13 @@ func TestRecurrenceEndsOn(t *testing.T) {
 		t.Fatal(err)
 	}
 	if res.Next != nil {
-		t.Fatalf("終了日を過ぎているのに生成された: %s", res.Next.ScheduledOn)
+		t.Fatalf("generated even though the end date has passed: %s", res.Next.ScheduledOn)
 	}
 }
 
-// 8-13: 「資料」と判断したら Wiki ページを生成し、元タスクを filed にする。
-// **done にも dropped にもしないこと。**
+// 8-13: judged to be reference material, an item becomes a wiki page and the
+// original task becomes filed.
+// **Never done, never dropped.**
 func TestFileAsReferenceUsesFiledState(t *testing.T) {
 	s, pages, _ := newSvc(t)
 	ctx := context.Background()
@@ -285,47 +289,48 @@ func TestFileAsReferenceUsesFiledState(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got.State != gtd.StateFiled {
-		t.Fatalf("state = %q, want filed(done でも dropped でもない)", got.State)
+		t.Fatalf("state = %q, want filed (neither done nor dropped)", got.State)
 	}
 	if page.Title != "参考資料" {
-		t.Fatalf("ページ = %q", page.Title)
+		t.Fatalf("page = %q", page.Title)
 	}
-	// links で繋がっていること
+	// They must be connected through links
 	links, err := s.LinkedPages(ctx, "task", tk.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(links) != 1 || !links[0].Resolved || *links[0].PageID != page.ID {
-		t.Fatalf("links で繋がっていない: %+v", links)
+		t.Fatalf("not connected through links: %+v", links)
 	}
-	// filed は Inbox にも Next にも出ない
+	// filed appears in neither the inbox nor next actions
 	inbox, _ := s.Inbox(ctx)
 	if len(inbox) != 0 {
-		t.Errorf("filed が Inbox に残っている")
+		t.Errorf("a filed item is still in the inbox")
 	}
 }
 
-// waiting にしたら委譲日が自動で入る(経過日数の警告に使う)。
+// Moving to waiting fills in the delegation date, which the days-elapsed
+// warning needs.
 func TestWaitingGetsDelegatedAt(t *testing.T) {
 	s, _, _ := newSvc(t)
 	tk := capture(t, s, "返事待ち")
 	got := patch(t, s, tk.ID, gtd.TaskPatch{State: str(gtd.StateWaiting), WaitingFor: str("田中さん")})
 	if got.DelegatedAt == "" {
-		t.Fatal("delegated_at が入っていない")
+		t.Fatal("delegated_at was not filled in")
 	}
 }
 
-// state='scheduled' には scheduled_on が必須。
+// state='scheduled' requires scheduled_on.
 func TestScheduledRequiresDate(t *testing.T) {
 	s, _, _ := newSvc(t)
 	tk := capture(t, s, "日付なし")
 	_, err := s.Patch(context.Background(), tk.ID, gtd.TaskPatch{State: str(gtd.StateScheduled)})
 	if err == nil {
-		t.Fatal("scheduled_on 無しの scheduled が通ってしまった")
+		t.Fatal("scheduled without scheduled_on was accepted")
 	}
 }
 
-// 楽観ロック。
+// Optimistic locking.
 func TestTaskVersionConflict(t *testing.T) {
 	s, _, _ := newSvc(t)
 	ctx := context.Background()
@@ -335,14 +340,14 @@ func TestTaskVersionConflict(t *testing.T) {
 	_, err := s.Patch(ctx, tk.ID, gtd.TaskPatch{Title: str("別の更新"), Version: tk.Version})
 	var vc *gtd.VersionConflictError
 	if !errors.As(err, &vc) {
-		t.Fatalf("version_conflict を期待したが %v", err)
+		t.Fatalf("expected version_conflict, got %v", err)
 	}
 	if vc.Current.Title != "更新後" {
-		t.Errorf("現行データが返っていない: %+v", vc.Current)
+		t.Errorf("the current data was not returned: %+v", vc.Current)
 	}
 }
 
-// 2.2: someday の再検討日が到来したら浮上させる。
+// 2.2: a someday project resurfaces when its review date arrives.
 func TestSomedayDueReview(t *testing.T) {
 	s, _, _ := newSvc(t)
 	ctx := context.Background()
@@ -358,11 +363,11 @@ func TestSomedayDueReview(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(got) != 1 || got[0].ID != due.ID {
-		t.Fatalf("再検討日が到来した someday = %d 件", len(got))
+		t.Fatalf("someday items due for review = %d", len(got))
 	}
 }
 
-// 定期タスク系列の一覧(Weekly Review の棚卸し用)。
+// The list of recurring series, for taking stock in the Weekly Review.
 func TestSeriesList(t *testing.T) {
 	s, _, _ := newSvc(t)
 	ctx := context.Background()
@@ -379,14 +384,14 @@ func TestSeriesList(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(list) != 1 {
-		t.Fatalf("系列 = %d 件, want 1", len(list))
+		t.Fatalf("series = %d, want 1", len(list))
 	}
 	if list[0].DoneCount != 1 || list[0].OpenTaskID == nil {
-		t.Fatalf("系列の集計が合わない: %+v", list[0])
+		t.Fatalf("the series aggregate is wrong: %+v", list[0])
 	}
 }
 
-// チェックリストのキーは標準のものだけを受け付ける。
+// Only the standard checklist keys are accepted.
 func TestReviewChecklist(t *testing.T) {
 	s, _, _ := newSvc(t)
 	ctx := context.Background()
@@ -399,15 +404,15 @@ func TestReviewChecklist(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := s.SetChecklistItem(ctx, r.ID, "勝手に決めた項目", true); err == nil {
-		t.Fatal("標準外のキーが通ってしまった")
+		t.Fatal("a non-standard key was accepted")
 	}
 	got, _ := s.Review(ctx, r.ID)
 	if !got.Checklist["review_projects"] {
-		t.Fatal("チェックが保存されていない")
+		t.Fatal("the check was not saved")
 	}
-	// 同じレビューが返ること(毎回新規作成しない)
+	// The same review comes back; a new one is not created every time
 	again, _ := s.CurrentReview(ctx)
 	if again.ID != r.ID {
-		t.Fatalf("未完了のレビューがあるのに新規作成された: %d → %d", r.ID, again.ID)
+		t.Fatalf("a new review was created although one was unfinished: %d -> %d", r.ID, again.ID)
 	}
 }

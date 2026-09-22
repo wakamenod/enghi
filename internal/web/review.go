@@ -7,18 +7,18 @@ import (
 	"github.com/wakamenod/enghi/internal/i18n"
 )
 
-// ReviewData は Weekly Review 画面に出すすべて。
+// ReviewData is everything the Weekly Review screen shows.
 //
-// **ウィザードは作らない**(DESIGN 2.3)。チェックリスト付きの画面を1枚用意し、
-// **その画面に判断材料をすべて並べる。**
-// 別画面に移動しないと確認できない項目があると、レビューが続かなくなる。
+// **No wizard** (DESIGN 2.3). One screen with a checklist, and **everything
+// needed to decide laid out on it.** An item that can only be checked by
+// navigating away is what makes the review stop happening.
 type ReviewData struct {
 	Review    *gtd.Review     `json:"review"`
 	Checklist []ChecklistItem `json:"checklist"`
 
 	// inbox_zero
 	Inbox []*gtd.Task `json:"inbox"`
-	// review_next_actions — コンテキスト別
+	// review_next_actions - grouped by context
 	Contexts    []*gtd.Context `json:"contexts"`
 	NextActions []*gtd.Task    `json:"next_actions"`
 	// review_past_calendar
@@ -27,15 +27,15 @@ type ReviewData struct {
 	Upcoming []*gtd.Task `json:"upcoming"`
 	// review_waiting_for
 	Waiting []*gtd.Task `json:"waiting"`
-	// **review_projects — 停滞プロジェクト検出の結果(DESIGN 2.4)**
+	// **review_projects - the stalled-project detection (DESIGN 2.4)**
 	Stalled []*gtd.Project `json:"stalled_projects"`
-	// **review_someday — 再検討日が到来した someday プロジェクト**
+	// **review_someday - someday projects whose review date has come**
 	SomedayDue []*gtd.Project `json:"someday_due_review"`
-	// review_recurring — 定期タスク系列の一覧(DESIGN 2.6)
+	// review_recurring - the list of recurring series (DESIGN 2.6)
 	Series []gtd.Series `json:"series"`
 }
 
-// ChecklistItem は表示用のチェック項目。
+// ChecklistItem is a checklist item as displayed.
 type ChecklistItem struct {
 	Key     string `json:"key"`
 	Label   string `json:"label"`
@@ -50,7 +50,7 @@ func (s *Server) reviewData(ctx context.Context, lang i18n.Lang) (*ReviewData, e
 	if d.Review, err = s.gtd.CurrentReview(ctx); err != nil {
 		return nil, err
 	}
-	// 文言は i18n から引く。**gtd 側に日本語を持たせない。**
+	// Labels come from i18n. **No Japanese lives on the gtd side.**
 	for _, c := range gtd.ChecklistKeys {
 		d.Checklist = append(d.Checklist, ChecklistItem{
 			Key:     c.Key,
@@ -75,7 +75,7 @@ func (s *Server) reviewData(ctx context.Context, lang i18n.Lang) (*ReviewData, e
 	if d.CompletedLastWeek, err = s.gtd.CompletedBetween(ctx, lastWeek, gtd.FormatDate(today)); err != nil {
 		return nil, err
 	}
-	// 今後2週間
+	// The next two weeks
 	if d.Upcoming, err = s.gtd.UpcomingBetween(ctx,
 		gtd.FormatDate(today), gtd.FormatDate(today.AddDate(0, 0, 14))); err != nil {
 		return nil, err
@@ -83,7 +83,8 @@ func (s *Server) reviewData(ctx context.Context, lang i18n.Lang) (*ReviewData, e
 	if d.Waiting, err = s.gtd.Waiting(ctx); err != nil {
 		return nil, err
 	}
-	// この2項目がこのシステムの存在理由に直結する。**他を削ってもこの2つは削らないこと。**
+	// These two are tied directly to why this system exists. **Cut anything
+	// else, but never these.**
 	if d.Stalled, err = s.gtd.StalledProjects(ctx); err != nil {
 		return nil, err
 	}

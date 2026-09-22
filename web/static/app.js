@@ -1,9 +1,10 @@
-// enghi — 少量の vanilla JS。キーボード操作と focus チャネルの受信だけを担う。
+// enghi - a small amount of vanilla JS: keyboard handling and the focus
+// channel, nothing more.
 
-// ---------------------------------------------------------------- 文言
+// ---------------------------------------------------------------- messages
 //
-// **JS の中に文言を直書きしない。**サーバがその言語の文言を body の
-// data-strings に入れて渡すので、そこから引く。
+// **Never write messages inline in the JS.** The server puts the messages for
+// the current language into data-strings on body; they are read from there.
 
 var S = (function () {
   try {
@@ -16,11 +17,13 @@ function t(key, arg) {
   return arg === undefined ? s : s.replace(/%[sd]/, arg);
 }
 
-// ---------------------------------------------------------------- focus チャネル
+// ---------------------------------------------------------------- focus channel
 //
-// DESIGN 4.3: Emacs で検索・選択 → 別ディスプレイに開きっぱなしのブラウザが追従する。
-// **指数バックオフの自動再接続を必ず実装すること**(DESIGN 8-8)。
-// サーバ再起動後に張り直されないと、常駐運用で「なぜか focus が飛ばない」状態になる。
+// DESIGN 4.3: search and select in Emacs, and the browser left open on another
+// display follows.
+// **Automatic reconnection with exponential backoff is mandatory** (DESIGN 8-8).
+// Without it, a server restart leaves "focus does not arrive for some reason"
+// for the rest of the day.
 
 (function () {
   var backoff = 500;           // ms
@@ -35,7 +38,7 @@ function t(key, arg) {
 
   function connect() {
     timer = null;
-    if (ws) return;            // 二重接続を作らない
+    if (ws) return;            // never open a second connection
     try {
       ws = new WebSocket(url());
     } catch (e) {
@@ -44,7 +47,7 @@ function t(key, arg) {
     }
 
     ws.onopen = function () {
-      backoff = 500;           // 接続できたらバックオフを戻す
+      backoff = 500;           // reset the backoff once connected
     };
 
     ws.onmessage = function (ev) {
@@ -55,54 +58,58 @@ function t(key, arg) {
           window.location.assign(msg.path);
         }
       }
-      // 表示中のページが他の経路で更新されたら読み込み直す(編集中は触らない)
+      // Reload when the page on screen was updated elsewhere; never while
+      // editing
       if (msg.type === 'updated' && msg.slug) {
-        // **pathname はパーセントエンコード済み、slug は生。**日本語のスラグでは
-        // そのまま比べると必ず外れるので、復号した方とも突き合わせる。
+        // **pathname is percent-encoded while the slug is raw.** For a Japanese
+        // slug a direct comparison always fails, so the decoded form is
+        // compared as well.
         var here = window.location.pathname;
         var hereDecoded = here;
-        try { hereDecoded = decodeURIComponent(here); } catch (e) { /* 壊れた URL */ }
+        try { hereDecoded = decodeURIComponent(here); } catch (e) { /* malformed URL */ }
         if ((here === '/wiki/' + msg.slug || hereDecoded === '/wiki/' + msg.slug) &&
             !document.querySelector('textarea')) {
-          // Emacs で編集しながら見ている場合、読み直しのたびに先頭へ戻ると使えない。
-          // 読む位置を持ち越す(復帰は下の restoreScroll)。
+          // When reading along while editing in Emacs, jumping back to the top
+          // on every reload makes it useless. The scroll position is carried
+          // over (restored by restoreScroll below).
           try {
             sessionStorage.setItem('enghi:scroll:' + here,
                                    JSON.stringify({ y: window.scrollY, t: Date.now() }));
-          } catch (e) { /* private mode などでは諦める */ }
+          } catch (e) { /* give up in private mode and the like */ }
           window.location.reload();
         }
       }
     };
 
-    // **指数バックオフの自動再接続は必須**(DESIGN 8-8)。
-    // サーバ再起動後に張り直されないと、常駐運用で
-    // 「なぜか focus が飛ばない」状態になる。
+    // **Automatic reconnection with exponential backoff is mandatory**
+    // (DESIGN 8-8). Without it, a server restart leaves "focus does not arrive
+    // for some reason" for the rest of the day.
     ws.onclose = function () { ws = null; schedule(); };
     ws.onerror = function () { if (ws) { ws.close(); } };
   }
 
   function disconnect() {
     if (ws) {
-      ws.onclose = null;       // 意図的な切断では再接続を仕掛けない
+      ws.onclose = null;       // a deliberate close must not schedule a retry
       ws.close();
       ws = null;
     }
   }
 
   function schedule() {
-    if (timer) return;         // 保留中の再接続が既にあるなら足さない
+    if (timer) return;         // a retry is already pending
     timer = setTimeout(connect, backoff);
     backoff = Math.min(backoff * 2, BACKOFF_MAX);
   }
 
-  // ページを離れるときは閉じる。bfcache に残ったページが接続を掴んだままにならないように。
+  // Close when leaving the page, so a page kept in the bfcache does not hold
+  // the connection.
   window.addEventListener('pagehide', function () {
     if (timer) { clearTimeout(timer); timer = null; }
     disconnect();
   });
 
-  // bfcache から復帰したら張り直す。
+  // Re-establish it when restored from the bfcache.
   window.addEventListener('pageshow', function () {
     backoff = 500;
     if (!ws && !timer) connect();
@@ -111,10 +118,11 @@ function t(key, arg) {
   connect();
 })();
 
-// ---------------------------------------------------------------- 読む位置の持ち越し
+// ------------------------------------------------- carrying the scroll position
 //
-// 上の updated が仕掛けた読み直しのときだけ、直前のスクロール位置に戻す。
-// 普通の遷移や再読込を巻き込まないよう、印は一度使ったら消し、古いものは捨てる。
+// Only a reload triggered by the updated event above returns to the previous
+// scroll position. So that ordinary navigation and refreshes are not caught up
+// in it, the marker is cleared once used and stale ones are discarded.
 
 (function () {
   var key = 'enghi:scroll:' + window.location.pathname;
@@ -126,17 +134,17 @@ function t(key, arg) {
   if (!raw) return;
   var saved;
   try { saved = JSON.parse(raw); } catch (e) { return; }
-  if (!saved || Date.now() - saved.t > 10000) return;   // 10 秒より古い印は使わない
+  if (!saved || Date.now() - saved.t > 10000) return;   // ignore markers older than 10s
   window.scrollTo(0, saved.y);
 })();
 
-// ---------------------------------------------------------------- キーボード操作
+// ---------------------------------------------------------------- keyboard
 //
-// DESIGN 6: キーボード操作を第一級に扱う。
-//   /      … 検索にフォーカス
-//   g d/w/i/n/p … ダッシュボード / Wiki / Inbox / Next / Projects
-//   e      … 表示中の記事を編集
-//   j / k  … リスト内移動、Enter で開く
+// DESIGN 6: the keyboard is a first-class way to drive this.
+//   /            ... focus the search box
+//   g d/w/i/n/p  ... dashboard / wiki / inbox / next / projects
+//   e            ... edit the article on screen
+//   j / k        ... move within a list; Enter opens
 
 (function () {
   var pendingG = false;
@@ -171,14 +179,16 @@ function t(key, arg) {
     list[next].scrollIntoView({ block: 'nearest' });
   }
 
-  // ---- カーソル行のタスクを1キーで動かす
+  // ---- act on the task under the cursor with a single key
   //
-  // 状態変更の口はサーバに揃っているので、ここは form を1つ作って投げるだけ。
-  // **fetch ではなく form 送信にする。**Origin と Sec-Fetch-Site が付き、
-  // 既存の画面と同じ経路(secure ミドルウェアの formAllowed)を通る。
+  // The server already has an endpoint for every state change, so this just
+  // builds a form and submits it.
+  // **A form submission, not fetch.** It carries Origin and Sec-Fetch-Site and
+  // goes through the same path as the screens (formAllowed in the secure
+  // middleware).
   //
-  // `k' は既にカーソルの上移動なので、agenda で `k' だった「今回は飛ばす」は
-  // `S' に逃がしてある。
+  // `k' already moves the cursor up, so "skip this one" - `k' in agenda - has
+  // been moved to `S'.
   function post(path, fields) {
     var form = document.createElement('form');
     form.method = 'post';
@@ -204,7 +214,7 @@ function t(key, arg) {
     var i = cursorIndex(list);
     if (i < 0) return null;
     var id = list[i].getAttribute('data-task-id');
-    if (!id) return null;                       // 記事の一覧など、タスクでない行
+    if (!id) return null;                       // a non-task row, such as in an article list
     var link = list[i].querySelector('a[href]');
     return { id: id, title: link ? link.textContent.trim() : '' };
   }
@@ -232,7 +242,7 @@ function t(key, arg) {
       return true;
     }
     if (key === 'x') {
-      // 破棄だけは戻せないので確認する
+      // Dropping is the one that cannot be undone, so confirm it
       if (window.confirm(t('keys.confirm_drop', task.title))) post(base + '/delete');
       return true;
     }
@@ -301,11 +311,11 @@ function t(key, arg) {
   });
 })();
 
-// ---------------------------------------------------------------- テーマの切り替え
+// ---------------------------------------------------------------- theme switch
 //
-// auto(OS の設定に従う) → light → dark → auto の順に回す。
-// 選択は localStorage に持つ。auto のときは属性を外して CSS の
-// prefers-color-scheme に任せる。
+// Cycles auto (follow the OS) -> light -> dark -> auto.
+// The choice lives in localStorage. On auto the attribute is removed and CSS
+// prefers-color-scheme takes over.
 
 (function () {
   var KEY = "enghi-theme";
@@ -342,10 +352,11 @@ function t(key, arg) {
   }
 })();
 
-// ---------------------------------------------------------------- クイックキャプチャ
+// ---------------------------------------------------------------- quick capture
 //
-// DESIGN 6: c … どこからでも Inbox へ1行追加するモーダル。
-// 頭の中を空にする操作は、どの画面からでも1打鍵で始まること。
+// DESIGN 6: c opens a modal that adds one line to the inbox from anywhere.
+// Getting something out of your head must start with a single keystroke, on any
+// screen.
 
 function openCapture() {
   if (document.getElementById('capture-modal')) return;
@@ -401,10 +412,10 @@ function openCapture() {
   });
 }
 
-// ---------------------------------------------------------------- 画像の貼り付け
+// ---------------------------------------------------------------- pasting images
 //
-// 編集中のテキストエリアに画像を貼る/落とすと、その場でアップロードして
-// Markdown の記法をカーソル位置に差し込む。
+// Pasting or dropping an image into the editing textarea uploads it there and
+// then and inserts the Markdown at the cursor.
 
 (function () {
   var ta = document.querySelector('textarea[name=body]');
@@ -426,7 +437,7 @@ function openCapture() {
       if (!r.ok) return r.json().then(function (e) { throw new Error(e.message || r.status); });
       return r.json();
     }).then(function (res) {
-      // 仮置きの文字列を実際のリンクに差し替える
+      // Replace the placeholder with the real link
       ta.value = ta.value.replace(placeholder, res.markdown);
       ta.dispatchEvent(new Event('input', { bubbles: true }));
     }).catch(function (err) {
@@ -440,7 +451,7 @@ function openCapture() {
     });
     if (!files.length) return false;
     files.forEach(function (file, i) {
-      // 応答が返るまでの間、どこに入るかが分かるようにしておく
+      // Until the response arrives, show where it will land
       var placeholder = '![' + t("capture.uploading") + Date.now() + '-' + i + ']()';
       insertAtCursor(placeholder + '\n');
       upload(file, placeholder);
@@ -465,7 +476,7 @@ function openCapture() {
   });
 })();
 
-// ---------------------------------------------------------------- 編集画面のプレビュー
+// ---------------------------------------------------------------- edit preview
 (function () {
   var btn = document.getElementById('preview-toggle');
   if (!btn) return;
@@ -483,29 +494,30 @@ function openCapture() {
   });
 })();
 
-// ---------------------------------------------------------------- [[...]] の補完
+// ---------------------------------------------------------------- [[...]] completion
 //
-// 編集中に `[[` を打つと、タイトルと別名の一覧がキャレットの位置に出る。
-// タイトルを覚えていなくてもリンクが張れること。打ち間違いで静かに未解決リンクに
-// 落ちるのを防ぐのが主目的なので、**候補は必ず解決されるものだけ**を出す
-// (サーバ側で page_titles だけを引いている)。
+// Typing `[[` while editing shows titles and aliases at the caret, so a link
+// can be made without remembering the exact title. The main point is to stop a
+// typo from silently becoming an unresolved link, so **every candidate offered
+// is guaranteed to resolve** (the server queries page_titles alone).
 //
-// 候補が無いときは、入力中の文字列をそのまま挿入する行だけを出す。
-// 未解決リンクは「これから書く記事」を示す正当な使い方なので、塞がない(DESIGN 2.1)。
+// With no candidates, the only row offered inserts what was typed as is. An
+// unresolved link is a legitimate way to say "an article I am about to write",
+// so it is never blocked (DESIGN 2.1).
 
 (function () {
   var ta = document.querySelector('textarea[name=body]');
   if (!ta) return;
 
-  var box = null;     // 候補の入れ物
-  var items = [];     // 候補(最後の1件は「そのまま挿入」のことがある)
-  var sel = 0;        // 選択位置
-  var open = 0;       // 本文中の `[[` の開始位置
+  var box = null;     // the container for the candidates
+  var items = [];     // candidates; the last one may be "insert as typed"
+  var sel = 0;        // which one is selected
+  var open = 0;       // where `[[` starts in the body
   var timer = null;
-  var seq = 0;        // 応答の追い越し対策。打鍵が速いと古い応答が後から届く
+  var seq = 0;        // guards against out-of-order responses when typing fast
 
-  // キャレットの画面位置。textarea には位置を取る API が無いので、
-  // 同じ体裁の隠し要素に同じ文字を流し込んで測る。
+  // Where the caret is on screen. A textarea has no API for that, so the same
+  // text is poured into a hidden element with the same styling and measured.
   function caretXY(pos) {
     var cs = getComputedStyle(ta);
     var m = document.createElement('div');
@@ -533,8 +545,8 @@ function openCapture() {
     return xy;
   }
 
-  // キャレット直前の `[[` を探す。閉じ括弧・改行・`|` を跨いだら補完しない
-  // (`|` の後はラベルであってタイトルではない)。
+  // Find the `[[` before the caret. Completion stops at a closing bracket, a
+  // newline or a `|` (after a `|` comes the label, not the title).
   function context() {
     var pos = ta.selectionStart;
     if (pos !== ta.selectionEnd) return null;
@@ -606,11 +618,12 @@ function openCapture() {
     fetch('/api/titles?limit=8&q=' + encodeURIComponent(ctx.q))
       .then(function (r) { return r.json(); })
       .then(function (res) {
-        if (my !== seq) return;          // 追い越された応答は捨てる
+        if (my !== seq) return;          // drop a response that was overtaken
         var now = context();
         if (!now || now.start !== open) { close(); return; }
         items = (res.titles || []).map(function (v) { return v; });
-        // 完全一致が既にあるなら「そのまま挿入」は出さない(同じ行が二重に並ぶ)
+        // With an exact match already present, "insert as typed" is dropped:
+        // it would list the same row twice
         var exact = items.some(function (v) {
           return v.title.toLowerCase() === now.q.trim().toLowerCase();
         });
@@ -624,7 +637,7 @@ function openCapture() {
 
   function schedule() {
     clearTimeout(timer);
-    timer = setTimeout(refresh, 100);   // 検索窓と同じ間隔
+    timer = setTimeout(refresh, 100);   // same interval as the search box
   }
 
   ta.addEventListener('input', schedule);
@@ -640,7 +653,7 @@ function openCapture() {
     } else if (ev.key === 'Enter' || ev.key === 'Tab') {
       pick(sel); ev.preventDefault();
     } else if (ev.key === 'Escape') {
-      close(); ev.preventDefault(); ev.stopPropagation();   // クイックキャプチャに渡さない
+      close(); ev.preventDefault(); ev.stopPropagation();   // do not pass it to quick capture
     }
   });
 })();

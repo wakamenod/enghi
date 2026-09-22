@@ -1,4 +1,4 @@
-// Package config はユーザ設定の読み込みと既定値の解決を行う。
+// Package config loads the user configuration and resolves defaults.
 package config
 
 import (
@@ -10,36 +10,42 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-// Config は ~/.config/enghi/config.toml の内容。
+// Config is the content of ~/.config/enghi/config.toml.
 type Config struct {
 	Port int    `toml:"port"`
-	Host string `toml:"host"` // 127.0.0.1 固定。0.0.0.0 は拒否する(DESIGN 4.4)
-	// AllowedHosts: Host ヘッダで追加で許す名前。前段にリバースプロキシを置いて
-	// 他の端末から使うときだけ設定する。**空なら従来どおりループバックのみ**。
+	Host string `toml:"host"` // fixed to 127.0.0.1; 0.0.0.0 is rejected (DESIGN 4.4)
+	// AllowedHosts: extra names accepted in the Host header. Set this only when
+	// a reverse proxy in front makes enghi reachable from another device.
+	// **Empty means loopback only, as before.**
 	//
-	// bind は 127.0.0.1 のまま変えない。プロキシが受けて loopback へ渡すので、
-	// ここで増えるのは「どの名前で呼ばれたリクエストを受け付けるか」だけである。
+	// The bind address stays 127.0.0.1. The proxy terminates the connection and
+	// forwards to loopback, so all this adds is "which name a request may
+	// arrive under".
 	//
-	// **ワイルドカードは受け付けない。** Host 検証は DNS rebinding に対する
-	// 唯一有効な防御なので(DESIGN 4.4)、緩めるのは書いた名前1つずつに限る。
+	// **Wildcards are not accepted.** Host validation is the only effective
+	// defense against DNS rebinding (DESIGN 4.4), so it is relaxed one literal
+	// name at a time.
 	//
-	// **これを設定した時点で「他マシンから到達できる」状態になるため、
-	// 前段での本物の認証が必須になる**(DESIGN 4.4)。enghi は認証を持たない。
+	// **Setting this makes enghi reachable from other machines, which means
+	// real authentication in front of it is mandatory** (DESIGN 4.4). enghi
+	// has no authentication of its own.
 	AllowedHosts []string `toml:"allowed_hosts"`
 	DBPath       string   `toml:"db_path"`
-	// FilesDBPath: 画像などのバイナリ。**本体とは別ファイルにする**(バックアップを軽く保つため)
+	// FilesDBPath: binaries such as images. **Kept in a separate file** from the
+	// main database, so backups stay small.
 	FilesDBPath string `toml:"files_db_path"`
 	ExportDir   string `toml:"export_dir"`
-	// RevisionCompactMinutes: 直前のリビジョンがこの分数以内なら上書きする(DESIGN 4.2)
+	// RevisionCompactMinutes: overwrite the previous revision when it is newer
+	// than this many minutes (DESIGN 4.2)
 	RevisionCompactMinutes int `toml:"revision_compact_minutes"`
 
-	// バックアップ。常駐中に1日1回、VACUUM INTO で取る。
+	// Backups. Taken once a day while resident, with VACUUM INTO.
 	BackupDir     string `toml:"backup_dir"`
-	BackupKeep    int    `toml:"backup_keep"`    // 残す世代数
-	BackupEnabled *bool  `toml:"backup_enabled"` // 既定は有効
+	BackupKeep    int    `toml:"backup_keep"`    // how many generations to keep
+	BackupEnabled *bool  `toml:"backup_enabled"` // enabled by default
 }
 
-// BackupOn はバックアップが有効かを返す(未設定なら有効)。
+// BackupOn reports whether backups are enabled (unset means enabled).
 func (c Config) BackupOn() bool { return c.BackupEnabled == nil || *c.BackupEnabled }
 
 func dataHome() string {
@@ -58,23 +64,24 @@ func configHome() string {
 	return filepath.Join(home, ".config")
 }
 
-// Path は設定ファイルの既定位置を返す。
+// Path returns the default location of the configuration file.
 func Path() string { return filepath.Join(configHome(), "enghi", "config.toml") }
 
-// filesPathFor は本体 DB のパスから、画像用 DB のパスを決める。
-// **db_path を変えたら画像もそれに追従する**(別の場所に取り残さない)。
+// filesPathFor derives the image database path from the main database path.
+// **Change db_path and the images follow**, instead of being left behind
+// somewhere else.
 func filesPathFor(dbPath string) string {
 	return strings.TrimSuffix(dbPath, ".db") + "-files.db"
 }
 
-// Default は設定ファイルが無いときの既定値。
+// Default is the configuration used when there is no configuration file.
 func Default() Config { return withDefaults(Config{}) }
 
-// withDefaults は未設定の項目を既定値で埋める。
+// withDefaults fills in the fields that were not set.
 //
-// **設定ファイルを読む前に既定値を入れてはいけない。**
-// 入れてしまうと「未設定かどうか」が判別できなくなり、
-// db_path に追従させたい files_db_path のような項目が既定値のまま固まる。
+// **Do not apply defaults before reading the configuration file.** Doing so
+// makes "was this set?" impossible to answer, and fields that should follow
+// another one — files_db_path following db_path — freeze at their default.
 func withDefaults(c Config) Config {
 	if c.Port == 0 {
 		c.Port = 7777
@@ -108,7 +115,8 @@ func withDefaults(c Config) Config {
 	return c
 }
 
-// Load は設定ファイルを読み、既定値で埋めて返す。ファイルが無いのはエラーではない。
+// Load reads the configuration file and fills in defaults. A missing file is
+// not an error.
 func Load(path string) (Config, error) {
 	if path == "" {
 		path = Path()
@@ -123,34 +131,35 @@ func Load(path string) (Config, error) {
 		return withDefaults(c), err
 	}
 	if err := toml.Unmarshal(b, &c); err != nil {
-		return withDefaults(c), fmt.Errorf("設定ファイル %s: %w", path, err)
+		return withDefaults(c), fmt.Errorf("config file %s: %w", path, err)
 	}
 	c = withDefaults(c)
 	return c, c.validate()
 }
 
-// validate はローカル専用の前提を守る(DESIGN 4.4)。
+// validate enforces the local-only premise (DESIGN 4.4).
 func (c Config) validate() error {
 	switch c.Host {
 	case "127.0.0.1", "localhost", "::1":
 	default:
-		return fmt.Errorf("host %q は許可されない。enghi はループバックにのみ bind する(DESIGN 4.4)", c.Host)
+		return fmt.Errorf("host %q is not allowed: enghi binds to loopback only (DESIGN 4.4)", c.Host)
 	}
 	for _, h := range c.AllowedHosts {
-		// 手で書く設定なので前後の空白は許す。中の空白は名前ではないので弾く。
+		// Hand-written config, so surrounding spaces are fine. A space inside is
+		// not part of a host name, so reject it.
 		h = strings.TrimSpace(h)
 		if h == "" {
-			return fmt.Errorf("allowed_hosts に空の項目がある")
+			return fmt.Errorf("allowed_hosts contains an empty entry")
 		}
 		if strings.ContainsAny(h, "*?/ ") {
-			return fmt.Errorf("allowed_hosts %q: ワイルドカードや区切りは使えない。名前を1つずつ書くこと(DESIGN 4.4)", h)
+			return fmt.Errorf("allowed_hosts %q: wildcards and separators are not allowed; list one literal name at a time (DESIGN 4.4)", h)
 		}
 	}
 	return nil
 }
 
-// NormalizedAllowedHosts は allowed_hosts を比較しやすい形にする。
-// ホスト名は大小を区別しないので小文字に揃え、ポートが書かれていれば落とす。
+// NormalizedAllowedHosts puts allowed_hosts into a comparable form: host names
+// are case-insensitive, so lower-case them, and drop a port if one was written.
 func (c Config) NormalizedAllowedHosts() []string {
 	out := make([]string, 0, len(c.AllowedHosts))
 	for _, h := range c.AllowedHosts {

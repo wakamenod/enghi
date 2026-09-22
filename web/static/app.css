@@ -1,18 +1,19 @@
-/* enghi — シックで落ち着いたトーン。装飾を足さない。余白と階調で構造を示す(DESIGN 6)。
-   アクセント色は1色だけ。状態表示にのみ使う。
+/* enghi - a quiet, restrained tone. No decoration; structure comes from spacing
+   and tonal steps (DESIGN 6). One accent colour only, used for state.
 
-   【色は light-dark() で1回だけ書く】
-   以前は同じ 10 個の値が「ライト」「OS がダーク」「明示的にダーク」の3か所に
-   並んでいて、1色変えるのに3か所直す必要があった。color-scheme を切り替えれば
-   light-dark() が両方の値から選ぶので、パレットの記述は1か所で済む。
-   base.html の先読みスクリプトが data-theme を置く役割は変わらない。 */
+   **Colours are written once, with light-dark().**
+   The same ten values used to be repeated three times - light, OS dark and
+   explicit dark - so changing one colour meant editing three places. Switching
+   color-scheme lets light-dark() pick between the two, so the palette is
+   written once. The preload script in base.html still sets data-theme. */
 
-/* ---- 欧文フォント ----
-   Inter Variable(SIL OFL、web/static/fonts/OFL.txt)を同梱する。CDN は使わない。
-   **unicode-range を欧文に限るのが要点**で、和文はフォールバックして OS の
-   ヒラギノ/游ゴシックが使われる。和文フォントを積むと数 MB になるが、
-   欧文だけなら 2 ファイルで約 100KB で済む。
-   ファイル名が _ や . で始まると embed から落ちるので、その命名をしないこと。 */
+/* ---- Latin font ----
+   Inter Variable (SIL OFL, web/static/fonts/OFL.txt) ships with the binary; no
+   CDN. **The point is to limit unicode-range to Latin**, so Japanese falls back
+   to the OS fonts (Hiragino / Yu Gothic). Bundling a Japanese font would cost
+   several MB; Latin alone is about 100KB in two files.
+   A file name starting with _ or . is dropped by embed, so never name one that
+   way. */
 
 @font-face {
   font-family: "Inter Variable";
@@ -32,14 +33,15 @@
 }
 
 :root {
-  /* 既定は OS に従う。data-theme が付いたときだけ下で上書きする */
+  /* Follow the OS by default; the rules below override only when data-theme
+     is set */
   color-scheme: light dark;
 
-  /*                  ライト     ダーク  */
+  /*                  light      dark    */
   --bg:        light-dark(#fbfaf8, #16171a);
   --bg-sunken: light-dark(#f2f0ec, #121316);
   --bg-raised: light-dark(#ffffff, #1d1f23);
-  --bg-hover:  light-dark(#efece6, #23262b);   /* 行のホバー・カーソル用の階調 */
+  --bg-hover:  light-dark(#efece6, #23262b);   /* row hover and cursor tone */
   --border:        light-dark(#e0ddd6, #2c2f34);
   --border-strong: light-dark(#cdc9c0, #3d4147);
 
@@ -47,59 +49,59 @@
   --fg-muted:  light-dark(#6d685e, #918d86);
   --fg-faint:  light-dark(#938d82, #6a665f);
 
-  /* アクセントは1色。状態表示にのみ使う */
+  /* One accent colour, used for state only */
   --accent:    light-dark(#5b6f5a, #8fa88c);
   --accent-fg: light-dark(#ffffff, #16171a);
   --warn:      light-dark(#8a6a3d, #b8956a);
 
-  accent-color: var(--accent);   /* チェックボックス等のネイティブ部品 */
+  accent-color: var(--accent);   /* native controls such as checkboxes */
 
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
   --sans: "Inter Variable", -apple-system, BlinkMacSystemFont,
           "Hiragino Sans", "Noto Sans JP", sans-serif;
 
-  /* ---- 寸法のスケール ----
-     場当たりの px を使わず、必ずここから採る。
-     余白は 4px グリッド。角丸は3段。文字サイズは8段。 */
+  /* ---- the scales ----
+     Never reach for an ad-hoc px value; take it from here.
+     Spacing is a 4px grid, radii come in three steps, type in eight. */
 
   --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
   --sp-5: 24px; --sp-6: 32px; --sp-7: 48px; --sp-8: 64px;
 
-  --fs-1: 11px;   /* バッジ、kbd、補助の注記 */
-  --fs-2: 12px;   /* meta、タグ、日時、ラベル */
-  --fs-3: 13px;   /* ナビ、ボタン、フォーム */
-  --fs-4: 14px;   /* 空状態、注意書き */
-  --fs-5: 15px;   /* 本文 */
-  --fs-6: 18px;   /* 小見出し */
-  --fs-7: 22px;   /* 節見出し */
-  --fs-8: 28px;   /* ページ見出し */
+  --fs-1: 11px;   /* badges, kbd, side notes */
+  --fs-2: 12px;   /* meta, tags, timestamps, labels */
+  --fs-3: 13px;   /* nav, buttons, forms */
+  --fs-4: 14px;   /* empty states, cautions */
+  --fs-5: 15px;   /* body text */
+  --fs-6: 18px;   /* subheadings */
+  --fs-7: 22px;   /* section headings */
+  --fs-8: 28px;   /* page headings */
 
-  --lh-tight: 1.25;  /* 見出し */
-  --lh-snug:  1.45;  /* リスト行、UI */
-  --lh-body:  1.75;  /* 本文 */
-  --lh-prose: 1.85;  /* 記事本文 */
+  --lh-tight: 1.25;  /* headings */
+  --lh-snug:  1.45;  /* list rows, UI */
+  --lh-body:  1.75;  /* body text */
+  --lh-prose: 1.85;  /* article prose */
 
-  /* 大きい文字は字間を詰めないと間延びして見える */
+  /* Large type needs tighter tracking or it looks loose */
   --tracking-tight: -0.012em;
   --tracking-label:  0.08em;
 
-  --r-sm: 4px;      /* タグ、バッジ、インラインコード */
-  --r-md: 8px;      /* ボタン、入力、パネル、コードブロック */
-  --r-lg: 12px;     /* モーダル、ポップオーバー */
-  --r-full: 999px;  /* ピル */
+  --r-sm: 4px;      /* tags, badges, inline code */
+  --r-md: 8px;      /* buttons, inputs, panels, code blocks */
+  --r-lg: 12px;     /* modals, popovers */
+  --r-full: 999px;  /* pills */
 
-  /* 影は「浮いている物」にだけ使う。地の面には使わない */
+  /* Shadows are for things that float, never for the base surfaces */
   --shadow-1: 0 1px 2px light-dark(rgba(38,36,31,.06), rgba(0,0,0,.40));
   --shadow-2: 0 8px 28px light-dark(rgba(38,36,31,.10), rgba(0,0,0,.50));
 
-  /* フォーカスの環。アクセントの「状態表示にのみ使う」に合致する */
+  /* The focus ring - which fits "the accent is for state" */
   --ring: 0 0 0 3px color-mix(in oklab, var(--accent) 28%, transparent);
 
-  --measure: 74ch;   /* 行長は 70〜80 文字程度で頭打ちにする */
-  --wrap: 900px;     /* 本文カラムの幅。ヘッダと本体で同じ値を使う */
+  --measure: 74ch;   /* cap the line length at roughly 70-80 characters */
+  --wrap: 900px;     /* content column width, shared by header and body */
 }
 
-/* 明示的に選ばれたときは OS の設定より優先する(app.js が data-theme を置く) */
+/* An explicit choice outranks the OS setting (app.js sets data-theme) */
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"]  { color-scheme: dark; }
 
@@ -117,20 +119,21 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* キーボード操作を第一級に扱う(DESIGN 6)以上、フォーカスは必ず見えること。
-   :focus-visible なのでマウス操作では出ない。 */
+/* Since the keyboard is first-class (DESIGN 6), focus must always be visible.
+   Being :focus-visible, it does not appear for mouse interaction. */
 :where(a, button, input, textarea, select, [tabindex]):focus-visible {
   outline: none;
   box-shadow: var(--ring);
   border-radius: var(--r-sm);
 }
 
-/* ---- レイアウト ---- */
+/* ---- layout ---- */
 
 .wrap { max-width: var(--wrap); margin: 0 auto; padding: 0 var(--sp-5) var(--sp-8); }
 
-/* ヘッダは本文の上に乗って動く。罫線1本で切るのではなく、背景を透かして
-   奥に本文がある状態を見せる。色は足していない(階調だけ) */
+/* The header rides above the content. Rather than cutting it off with a rule,
+   the background is translucent so the content shows through behind it. No new
+   colour, only tone. */
 header.top {
   position: sticky; top: 0; z-index: 10;
   background: color-mix(in oklab, var(--bg) 82%, transparent);
@@ -158,8 +161,9 @@ nav.main a {
 nav.main a:hover { color: var(--fg); background: var(--bg-hover); }
 nav.main a.on { color: var(--fg); background: var(--bg-sunken); font-weight: 500; }
 
-/* 狭い画面。項目を折り返させると「ガ/イ/ド」のように割れて header が2段になる。
-   折り返しは禁止し、代わりに検索欄を縮める。 */
+/* Narrow screens. Letting the items wrap splits a label mid-word and pushes the
+   header onto two rows, so wrapping is forbidden and the search box shrinks
+   instead. */
 nav.main a { white-space: nowrap; }
 @media (max-width: 720px) {
   header.top .inner { padding-left: var(--sp-4); padding-right: var(--sp-4); gap: var(--sp-2); }
@@ -167,17 +171,17 @@ nav.main a { white-space: nowrap; }
   .searchbox { flex: 1 1 auto; min-width: 0; }
   .searchbox input[type=text] { width: 100%; }
 }
-/* これ以上は1段に収まらない。検索欄だけ2段目に送る(隠さない。`/` の
-   フォーカス先が無くなるとキーボード操作が成立しない) */
+/* Below this nothing fits on one row, so the search box moves to a second row.
+   It is never hidden: without a target for `/`, keyboard driving falls apart. */
 @media (max-width: 560px) {
   header.top .inner { flex-wrap: wrap; }
   .searchbox { order: 3; flex-basis: 100%; }
   .suggest { width: 100%; }
 }
 
-/* ---- アイコン ----
-   base.html のスプライトを <use> で参照する。線は currentColor を継ぐので
-   置いた場所の文字色になる。 */
+/* ---- icons ----
+   Referenced with <use> from the sprite in base.html. The strokes inherit
+   currentColor, so an icon takes the text colour where it sits. */
 .sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
 .ic {
   width: 1em; height: 1em; flex: none;
@@ -186,7 +190,7 @@ nav.main a { white-space: nowrap; }
   vertical-align: -0.125em;
 }
 
-/* ---- 検索 ---- */
+/* ---- search ---- */
 
 .searchbox { position: relative; }
 .searchbox form { position: relative; display: flex; align-items: center; }
@@ -194,8 +198,9 @@ nav.main a { white-space: nowrap; }
   position: absolute; left: var(--sp-3); color: var(--fg-faint);
   pointer-events: none; font-size: var(--fs-3);
 }
-/* 属性セレクタまで書く。下の共通規則 input[type=text] と詳細度が同じだと、
-   後に書かれている方が勝って幅も余白も効かない。 */
+/* The attribute selector is written out. At the same specificity as the shared
+   input[type=text] rule below, whichever comes last wins and neither the width
+   nor the padding here would apply. */
 .searchbox input[type=text] {
   width: 280px; padding: var(--sp-2) var(--sp-4) var(--sp-2) var(--sp-7);
   font-size: var(--fs-3); font-family: var(--sans);
@@ -208,8 +213,8 @@ nav.main a { white-space: nowrap; }
   outline: none; border-color: var(--border-strong);
   background: var(--bg-raised); box-shadow: var(--ring);
 }
-/* 候補は「浮いている物」なので影を使う。:empty で開閉しているので、
-   中身が空のときに何も描かないこと(空白文字も入れない) */
+/* The suggestion list floats, so it gets a shadow. It is opened and closed with
+   :empty, so nothing may be drawn when it is empty - not even whitespace. */
 .suggest {
   position: absolute; right: 0; top: calc(100% + var(--sp-2)); width: 420px; z-index: 20;
   background: var(--bg-raised); border: 1px solid var(--border);
@@ -225,7 +230,7 @@ nav.main a { white-space: nowrap; }
 .suggest .t { font-size: var(--fs-3); }
 .suggest .s { font-size: var(--fs-2); color: var(--fg-muted); }
 
-/* ---- 見出しと本文 ---- */
+/* ---- headings and body text ---- */
 
 h1, h2, h3 { text-wrap: balance; line-height: var(--lh-tight); }
 h1 { font-size: var(--fs-8); font-weight: 650; margin: var(--sp-6) 0 var(--sp-2); letter-spacing: var(--tracking-tight); }
@@ -236,30 +241,32 @@ h3 { font-size: var(--fs-6); font-weight: 600; margin: var(--sp-5) 0 var(--sp-2)
   color: var(--fg-faint); font-size: var(--fs-2); font-family: var(--mono);
   font-variant-numeric: tabular-nums;
 }
-/* 既定の青リンクは配色から浮くので、本文と同じ階調に寄せる */
+/* The default blue link jars against this palette, so links take the same tone
+   as the text */
 .meta a, .empty a {
   color: var(--fg-muted); text-decoration: none;
   border-bottom: 1px solid var(--border-strong);
 }
 .meta a:hover, .empty a:hover { color: var(--fg); border-bottom-color: var(--accent); }
 .meta a strong { font-weight: 600; color: var(--fg); }
-/* 選ばれている絞り込み。アクセントは状態表示にのみ使う(DESIGN 6) */
+/* The selected filter. The accent is for state only (DESIGN 6) */
 .meta a.on { color: var(--fg); border-bottom: 2px solid var(--accent); }
 
-/* 見出しの直下の meta は見出しと1つの塊に見せる */
+/* meta right under a heading reads as part of it */
 h1 + .meta { margin-top: calc(-1 * var(--sp-1)); }
 
 .prose { max-width: var(--measure); font-size: 16px; line-height: var(--lh-prose); }
 .prose p { text-wrap: pretty; }
-/* **切れ目の無い長い文字列は折り返す。** 日本語はどこでも折り返せるので
-   これまで表面化していなかったが、URL や長い識別子を1つ貼るだけで
-   画面の外へはみ出して横スクロールが出る。 */
+/* **Break long unbroken strings.** Japanese wraps anywhere, so this never
+   surfaced, but a single URL or long identifier pushes the content off screen
+   and brings a horizontal scrollbar with it. */
 .prose, ul.rows li, .meta, .empty, .notice { overflow-wrap: break-word; }
-/* 表は折り返せないので、表だけを横にスクロールさせる。
-   ページ全体が横に流れるより、表の中で動かせた方が読める。 */
+/* Tables cannot wrap, so the table alone scrolls horizontally. Moving inside
+   the table reads better than the whole page sliding sideways. */
 .prose table { display: block; overflow-x: auto; max-width: 100%; width: max-content; }
-/* 中のセルは折り返させない。折り返すと表が容器の幅に潰れて、
-   1列1文字のような読めない形になる(スクロールさせたいのは表の方)。 */
+/* The cells themselves do not wrap: wrapping collapses the table to the width
+   of its container, one character per column, which is unreadable. The table is
+   what should scroll. */
 .prose th, .prose td { white-space: nowrap; }
 .prose h1 { font-size: var(--fs-7); margin-top: var(--sp-6); }
 .prose h2 {
@@ -290,22 +297,24 @@ h1 + .meta { margin-top: calc(-1 * var(--sp-1)); }
 .prose a { color: var(--fg); text-decoration-color: var(--border-strong); text-decoration-thickness: 1px; text-underline-offset: 3px; }
 .prose a:hover { text-decoration-color: var(--accent); }
 
-/* 未解決の wikilink。存在しないページであることを階調で示す */
+/* An unresolved wikilink; the tone says the page does not exist */
 a.wikilink-new { color: var(--fg-faint) !important; text-decoration-style: dotted; }
 
-/* 検索結果の一致箇所。UA 既定の蛍光イエローはどちらのテーマでも浮く。
-   一致は「状態」なのでアクセントを薄く敷く(DESIGN 6 に反しない) */
+/* The match inside a search result. The UA's default highlighter yellow jars in
+   either theme. A match is state, so a faint wash of the accent is used - which
+   does not contradict DESIGN 6. */
 mark {
   background: color-mix(in oklab, var(--accent) 24%, transparent);
   color: inherit; border-radius: 2px; padding: 0 2px;
 }
 
-/* ---- リスト ----
-   j/k のカーソルはこの `ul.rows > li` を選んでいる(app.js)。
-   構造と li.cur のクラス名は変えないこと。 */
+/* ---- lists ----
+   The j/k cursor selects these `ul.rows > li` elements (app.js).
+   Do not change the structure or the li.cur class name. */
 
-/* 行の「面」は本文の左右にはみ出させ、区切り線は本文の幅に揃える。
-   線まではみ出させると見出しより広い線が引かれて、列がずれて見える。 */
+/* The row's surface extends past the text column while the separator stays at
+   the text width. Extending the line too would draw it wider than the heading
+   and the columns would look misaligned. */
 ul.rows { list-style: none; margin: 0 calc(-1 * var(--sp-3)); padding: 0; }
 ul.rows li {
   position: relative;
@@ -318,7 +327,8 @@ ul.rows li + li::before {
   height: 1px; background: var(--border);
 }
 ul.rows li:hover, li.cur { background: var(--bg-hover); }
-/* 面に触れる線は残さない。角丸の直下に線が来ると欠けて見える */
+/* No line touching a surface: a rule right under a rounded corner looks
+   chipped */
 ul.rows li:hover::before, li.cur::before,
 ul.rows li:hover + li::before, li.cur + li::before { display: none; }
 ul.rows a { color: var(--fg); text-decoration: none; }
@@ -328,7 +338,8 @@ ul.rows .when {
   font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 
-/* タグとバッジは罫線ではなく階調で示す。画面上の細い線が減るほど落ち着く */
+/* Tags and badges are drawn with tone rather than borders; the fewer hairlines
+   on screen, the calmer it reads */
 .tag {
   font-family: var(--mono); font-size: var(--fs-2); color: var(--fg-muted);
   background: var(--bg-sunken); border: none; border-radius: var(--r-full);
@@ -343,20 +354,21 @@ ul.rows .when {
   border: none; border-radius: var(--r-sm);
   padding: 1px var(--sp-2); text-transform: uppercase; white-space: nowrap;
 }
-/* 種別は4つある。page だけ規則があって残りが素通しだったのを揃える */
+/* There are four kinds. page had a rule and the others fell through; they are
+   aligned here */
 .badge.page, .badge.project, .badge.task, .badge.area { color: var(--fg-muted); }
-/* 行の先頭に置かれたバッジは幅を揃える。種別ごとに文字数が違うと
-   タイトルの頭が1行ずつずれて読みにくい */
+/* Badges at the start of a row share a width. With a different number of
+   characters per kind, the titles start at a different place on every row. */
 ul.rows li > .badge:first-child { min-width: 6em; text-align: center; }
 
 .count { font-family: var(--mono); color: var(--fg-faint); font-size: var(--fs-2); font-variant-numeric: tabular-nums; }
 
-/* 行の中に置く POST フォーム(1行の操作ボタン) */
+/* A POST form sitting inside a row - a single-line action button */
 .inline-form { display: inline; }
 
-/* 記号1文字だけのボタン(タスクの完了、Weekly Review のチェック)。
-   中身が文字1つなので、普通のボタンの余白では大きな四角になってしまう。
-   フォームの submit だが、見た目はチェックボックスに寄せる。 */
+/* A button holding a single glyph (completing a task, ticking the Weekly
+   Review). With one character inside, ordinary button padding turns it into a
+   big square. It submits a form but is styled towards a checkbox. */
 button.check {
   width: 22px; height: 22px; padding: 0; flex: none;
   justify-content: center; border-radius: var(--r-sm);
@@ -364,26 +376,28 @@ button.check {
   color: var(--accent); font-size: var(--fs-3); line-height: 1;
 }
 button.check:hover { background: var(--bg-hover); border-color: var(--border-strong); }
-/* 済んだ項目は階調で下げる。消さずに残すのがレビューの作法 */
+/* Done items drop back in tone. Keeping rather than removing them is the way a
+   review works */
 ul.rows a.done { color: var(--fg-faint); }
 
-/* 一覧の上に出る絞り込みの行 */
+/* The filter row above a list */
 .meta.filters { margin-top: var(--sp-2); }
 
-/* clarify の本文欄は記事の編集ほど高さが要らない */
+/* The body field on clarify does not need the height of the article editor */
 textarea.short { min-height: 220px; }
 
-/* 編集画面のプレビュー。表示の切り替えは app.js が inline style で行う */
+/* Preview on the edit screen; app.js toggles it with an inline style */
 .preview-pane {
   display: none; margin-top: var(--sp-5);
   border-top: 1px solid var(--border); padding-top: var(--sp-4);
 }
 
-/* ---- グリッド ---- */
+/* ---- grid ---- */
 
 .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--sp-7); }
-/* 仕切り線は隙間の**中央**に置く。padding と同じ値を margin で戻すと線が
-   左の列の右端に密着し、件数や入力欄が線に触れてしまう。 */
+/* The divider sits in the **middle** of the gap. Cancelling the padding with an
+   equal negative margin pulls the line against the right edge of the left
+   column, where counts and inputs end up touching it. */
 .cols > * + * {
   padding-left: var(--sp-7); border-left: 1px solid var(--border);
   margin-left: calc(-1 * var(--sp-5));
@@ -394,10 +408,11 @@ textarea.short { min-height: 220px; }
                   border-top: 1px solid var(--border); }
 }
 
-/* ---- セクション ----
-   見出しだけだと切れ目が読み取りにくいので、上に罫線を1本引き、
-   見出しの左に短いアクセントを置く。
-   ダッシュボードだけは .panel.card で面に載せる(情報の塊が多いため)。 */
+/* ---- sections ----
+   A heading alone does not read as a break, so there is a rule above it and a
+   short accent to its left.
+   The dashboard alone puts sections on a surface with .panel.card, because it
+   carries many separate clusters of information. */
 
 section.panel {
   margin-top: var(--sp-6);
@@ -405,8 +420,9 @@ section.panel {
   border-top: 1px solid var(--border);
 }
 section.panel:first-of-type { border-top: none; padding-top: 0; }
-/* 列の中の節は、列そのものが既に区切りなので上の罫線を引かない。
-   兄弟が2つ並ぶと片方だけ線が出て左右が揃わなくなる */
+/* A section inside a column needs no rule above it: the column is already the
+   break. With two siblings side by side, only one would get a line and the two
+   halves would stop lining up. */
 .cols > section.panel { border-top: none; padding-top: 0; }
 
 section.panel.card {
@@ -415,7 +431,8 @@ section.panel.card {
   padding: var(--sp-4) var(--sp-5) var(--sp-5); margin-top: var(--sp-4);
 }
 section.panel.card:first-of-type { border-top: 1px solid var(--border); padding-top: var(--sp-4); }
-/* カードの中では列の間の罫線は二重の区切りになる。余白だけで離す */
+/* Inside a card, a rule between the columns is a second break on top of the
+   first; spacing alone separates them */
 section.panel.card .cols > * + * { border-left: none; }
 
 section.panel > h2 {
@@ -430,7 +447,8 @@ section.panel > h2::before {
 }
 section.panel .cols { margin-top: var(--sp-4); }
 
-/* 節の中の小見出し(cols の中など)。罫線は引かず、字送りだけで階層を示す */
+/* A subheading inside a section, such as within cols. No rule; tracking alone
+   carries the hierarchy */
 .subhead {
   margin: 0 0 var(--sp-2); font-size: var(--fs-2); font-weight: 600;
   letter-spacing: var(--tracking-label);
@@ -442,13 +460,13 @@ section.panel .cols { margin-top: var(--sp-4); }
 .empty {
   color: var(--fg-faint); font-size: var(--fs-4); padding: var(--sp-3) 0;
 }
-/* 中身が空の節は詰める。Weekly Review は「1画面に判断材料を全部並べる」のが
-   規定(DESIGN 2.4)なので節は減らせない。空の節が場所を取るぶんだけ、
-   埋まっている節が視界から出ていってしまう。 */
+/* Empty sections are tightened up. The Weekly Review is specified to put
+   everything needed to decide on one screen (DESIGN 2.4), so sections cannot be
+   dropped - and every empty one pushes a full one out of view. */
 section.panel:has(> .empty:last-child) { margin-top: var(--sp-5); padding-top: var(--sp-4); }
 section.panel:has(> .empty:last-child) > h2 { margin-bottom: var(--sp-1); }
 
-/* ---- フォーム ---- */
+/* ---- forms ---- */
 
 input[type=text], textarea, select {
   font-family: var(--sans); font-size: var(--fs-4); color: var(--fg);
@@ -494,7 +512,7 @@ button.danger:hover { border-color: var(--warn); }
   background: var(--bg-sunken); border: none; border-radius: var(--r-sm); padding: 1px var(--sp-1);
 }
 
-/* ---- クイックキャプチャ(c) ---- */
+/* ---- quick capture (c) ---- */
 
 .modal-overlay {
   position: fixed; inset: 0; z-index: 100;
@@ -512,7 +530,7 @@ button.danger:hover { border-color: var(--warn); }
 .modal input { font-size: var(--fs-5); }
 .modal-hint { font-size: var(--fs-1); color: var(--fg-faint); margin-top: var(--sp-2); font-family: var(--mono); }
 
-/* ---- テーマ切り替え ---- */
+/* ---- theme switch ---- */
 
 .theme-toggle {
   flex: none; width: 30px; height: 30px; padding: 0;
@@ -523,16 +541,16 @@ button.danger:hover { border-color: var(--warn); }
 }
 .theme-toggle:hover { color: var(--fg); background: var(--bg-hover); }
 .theme-toggle .ic { font-size: 15px; }
-/* 3つとも置いておき、今の状態のものだけ出す。
-   以前は ◐ ☀ ☾ の文字を使っていたが、環境によって字面が変わる。 */
+/* All three are present and only the current one is shown.
+   They used to be the characters ◐ ☀ ☾, whose shapes vary by platform. */
 .theme-toggle .ic { display: none; }
-.theme-toggle .ic-auto { display: block; }            /* OS の設定に従う */
+.theme-toggle .ic-auto { display: block; }            /* follow the OS */
 :root[data-theme="light"] .theme-toggle .ic-auto,
 :root[data-theme="dark"]  .theme-toggle .ic-auto { display: none; }
 :root[data-theme="light"] .theme-toggle .ic-sun  { display: block; }
 :root[data-theme="dark"]  .theme-toggle .ic-moon { display: block; }
 
-/* ---- 言語の切り替え ---- */
+/* ---- language switch ---- */
 
 .lang-switch { flex: none; display: flex; gap: var(--sp-1); }
 .lang-switch a {
@@ -543,8 +561,8 @@ button.danger:hover { border-color: var(--warn); }
 }
 .lang-switch a:hover { color: var(--fg); background: var(--bg-hover); }
 
-/* [[...]] の補完。キャレットの位置に出すので body 直下に絶対配置する。
-   体裁は検索窓の .suggest に合わせる */
+/* [[...]] completion. It appears at the caret, so it is absolutely positioned
+   directly under body. The styling follows .suggest from the search box. */
 .wl-suggest {
   position: absolute; z-index: 60; min-width: 220px; max-width: 420px;
   background: var(--bg-raised); border: 1px solid var(--border);
@@ -564,11 +582,13 @@ button.danger:hover { border-color: var(--warn); }
   font-size: var(--fs-1); color: var(--fg-faint);
 }
 
-/* ---- 使い方ガイド ----
-   左に目次、右に本文。本文は記事と同じ .prose を使う */
+/* ---- the guide ----
+   Contents on the left, prose on the right. The prose uses the same .prose as
+   articles. */
 .guide { display: grid; grid-template-columns: 200px 1fr; gap: 0 var(--sp-7); }
-/* **グリッドの子は既定で min-width:auto**。中身より縮まないので、横に長い図や表を
-   置くと列のほうが広がって、ページ全体に横スクロールが出る。 */
+/* **A grid child is min-width:auto by default**, so it never shrinks below its
+   content; a wide diagram or table widens the column instead and the whole page
+   gains a horizontal scrollbar. */
 .guide > * { min-width: 0; }
 .guide-toc {
   position: sticky; top: 64px; align-self: start;
@@ -581,14 +601,14 @@ button.danger:hover { border-color: var(--warn); }
 .guide-toc > .guide-topic > a.on { border-bottom: 2px solid var(--accent); }
 .guide-toc ul { list-style: none; margin: var(--sp-2) 0 0; padding: 0; border-left: 1px solid var(--border); }
 .guide-toc li { padding: 1px 0 1px var(--sp-3); }
-/* 見出しはヘッダに隠れない位置で止める */
+/* Stop headings where the header will not cover them */
 .guide .prose h2, .guide .prose h3 { scroll-margin-top: 64px; }
 @media (max-width: 720px) {
   .guide { grid-template-columns: 1fr; }
   .guide-toc { position: static; padding-top: var(--sp-5); }
 }
 
-/* 見出しの脇に置く「?」。目立たせず、探せば見つかる程度に */
+/* The "?" beside a heading: unobtrusive, but findable when looked for */
 a.help {
   margin-left: var(--sp-2); text-decoration: none;
   color: var(--fg-faint); font-family: var(--mono); font-size: var(--fs-1);
@@ -598,12 +618,13 @@ a.help {
 a.help:hover { color: var(--fg); background: var(--bg-hover); }
 label a.help { background: none; padding: 0; margin-left: var(--sp-2); text-decoration: underline; border-radius: 0; }
 
-/* ---- ガイドの図(inline SVG) ----
-   色はすべて変数に寄せる。light-dark() が両テーマを持っているので、
-   図の側でテーマ分岐を書く必要はない。
-   文字サイズは viewBox の座標系に対する値であり、画面上では拡大縮小される。 */
-/* 図は縮めすぎると文字が読めなくなるので、狭い画面では図の中で横に
-   動かせるようにする(表と同じ扱い。ページ全体を横に流さない)。 */
+/* ---- diagrams in the guide (inline SVG) ----
+   Every colour comes from a variable. light-dark() already carries both themes,
+   so the diagrams need no theme branching of their own.
+   Font sizes are in viewBox units and scale with the drawing. */
+/* Shrunk too far, the labels stop being readable, so on a narrow screen the
+   diagram scrolls within itself - the same treatment as a table, and never the
+   whole page. */
 .dg-wrap { overflow-x: auto; min-width: 0; margin: var(--sp-5) 0; }
 svg.dg { display: block; width: 100%; min-width: 600px; height: auto; font-family: var(--sans); }
 svg.dg rect.box { fill: var(--bg-raised); stroke: var(--border); }
@@ -617,10 +638,10 @@ svg.dg text.mono  { font-family: var(--mono); font-size: 13px; }
 svg.dg text.lab   { fill: var(--fg-faint); font-size: 11.5px; font-family: var(--mono); }
 svg.dg text.end-t { fill: var(--accent-fg); }
 
-/* ---- 記事系の画面の左列 ----
-   ヘッダーから「記事」「タグ」を外した代わりに、タグをここに常に並べる。
-   ガイドの目次(.guide-toc)と同じ幅・同じ位置に置き、画面が変わっても
-   左の列が動かないようにする。 */
+/* ---- the left column on article screens ----
+   Articles and tags came out of the header, and the tags live here instead.
+   Same width and position as the guide's contents (.guide-toc), so the left
+   column does not shift as you move between screens. */
 .wrap.with-side { display: grid; grid-template-columns: 200px 1fr; gap: 0 var(--sp-7); }
 .wrap.with-side > * { min-width: 0; }
 .side {
@@ -641,13 +662,14 @@ svg.dg text.end-t { fill: var(--accent-fg); }
   .side { position: static; padding-top: var(--sp-5); }
 }
 
-/* 設定のチェックボックス。ラベル全体を押せるようにする */
+/* The settings checkboxes; the whole label is clickable */
 label.check {
   display: flex; gap: var(--sp-3); align-items: baseline;
   margin: var(--sp-4) 0 0; font-size: var(--fs-4); color: var(--fg); cursor: pointer;
 }
 label.check input { margin: 0; }
 label.check strong { font-weight: 600; }
-/* 節見出しがリンクのとき(ダッシュボードの「記事」→ 一覧)は、見出しの見た目のまま */
+/* When a section heading is a link (the dashboard's Articles to the list), it
+   keeps the look of a heading */
 section.panel > h2 a { color: inherit; text-decoration: none; }
 section.panel > h2 a:hover { text-decoration: underline; text-underline-offset: 3px; }

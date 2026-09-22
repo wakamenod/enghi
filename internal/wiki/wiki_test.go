@@ -40,7 +40,8 @@ func canonicalCount(t *testing.T, db *store.DB, pageID int64) int {
 	return n
 }
 
-// リネームの往復。DESIGN 2.5 が「UPSERT が無いと必ず失敗する」と名指ししている経路。
+// Rename and rename back. DESIGN 2.5 names this as the path that always fails
+// without the UPSERT.
 func TestRenameAndRevert(t *testing.T) {
 	s, db := newSvc(t)
 	ctx := context.Background()
@@ -48,34 +49,35 @@ func TestRenameAndRevert(t *testing.T) {
 
 	p2, err := s.Update(ctx, p.Slug, wiki.UpdateInput{Title: "GNU Emacs", Body: "本文", Version: p.Version})
 	if err != nil {
-		t.Fatalf("リネーム: %v", err)
+		t.Fatalf("rename: %v", err)
 	}
 	if p2.Title != "GNU Emacs" {
 		t.Fatalf("title = %q, want GNU Emacs", p2.Title)
 	}
 	if n := canonicalCount(t, db, p.ID); n != 1 {
-		t.Fatalf("リネーム後の正式名が %d 件", n)
+		t.Fatalf("canonical titles after rename = %d", n)
 	}
 
-	// **元の名前に戻す。** 旧名は自分自身の別名として既に存在するので、
-	// 素の INSERT ではここで必ず UNIQUE constraint failed になる。
+	// **Rename back.** The old name already exists as this page's own alias, so
+	// a plain INSERT is guaranteed to hit UNIQUE constraint failed here.
 	p3, err := s.Update(ctx, p2.Slug, wiki.UpdateInput{Title: "Emacs", Body: "本文", Version: p2.Version})
 	if err != nil {
-		t.Fatalf("元のタイトルに戻す: %v", err)
+		t.Fatalf("rename back: %v", err)
 	}
 	if p3.Title != "Emacs" {
 		t.Fatalf("title = %q, want Emacs", p3.Title)
 	}
 	if n := canonicalCount(t, db, p.ID); n != 1 {
-		t.Fatalf("戻した後の正式名が %d 件", n)
+		t.Fatalf("canonical titles after renaming back = %d", n)
 	}
 	if probs, err := store.Doctor(ctx, db); err != nil || len(probs) != 0 {
 		t.Fatalf("doctor: %v %v", probs, err)
 	}
 }
 
-// 他ページのタイトルと衝突するリネームは、**降格より前に**弾かれなければならない。
-// 降格が先に走ると、失敗したページが正式名ゼロのまま残る。
+// A rename colliding with another page's title must be rejected **before** the
+// demotion. If demotion runs first, the failed page is left with no canonical
+// title at all.
 func TestRenameConflictLeavesCanonicalIntact(t *testing.T) {
 	s, db := newSvc(t)
 	ctx := context.Background()
@@ -85,21 +87,22 @@ func TestRenameConflictLeavesCanonicalIntact(t *testing.T) {
 	_, err := s.Update(ctx, b.Slug, wiki.UpdateInput{Title: "Emacs", Body: "B", Version: b.Version})
 	var tc *wiki.TitleConflictError
 	if !errors.As(err, &tc) {
-		t.Fatalf("title_conflict を期待したが %v", err)
+		t.Fatalf("expected title_conflict, got %v", err)
 	}
 	if tc.Conflicting.ID != a.ID {
-		// 「どのページと衝突したのか」が分からないと利用者は辿れない(DESIGN 4.2)
-		t.Fatalf("衝突相手が返っていない: %+v", tc.Conflicting)
+		// Without "which page did it collide with", the user cannot follow up
+		// (DESIGN 4.2)
+		t.Fatalf("the conflicting page was not returned: %+v", tc.Conflicting)
 	}
 	if n := canonicalCount(t, db, b.ID); n != 1 {
-		t.Fatalf("失敗したのに正式名が %d 件になった(降格が先に走っている)", n)
+		t.Fatalf("after a failure there are %d canonical titles (demotion ran first)", n)
 	}
 	if probs, _ := store.Doctor(ctx, db); len(probs) != 0 {
 		t.Fatalf("doctor: %v", probs)
 	}
 }
 
-// 別名でも衝突すること(名前空間は page_titles 1枚で表現されている)。
+// Aliases collide too: the namespace is one table, page_titles.
 func TestAliasOccupiesNamespace(t *testing.T) {
 	s, _ := newSvc(t)
 	ctx := context.Background()
@@ -110,31 +113,31 @@ func TestAliasOccupiesNamespace(t *testing.T) {
 	_, err := s.Create(ctx, wiki.CreateInput{Title: "イーマックス"})
 	var tc *wiki.TitleConflictError
 	if !errors.As(err, &tc) {
-		t.Fatalf("別名と同名のページ作成は title_conflict になるはず: %v", err)
+		t.Fatalf("creating a page named like an alias must be title_conflict: %v", err)
 	}
 }
 
-// タイトルは COLLATE NOCASE。[[emacs]] が「Emacs」に解決されること。
+// Titles are COLLATE NOCASE, so [[emacs]] resolves to "Emacs".
 func TestTitleIsCaseInsensitive(t *testing.T) {
 	s, _ := newSvc(t)
 	ctx := context.Background()
 	mustCreate(t, s, "Emacs", "A")
 
 	if _, err := s.Create(ctx, wiki.CreateInput{Title: "emacs"}); err == nil {
-		t.Fatal("大小違いの同名ページが作れてしまった")
+		t.Fatal("a page differing only in case was created")
 	}
 	p, err := s.ByTitle(ctx, "emacs")
 	if err != nil || p.Title != "Emacs" {
 		t.Fatalf("ByTitle(emacs) = %v, %v", p, err)
 	}
-	// 日本語は NOCASE の影響を受けない
+	// Japanese is unaffected by NOCASE
 	mustCreate(t, s, "ハハ", "x")
 	if _, err := s.Create(ctx, wiki.CreateInput{Title: "パパ"}); err != nil {
-		t.Fatalf("「ハハ」と「パパ」は別物のはず: %v", err)
+		t.Fatalf("「ハハ」 and 「パパ」 must be different: %v", err)
 	}
 }
 
-// 保存のたびにリンク行が増殖しないこと(DESIGN 2.1)。
+// Link rows must not multiply on every save (DESIGN 2.1).
 func TestLinksDoNotMultiplyOnResave(t *testing.T) {
 	s, db := newSvc(t)
 	ctx := context.Background()
@@ -148,7 +151,7 @@ func TestLinksDoNotMultiplyOnResave(t *testing.T) {
 		return n
 	}
 	if got := count(); got != 2 {
-		t.Fatalf("リンク行 = %d, want 2", got)
+		t.Fatalf("link rows = %d, want 2", got)
 	}
 	cur := p
 	for i := 0; i < 3; i++ {
@@ -161,11 +164,11 @@ func TestLinksDoNotMultiplyOnResave(t *testing.T) {
 		}
 	}
 	if got := count(); got != 2 {
-		t.Fatalf("再保存後のリンク行 = %d, want 2(増殖している)", got)
+		t.Fatalf("link rows after re-saving = %d, want 2 (they are multiplying)", got)
 	}
 }
 
-// 未解決リンクは、その名前のページが作られた時点で解決される。
+// An unresolved link resolves the moment a page with that name is created.
 func TestUnresolvedLinkResolvesOnCreate(t *testing.T) {
 	s, _ := newSvc(t)
 	ctx := context.Background()
@@ -173,25 +176,26 @@ func TestUnresolvedLinkResolvesOnCreate(t *testing.T) {
 
 	links, _ := s.Links(ctx, src.ID)
 	if len(links) != 1 || links[0].Resolved {
-		t.Fatalf("最初は未解決のはず: %+v", links)
+		t.Fatalf("it should start out unresolved: %+v", links)
 	}
 	un, _ := s.UnresolvedLinks(ctx, 10)
 	if len(un) != 1 || un[0].Title != "まだ無い記事" {
-		t.Fatalf("未解決リンク一覧: %+v", un)
+		t.Fatalf("unresolved link list: %+v", un)
 	}
 
 	dst := mustCreate(t, s, "まだ無い記事", "できた")
 	links, _ = s.Links(ctx, src.ID)
 	if len(links) != 1 || !links[0].Resolved || *links[0].PageID != dst.ID {
-		t.Fatalf("作成後に解決されていない: %+v", links)
+		t.Fatalf("still unresolved after creation: %+v", links)
 	}
 	back, _ := s.Backlinks(ctx, dst.ID)
 	if len(back) != 1 || back[0].ID != src.ID {
-		t.Fatalf("バックリンク: %+v", back)
+		t.Fatalf("backlinks: %+v", back)
 	}
 }
 
-// ページ削除時: そこを指す行は未解決に落とし、そのページ発の行は消す(DESIGN 2.1)。
+// On delete: rows pointing at the page are demoted to unresolved, rows coming
+// from it are deleted (DESIGN 2.1).
 func TestDeleteDemotesIncomingLinks(t *testing.T) {
 	s, db := newSvc(t)
 	ctx := context.Background()
@@ -203,18 +207,19 @@ func TestDeleteDemotesIncomingLinks(t *testing.T) {
 	}
 	links, _ := s.Links(ctx, src.ID)
 	if len(links) != 1 || links[0].Resolved {
-		t.Fatalf("参照元のリンクは未解決リンクとして残るはず: %+v", links)
+		t.Fatalf("the referrer's link must remain as an unresolved link: %+v", links)
 	}
 	var n int
 	if err := db.QueryRow(`SELECT count(*) FROM links WHERE src_kind='page' AND src_id=?`, dst.ID).Scan(&n); err != nil {
 		t.Fatal(err)
 	}
 	if n != 0 {
-		t.Fatalf("削除したページ発のリンクが %d 行残っている", n)
+		t.Fatalf("%d link row(s) from the deleted page are still there", n)
 	}
 }
 
-// version はタグだけの変更でも上がる。リビジョンは本文/タイトルが変わったときだけ(DESIGN 4.2)。
+// version goes up even for a tag-only change; a revision is written only when
+// the body or title changes (DESIGN 4.2).
 func TestTagOnlyChangeBumpsVersionButMakesNoRevision(t *testing.T) {
 	s, _ := newSvc(t)
 	ctx := context.Background()
@@ -227,15 +232,16 @@ func TestTagOnlyChangeBumpsVersionButMakesNoRevision(t *testing.T) {
 		t.Fatal(err)
 	}
 	if p2.Version != p.Version+1 {
-		t.Fatalf("タグ変更で version が上がっていない: %d → %d", p.Version, p2.Version)
+		t.Fatalf("version did not go up on a tag change: %d -> %d", p.Version, p2.Version)
 	}
 	revs1, _ := s.Revisions(ctx, p.ID)
 	if len(revs1) != len(revs0) {
-		t.Fatalf("タグだけの変更でリビジョンが作られた: %d → %d", len(revs0), len(revs1))
+		t.Fatalf("a tag-only change created a revision: %d -> %d", len(revs0), len(revs1))
 	}
 }
 
-// 10 分以内の連続保存はリビジョンを上書きする。差分の大小は見ない(DESIGN 4.2)。
+// Saves within 10 minutes overwrite the revision, whatever the size of the
+// change (DESIGN 4.2).
 func TestRevisionCompaction(t *testing.T) {
 	s, _ := newSvc(t)
 	ctx := context.Background()
@@ -252,14 +258,14 @@ func TestRevisionCompaction(t *testing.T) {
 	}
 	revs, _ := s.Revisions(ctx, p.ID)
 	if len(revs) != 1 {
-		t.Fatalf("10 分以内の連続保存は1件に圧縮されるはず: %d 件", len(revs))
+		t.Fatalf("saves within 10 minutes must compact into one: %d revisions", len(revs))
 	}
 	full, err := s.Revision(ctx, revs[0].ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if full.Body != "本文 e" {
-		t.Fatalf("最新の内容で上書きされていない: %q", full.Body)
+		t.Fatalf("not overwritten with the latest content: %q", full.Body)
 	}
 }
 
@@ -271,14 +277,14 @@ func TestVersionConflict(t *testing.T) {
 	if _, err := s.Update(ctx, p.Slug, wiki.UpdateInput{Title: "記事", Body: "A", Version: p.Version}); err != nil {
 		t.Fatal(err)
 	}
-	// 古い version での書き戻し
+	// Writing back with a stale version
 	_, err := s.Update(ctx, p.Slug, wiki.UpdateInput{Title: "記事", Body: "B", Version: p.Version})
 	var vc *wiki.VersionConflictError
 	if !errors.As(err, &vc) {
-		t.Fatalf("version_conflict を期待したが %v", err)
+		t.Fatalf("expected version_conflict, got %v", err)
 	}
 	if vc.Current.Body != "A" {
-		t.Fatalf("現行データが返っていない: %+v", vc.Current)
+		t.Fatalf("the current data was not returned: %+v", vc.Current)
 	}
 }
 
@@ -286,10 +292,10 @@ func TestParseLinksIgnoresCode(t *testing.T) {
 	body := "[[本物]] `[[インラインコード]]`\n```\n[[コードブロック]]\n```\n[[本物2|表示名]]"
 	got := wiki.ParseLinks(body)
 	if len(got) != 2 {
-		t.Fatalf("リンク数 = %d, want 2: %+v", len(got), got)
+		t.Fatalf("links = %d, want 2: %+v", len(got), got)
 	}
 	if got[1].Title != "本物2" || got[1].Label != "表示名" {
-		t.Fatalf("ラベル付きリンク: %+v", got[1])
+		t.Fatalf("labelled link: %+v", got[1])
 	}
 }
 
@@ -316,9 +322,9 @@ func TestBigrams(t *testing.T) {
 	}
 }
 
-// 段落内の改行1つをそのまま改行として扱うこと(html.WithHardWraps)。
-// CommonMark の既定ではスペースになり、日本語の本文では文の途中に
-// 見えるスペースが入ってしまう。
+// A single newline inside a paragraph must render as a line break
+// (html.WithHardWraps). CommonMark's default turns it into a space, which shows
+// up as a visible gap mid-sentence in Japanese text.
 func TestRenderHardWraps(t *testing.T) {
 	r := wiki.NewRenderer(func(string) (string, bool) { return "", false })
 
@@ -327,17 +333,17 @@ func TestRenderHardWraps(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.Contains(html, "<br>") {
-		t.Fatalf("改行が <br> になっていない: %q", html)
+		t.Fatalf("the newline did not become <br>: %q", html)
 	}
 
-	// 段落・箇条書き・コードブロック・表は影響を受けないこと
+	// Paragraphs, lists, code blocks and tables must be unaffected
 	cases := []struct {
 		name, src, want string
 	}{
-		{"段落", "一段落目\n\n二段落目", "<p>二段落目</p>"},
-		{"箇条書き", "- 一つ目\n- 二つ目", "<li>二つ目</li>"},
-		{"コードブロック", "```\nコード内の\n改行\n```", "<pre>"},
-		{"表", "| 表 | も |\n|---|---|\n| 壊れ | ない |", "<table>"},
+		{"paragraph", "一段落目\n\n二段落目", "<p>二段落目</p>"},
+		{"list", "- 一つ目\n- 二つ目", "<li>二つ目</li>"},
+		{"code block", "```\nコード内の\n改行\n```", "<pre>"},
+		{"table", "| 表 | も |\n|---|---|\n| 壊れ | ない |", "<table>"},
 	}
 	for _, c := range cases {
 		got, err := r.Render(c.src)
@@ -345,71 +351,72 @@ func TestRenderHardWraps(t *testing.T) {
 			t.Fatalf("%s: %v", c.name, err)
 		}
 		if !strings.Contains(got, c.want) {
-			t.Errorf("%s: %q が出ていない\n%s", c.name, c.want, got)
+			t.Errorf("%s: %q is missing\n%s", c.name, c.want, got)
 		}
 	}
-	// コードブロックの中の改行は <br> にならない
+	// Newlines inside a code block must not become <br>
 	code, _ := r.Render("```\nコード内の\n改行\n```")
 	if strings.Contains(code, "<br>") {
-		t.Errorf("コードブロック内に <br> が入っている:\n%s", code)
+		t.Errorf("<br> ended up inside a code block:\n%s", code)
 	}
 }
 
-// macOS は日本語を NFD(分解形)で渡してくる経路が多い。
-// 「ビ」が「ヒ」+ 濁点になっていても、同じページとして扱えること。
+// macOS hands us Japanese in NFD (decomposed form) through many paths.
+// "ビ" written as "ヒ" plus a combining dakuten must still be the same page.
 //
-// 揃えないと「同じ見た目のタイトルが引けない」「同じ名前のページが2つ作れる」が起きる。
+// Without normalizing, an identical-looking title cannot be found, and two
+// pages with the same name can be created.
 func TestUnicodeNormalization(t *testing.T) {
 	s, _ := newSvc(t)
 	ctx := context.Background()
 
-	nfc := "ビデオリンク"   // 合成形
-	nfd := "\u30d2\u3099\u30c6\u3099\u30aa\u30ea\u30f3\u30af" // ビデオリンク の分解形
+	nfc := "ビデオリンク"                                           // composed form
+	nfd := "\u30d2\u3099\u30c6\u3099\u30aa\u30ea\u30f3\u30af" // decomposed form of ビデオリンク
 
 	if nfc == nfd {
-		t.Fatal("テストの前提が壊れている: NFC と NFD が同じ文字列になっている")
+		t.Fatal("the premise of this test is broken: NFC and NFD are the same string")
 	}
 
 	p := mustCreate(t, s, nfc, "本文")
 
-	// NFD で引いても同じページに辿り着くこと
+	// Looking it up in NFD must reach the same page
 	got, err := s.ByTitle(ctx, nfd)
 	if err != nil {
-		t.Fatalf("NFD のタイトルで引けない: %v", err)
+		t.Fatalf("cannot look it up by the NFD title: %v", err)
 	}
 	if got.ID != p.ID {
-		t.Fatalf("別のページが返った: %d != %d", got.ID, p.ID)
+		t.Fatalf("a different page came back: %d != %d", got.ID, p.ID)
 	}
 
-	// slug も同じになること(見た目が同じなら同じ URL)
+	// The slug must match too: identical-looking means the same URL
 	if s2 := wiki.Slugify(nfd); s2 != wiki.Slugify(nfc) {
-		t.Errorf("slug が揃わない: %q != %q", s2, wiki.Slugify(nfc))
+		t.Errorf("slugs do not match: %q != %q", s2, wiki.Slugify(nfc))
 	}
 	if _, err := s.BySlug(ctx, wiki.Slugify(nfd)); err != nil {
-		t.Errorf("NFD 由来の slug で引けない: %v", err)
+		t.Errorf("cannot look it up by the NFD-derived slug: %v", err)
 	}
 
-	// NFD で同名ページを作ろうとしたら衝突すること(二重登録を防ぐ)
+	// Creating the same page in NFD must collide, preventing a duplicate
 	if _, err := s.Create(ctx, wiki.CreateInput{Title: nfd}); err == nil {
-		t.Error("NFD で同名ページが作れてしまった")
+		t.Error("a duplicate page was created in NFD")
 	}
 
-	// 本文中の [[NFD]] が NFC のページに解決されること
+	// [[NFD]] in a body must resolve to the NFC page
 	src := mustCreate(t, s, "参照元", "[["+nfd+"]] を参照")
 	links, _ := s.Links(ctx, src.ID)
 	if len(links) != 1 || !links[0].Resolved {
-		t.Fatalf("NFD の wikilink が解決されていない: %+v", links)
+		t.Fatalf("the NFD wikilink did not resolve: %+v", links)
 	}
 	if *links[0].PageID != p.ID {
-		t.Errorf("別のページに解決された")
+		t.Errorf("it resolved to a different page")
 	}
 }
 
-// タグも揃えること。
+// Tags are normalized as well.
 func TestTagNormalization(t *testing.T) {
 	s, _ := newSvc(t)
 	ctx := context.Background()
-	nfd := "\u30d2\u3099\u30c6\u3099\u30aa" // ビデオ の分解形
+	nfd := "\u30d2\u3099\u30c6\u3099\u30aa" // decomposed form of ビデオ
 
 	mustCreate(t, s, "記事A", "本文", "ビデオ")
 	mustCreate(t, s, "記事B", "本文", nfd)
@@ -423,9 +430,9 @@ func TestTagNormalization(t *testing.T) {
 		for _, tc := range tags {
 			names = append(names, tc.Name)
 		}
-		t.Fatalf("同じ見た目のタグが %d 個に分かれた: %v", len(tags), names)
+		t.Fatalf("one identical-looking tag split into %d: %v", len(tags), names)
 	}
 	if tags[0].Count != 2 {
-		t.Errorf("タグの件数 = %d, want 2", tags[0].Count)
+		t.Errorf("tag count = %d, want 2", tags[0].Count)
 	}
 }

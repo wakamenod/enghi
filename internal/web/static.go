@@ -14,19 +14,20 @@ import (
 	enghi "github.com/wakamenod/enghi"
 )
 
-// staticAsset は埋め込み済みの静的ファイル1件。
+// staticAsset is one embedded static file.
 type staticAsset struct {
 	body []byte
-	etag string // 中身のハッシュ。"..." で囲んだ ETag 形式
-	ver  string // ?v= に載せる短いハッシュ
+	etag string // hash of the content, in ETag form with quotes
+	ver  string // the short hash carried in ?v=
 }
 
-// staticAssets は起動時に1度だけ作る。埋め込み済みなので読み直す意味はない。
+// staticAssets is built once at start-up. The files are embedded, so there is
+// nothing to re-read.
 //
-// **embed.FS の ModTime はゼロである。** そのため素の http.FileServer では
-// Last-Modified が出ず、ブラウザはヒューリスティックなキャッシュ判断をする。
-// 「CSS を直したのに画面が変わらない」が起きるので、内容のハッシュを ETag と
-// ?v= の両方に使い、URL が変わったときだけ取り直させる。
+// **ModTime in an embed.FS is zero.** A plain http.FileServer therefore emits
+// no Last-Modified and the browser falls back to heuristic caching, producing
+// "I fixed the CSS but the page looks the same". So the content hash goes into
+// both the ETag and ?v=, and the file is re-fetched only when the URL changes.
 var staticAssets = loadStaticAssets()
 
 func loadStaticAssets() map[string]staticAsset {
@@ -54,8 +55,8 @@ func loadStaticAssets() map[string]staticAsset {
 	return out
 }
 
-// assetURL は静的ファイルの URL に内容のハッシュを付ける。テンプレートから
-// {{asset "/static/app.css"}} として使う。未知のパスはそのまま返す。
+// assetURL appends the content hash to a static file's URL. Templates use it as
+// {{asset "/static/app.css"}}. An unknown path is returned unchanged.
 func assetURL(p string) string {
 	a, ok := staticAssets[p]
 	if !ok {
@@ -64,8 +65,9 @@ func assetURL(p string) string {
 	return p + "?v=" + a.ver
 }
 
-// serveStatic は埋め込み済みの静的ファイルを返す。?v= が付く前提で
-// 長期キャッシュを指示する(内容が変われば URL が変わる)。
+// serveStatic serves the embedded static files. It asks for long-lived caching
+// on the assumption that ?v= is present: when the content changes, so does the
+// URL.
 func serveStatic(w http.ResponseWriter, r *http.Request) {
 	a, ok := staticAssets[path.Clean(r.URL.Path)]
 	if !ok {
@@ -79,9 +81,10 @@ func serveStatic(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Query().Get("v") != "" {
 		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	} else {
-		// ?v= なしで直接叩かれた場合。毎回確かめさせる(ETag で 304 になる)
+		// Requested directly without ?v=: revalidate every time (the ETag makes
+		// it a 304)
 		w.Header().Set("Cache-Control", "no-cache")
 	}
-	// ModTime はゼロのまま渡す。ServeContent は ETag で 304 を返す。
+	// Pass the zero ModTime through; ServeContent answers 304 from the ETag.
 	http.ServeContent(w, r, path.Base(r.URL.Path), time.Time{}, bytes.NewReader(a.body))
 }

@@ -6,14 +6,16 @@ import (
 	"regexp"
 )
 
-// refRe は本文中の /files/<hash> を拾う。
+// refRe picks /files/<hash> out of a body.
 var refRe = regexp.MustCompile(`/files/([0-9a-f]{64})`)
 
-// Referenced は本体 DB のどこかから参照されている hash の集合を返す。
+// Referenced returns the set of hashes referenced anywhere in the main
+// database.
 //
-// 参照は本文の中にしか無いので、素直に全走査する。
-// **参照表を別に持たない。**持つと本文と二重管理になり、
-// 保存経路のどれか1つで更新を忘れた瞬間に静かにずれる。
+// References only ever live inside bodies, so this simply scans them all.
+// **There is no separate reference table.** One would duplicate what the bodies
+// already say, and the moment a single save path forgets to update it, the two
+// drift apart silently.
 func Referenced(ctx context.Context, db *sql.DB) (map[string]bool, error) {
 	out := map[string]bool{}
 	sources := []string{
@@ -46,7 +48,7 @@ func Referenced(ctx context.Context, db *sql.DB) (map[string]bool, error) {
 	return out, nil
 }
 
-// Unused はどこからも参照されていない hash を返す。
+// Unused returns the hashes nothing references.
 func (s *Store) Unused(ctx context.Context, db *sql.DB) ([]string, error) {
 	refs, err := Referenced(ctx, db)
 	if err != nil {
@@ -65,7 +67,8 @@ func (s *Store) Unused(ctx context.Context, db *sql.DB) ([]string, error) {
 	return out, nil
 }
 
-// Missing は本文から参照されているのに実体が無い hash を返す(リンク切れ)。
+// Missing returns hashes referenced by a body with no file behind them - a
+// broken link.
 func (s *Store) Missing(ctx context.Context, db *sql.DB) ([]string, error) {
 	refs, err := Referenced(ctx, db)
 	if err != nil {
@@ -88,7 +91,8 @@ func (s *Store) Missing(ctx context.Context, db *sql.DB) ([]string, error) {
 	return out, nil
 }
 
-// Prune は未参照のファイルを消して、消した数と減ったバイト数を返す。
+// Prune deletes unreferenced files and returns how many, and how many bytes,
+// were removed.
 func (s *Store) Prune(ctx context.Context, db *sql.DB) (int, int64, error) {
 	unused, err := s.Unused(ctx, db)
 	if err != nil {

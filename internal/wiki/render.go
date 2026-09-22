@@ -15,11 +15,13 @@ import (
 	"github.com/yuin/goldmark/util"
 )
 
-// Resolver は [[タイトル]] を slug に解決する。第2返値が false なら未解決リンク。
+// Resolver resolves [[title]] to a slug. A false second return value means an
+// unresolved link.
 type Resolver func(title string) (slug string, ok bool)
 
-// wikilinkParser は [[Title]] / [[Title|Label]] をリンクとして解釈する goldmark の拡張。
-// インラインコードとコードブロックの中身は goldmark 側で先に消費されるため、ここには来ない。
+// wikilinkParser is the goldmark extension that reads [[Title]] and
+// [[Title|Label]] as links. Inline code and code blocks are consumed by
+// goldmark first, so their contents never reach this parser.
 type wikilinkParser struct{ resolve Resolver }
 
 func (p *wikilinkParser) Trigger() []byte { return []byte{'['} }
@@ -46,7 +48,8 @@ func (p *wikilinkParser) Parse(parent ast.Node, block text.Reader, pc parser.Con
 		return nil
 	}
 	if label == "" {
-		// 表示は [[...]] に書かれた文字列をそのまま出す。現タイトルに置換しない(DESIGN 2.5)。
+		// Display exactly what was written in [[...]]; never substitute the
+		// current title (DESIGN 2.5).
 		label = title
 	}
 	block.Advance(end + 2)
@@ -56,10 +59,10 @@ func (p *wikilinkParser) Parse(parent ast.Node, block text.Reader, pc parser.Con
 	if slug, ok := p.resolve(title); ok {
 		link.Destination = []byte("/wiki/" + slug)
 	} else {
-		// 未解決リンク。クリックすると新規作成画面へ行く。
+		// An unresolved link. Clicking it goes to the new-page screen.
 		link.Destination = []byte("/wiki/new?title=" + queryEscape(title))
 		link.SetAttributeString("class", []byte("wikilink-new"))
-		link.Title = []byte("まだ存在しないページ")
+		link.Title = []byte("a page that does not exist yet")
 	}
 	link.AppendChild(link, ast.NewString([]byte(label)))
 	return link
@@ -81,19 +84,20 @@ func queryEscape(s string) string {
 	return b.String()
 }
 
-// Renderer は Markdown を HTML にする。
+// Renderer turns Markdown into HTML.
 type Renderer struct{ md goldmark.Markdown }
 
-// NewRenderer は GFM + 見出し ID 付きのレンダラを作る。
+// NewRenderer builds a renderer with GFM and heading IDs.
 //
-// **改行1つをそのまま改行として扱う**(`html.WithHardWraps`)。
-// CommonMark の既定では段落内の改行はスペースになるため、日本語の本文では
-// 文の途中に見えるスペースが入る。行末にスペース2つを置く記法は目に見えず、
-// エディタの行末空白削除で消えてしまうので採らない。
+// **A single newline is rendered as a line break** (`html.WithHardWraps`).
+// By default CommonMark turns a newline inside a paragraph into a space, which
+// in Japanese text shows up as a visible gap mid-sentence. The two-trailing-
+// spaces notation is invisible and gets eaten by editors that strip trailing
+// whitespace, so it is not an option.
 //
-// 代償として、**エクスポートした Markdown を他所のレンダラで開くと改行が失われる**
-// (段落が1行に繋がる)。エクスポートは原文をそのまま書き出すので、
-// この差は表示側だけの話である。
+// The cost is that **exported Markdown loses those breaks in other renderers**
+// (paragraphs join into one line). Export writes the source out verbatim, so
+// the difference is only in how it is displayed.
 func NewRenderer(resolve Resolver) *Renderer {
 	md := goldmark.New(
 		goldmark.WithExtensions(extension.GFM),
@@ -108,7 +112,7 @@ func NewRenderer(resolve Resolver) *Renderer {
 	return &Renderer{md: md}
 }
 
-// Render は Markdown 原文を HTML にする。
+// Render turns Markdown source into HTML.
 func (r *Renderer) Render(src string) (string, error) {
 	var buf bytes.Buffer
 	if err := r.md.Convert([]byte(src), &buf); err != nil {
@@ -117,7 +121,7 @@ func (r *Renderer) Render(src string) (string, error) {
 	return buf.String(), nil
 }
 
-// ResolverFor はこの Service の page_titles を引く Resolver を返す。
+// ResolverFor returns a Resolver backed by this Service's page_titles.
 func (s *Service) ResolverFor(ctx context.Context) Resolver {
 	cache := map[string]string{}
 	return func(title string) (string, bool) {

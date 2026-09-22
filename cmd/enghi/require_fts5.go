@@ -1,11 +1,12 @@
 //go:build !sqlite_fts5
 
-// このファイルは build tag sqlite_fts5 が無いときだけコンパイル対象になり、
-// 必ずコンパイルエラーになる。
+// This file is compiled only when the sqlite_fts5 build tag is missing, and it
+// always fails to build.
 //
-// タグを付け忘れても go-sqlite3 のビルド自体は通ってしまい、
-// 失敗が起動時(store.verifyFTS)まで遅れる。検索は最重要の非機能要件(DESIGN 3)で
-// あり、FTS5 の無いバイナリは配っても意味が無いので、ここで手前に一枚置く。
+// Forgetting the tag still builds go-sqlite3 fine, which delays the failure
+// until start-up (store.verifyFTS). Search is the most important non-functional
+// requirement (DESIGN 3) and a binary without FTS5 is not worth shipping, so we
+// put this guard in front of it.
 package main
 
 func init() {

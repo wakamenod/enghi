@@ -3,7 +3,8 @@
 
 <h1>{{t "dash.title"}}</h1>
 
-{{/* 上段 — GTD。使っていなければ自然に空になる。登録を強く促す UI にはしない(DESIGN 5) */}}
+{{/* Top half: GTD. Empty by itself when unused; never nag to fill it
+     (DESIGN 5) */}}
 <section class="panel card">
   <h2>{{t "dash.gtd"}}</h2>
   {{if $d.GTD.Enabled}}
@@ -80,12 +81,12 @@
   {{end}}
 </section>
 
-{{/* 下段 — Wiki */}}
+{{/* Lower half: the wiki */}}
 <section class="panel card">
   <h2><a href="/wiki">{{t "dash.articles"}}</a></h2>
 
-  {{/* 新規も更新も同じ流れとして1つの節に出す。version が 1 なら
-       作られてから一度も直されていない = 新規 */}}
+  {{/* Created and updated appear in one stream. version == 1 means it has not
+       been edited since it was created, i.e. it is new */}}
   <div class="col-block">
     <div class="subhead">{{t "dash.recent_changes"}}</div>
     {{if $d.Wiki.RecentUpdate}}
@@ -104,7 +105,8 @@
     {{end}}
   </div>
 
-  {{/* 未解決リンクは、あるときだけ記事一覧の下に出す */}}
+  {{/* Unresolved links appear under the article list, and only when there are
+     any */}}
   {{if $d.Wiki.Unresolved}}
   <div class="col-block">
     <div class="subhead">{{t "dash.unresolved"}}</div>

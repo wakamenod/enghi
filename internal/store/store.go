@@ -1,4 +1,4 @@
-// Package store は SQLite への接続、マイグレーション、整合性検査を担う。
+// Package store owns the SQLite connection, migrations and consistency checks.
 package store
 
 import (
@@ -17,25 +17,28 @@ import (
 //go:embed migrations/*.sql
 var migrationFS embed.FS
 
-// DB は *sql.DB の薄いラッパ。
+// DB is a thin wrapper around *sql.DB.
 type DB struct {
 	*sql.DB
 	Path string
 }
 
-// Open は DB を開き、PRAGMA を設定し、FTS5/trigram を検証し、マイグレーションを適用する。
+// Open opens the database, sets the PRAGMAs, verifies FTS5/trigram and applies
+// the migrations.
 func Open(path string) (*DB, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return nil, err
 	}
-	// foreign_keys は接続ごとの設定なので DSN で必ず指定する(DESIGN 10)。
+	// foreign_keys is a per-connection setting, so it must be in the DSN
+	// (DESIGN 10).
 	dsn := fmt.Sprintf("file:%s?_foreign_keys=on&_busy_timeout=5000&_txlock=immediate",
 		url.PathEscape(path))
 	sqldb, err := sql.Open("sqlite3", dsn)
 	if err != nil {
 		return nil, err
 	}
-	// 書き込みの直列化。WAL でも writer は1つなので、プールを絞ってロック競合を避ける。
+	// Serialize writes. Even with WAL there is a single writer, so a small pool
+	// avoids lock contention.
 	sqldb.SetMaxOpenConns(8)
 	db := &DB{DB: sqldb, Path: path}
 
@@ -43,7 +46,7 @@ func Open(path string) (*DB, error) {
 		sqldb.Close()
 		return nil, err
 	}
-	// journal_mode は永続設定なので一度でよい。
+	// journal_mode is persistent, so setting it once is enough.
 	for _, p := range []string{
 		"PRAGMA journal_mode = WAL",
 		"PRAGMA synchronous = NORMAL",
@@ -64,21 +67,22 @@ func Open(path string) (*DB, error) {
 	return db, nil
 }
 
-// verifyFTS は FTS5 と trigram tokenizer が使えることを起動時に確認する(DESIGN 1)。
+// verifyFTS confirms at start-up that FTS5 and the trigram tokenizer are
+// available (DESIGN 1).
 func (db *DB) verifyFTS() error {
 	var ver string
 	if err := db.QueryRow("SELECT sqlite_version()").Scan(&ver); err != nil {
-		return fmt.Errorf("sqlite_version の取得に失敗: %w", err)
+		return fmt.Errorf("cannot read sqlite_version: %w", err)
 	}
 	if _, err := db.Exec("CREATE VIRTUAL TABLE temp.enghi_fts_check USING fts5(x, tokenize='trigram')"); err != nil {
-		return fmt.Errorf("FTS5 の trigram tokenizer が使えない (sqlite %s): %w\n"+
-			"  go-sqlite3 を build tag 'sqlite_fts5' 付きでビルドし、SQLite 3.34 以降であることを確認すること", ver, err)
+		return fmt.Errorf("FTS5 trigram tokenizer is unavailable (sqlite %s): %w\n"+
+			"  build go-sqlite3 with the 'sqlite_fts5' build tag and make sure SQLite is 3.34 or newer", ver, err)
 	}
 	_, _ = db.Exec("DROP TABLE temp.enghi_fts_check")
 	return nil
 }
 
-// migrate は未適用のマイグレーションを版番号順に1トランザクションずつ適用する。
+// migrate applies pending migrations in version order, one transaction each.
 func (db *DB) migrate() error {
 	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
 		version TEXT PRIMARY KEY,
@@ -113,7 +117,7 @@ func (db *DB) migrate() error {
 		}
 		if _, err := tx.Exec(string(body)); err != nil {
 			tx.Rollback()
-			return fmt.Errorf("マイグレーション %s: %w", name, err)
+			return fmt.Errorf("migration %s: %w", name, err)
 		}
 		if _, err := tx.Exec("INSERT INTO schema_migrations(version) VALUES (?)", name); err != nil {
 			tx.Rollback()
@@ -126,7 +130,8 @@ func (db *DB) migrate() error {
 	return nil
 }
 
-// Tx は fn を単一トランザクションで実行する。すべての書き込みはこれを通すこと(DESIGN 10)。
+// Tx runs fn in a single transaction. **Every write goes through this**
+// (DESIGN 10).
 func (db *DB) Tx(ctx context.Context, fn func(*sql.Tx) error) error {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {

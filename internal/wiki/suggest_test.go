@@ -29,40 +29,41 @@ func TestSuggestTitles(t *testing.T) {
 		return out
 	}
 
-	// 前方一致が先、次に短い順。
+	// Prefix matches first, then shorter titles.
 	if got := pick("emacs"); len(got) != 2 || got[0] != "Emacs" || got[1] != "Emacs Lisp" {
-		t.Fatalf("前方一致が先に並ぶこと: %v", got)
+		t.Fatalf("prefix matches must come first: %v", got)
 	}
-	// 大小を区別しない。
+	// Case-insensitive.
 	if got := pick("EMACS LISP"); len(got) != 1 || got[0] != "Emacs Lisp" {
-		t.Fatalf("大小を無視すること: %v", got)
+		t.Fatalf("case must be ignored: %v", got)
 	}
-	// 日本語の部分一致。
+	// Substring match in Japanese.
 	if got := pick("移転"); len(got) != 1 || got[0] != "オフィス移転" {
-		t.Fatalf("部分一致すること: %v", got)
+		t.Fatalf("substring matching must work: %v", got)
 	}
-	// 別名も候補に出る。挿入する文字列は別名そのもので、正式名に置き換えない(DESIGN 2.5)。
+	// Aliases are offered too. The inserted string is the alias itself, never
+	// replaced by the canonical title (DESIGN 2.5).
 	got, err := s.SuggestTitles(ctx, "イーマ", 10)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(got) != 1 || got[0].Title != "イーマックス" || !got[0].IsAlias ||
 		got[0].Canonical != "Emacs" || got[0].Slug != emacs.Slug {
-		t.Fatalf("別名の候補: %+v", got)
+		t.Fatalf("alias candidate: %+v", got)
 	}
-	// q が空なら最近更新されたページ(正式名のみ)。
+	// An empty q returns recently updated pages, canonical titles only.
 	if got := pick(""); len(got) != 3 {
-		t.Fatalf("q が空なら全ページの正式名: %v", got)
+		t.Fatalf("an empty q must list every canonical title: %v", got)
 	}
-	// LIKE のワイルドカードは無効化されていること。
+	// LIKE wildcards must be neutralized.
 	if got := pick("%"); len(got) != 0 {
-		t.Fatalf("%% が全件に当たってはいけない: %v", got)
+		t.Fatalf("%% must not match everything: %v", got)
 	}
-	// limit が効くこと。
+	// limit must be honoured.
 	if got := pick(""); len(got) == 0 {
-		t.Fatal("空クエリで 0 件")
+		t.Fatal("an empty query returned nothing")
 	}
 	if got, _ := s.SuggestTitles(ctx, "", 1); len(got) != 1 {
-		t.Fatalf("limit=1 で %d 件", len(got))
+		t.Fatalf("limit=1 returned %d", len(got))
 	}
 }

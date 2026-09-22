@@ -10,6 +10,8 @@
       <span class="badge {{.Kind}}">{{kindLabel .Kind}}</span>
       {{if eq .Kind "page"}}<a href="/wiki/{{.Slug}}">{{.Title}}</a>
       {{else}}{{.Title}}{{end}}
+      {{if eq .Via "tag"}}<span class="meta">{{t "search.via_tag"}}</span>
+      {{else if eq .Via "alias"}}<span class="meta">{{t "search.via_alias"}}</span>{{end}}
       {{if .Snippet}}<span class="meta">{{snippet .Snippet}}</span>{{end}}
       <span class="when">{{shortTime .UpdatedAt}}</span>
     </li>

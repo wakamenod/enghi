@@ -1,17 +1,19 @@
-// Package textnorm は文字列の正規化を担う。
+// Package textnorm normalizes text.
 //
-// **macOS は日本語を NFD(分解形)で渡してくる経路が多い。**
-// 「ビ」が「ヒ」+ 濁点の2文字になっている状態で、見た目は同じだが
-// バイト列としては別物になる。タイトルで引く Wiki では、これを揃えないと
-// 「同じ名前なのに見つからない」「同じ名前のページが2つ作れてしまう」が起きる。
+// **macOS hands us Japanese in NFD (decomposed form) through many paths.**
+// There, "ビ" is stored as "ヒ" plus a combining dakuten — two code points that
+// look identical on screen but differ as bytes. In a wiki where titles are the
+// lookup key, leaving this alone produces "the page exists but cannot be found"
+// and "two pages with the same name".
 //
-// 保存も検索も NFC に揃えることで、入力経路の違いを吸収する。
+// Normalizing to NFC on both write and search absorbs the difference between
+// input paths.
 package textnorm
 
 import "golang.org/x/text/unicode/norm"
 
-// NFC は文字列を合成形に正規化する。
-// 既に NFC なら何もしない(その判定は norm 側が安く済ませる)。
+// NFC normalizes a string to composed form.
+// Already-NFC strings are returned as is (norm makes that check cheap).
 func NFC(s string) string {
 	if norm.NFC.IsNormalString(s) {
 		return s
@@ -19,10 +21,10 @@ func NFC(s string) string {
 	return norm.NFC.String(s)
 }
 
-// IsNFC は正規化済みかどうか。doctor の検査に使う。
+// IsNFC reports whether the string is already normalized. Used by doctor.
 func IsNFC(s string) bool { return norm.NFC.IsNormalString(s) }
 
-// Slice は文字列の並びをまとめて正規化する。
+// Slice normalizes a whole slice of strings.
 func Slice(in []string) []string {
 	out := make([]string, len(in))
 	for i, s := range in {

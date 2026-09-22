@@ -1,14 +1,14 @@
-// Command enghi はローカル専用の Wiki + GTD サーバ。
+// Command enghi is a local-only wiki and GTD server.
 //
-// 使い方:
+// Usage:
 //
-//	enghi                 常駐サーバを起動する(既定)
+//	enghi                 start the resident server (default)
 //	enghi serve
-//	enghi export [--dir]  Markdown に全件エクスポート
-//	enghi doctor          整合性検査(DESIGN 2.5)
-//	enghi backup          DB のバックアップ(1日1回、常駐中にも自動で取る)
-//	enghi install-agent   常駐設定(launchd / systemd)を書き出す
-//	enghi version         バージョンを表示する
+//	enghi export [--dir]  export everything as Markdown
+//	enghi doctor          consistency checks (DESIGN 2.5)
+//	enghi backup          back up the database (also taken daily while resident)
+//	enghi install-agent   write the service definition (launchd / systemd)
+//	enghi version         print the version
 package main
 
 import (
@@ -36,9 +36,10 @@ func main() {
 
 	cmd := "serve"
 	args := os.Args[1:]
-	// 先頭が '-' でなければサブコマンド。ただし --help / --version は
-	// 慣習どおりフラグの形でも来るので、サブコマンドとして拾う
-	// (拾わないと serve のフラグ解析に流れ、serve だけの usage が出る)。
+	// Anything not starting with '-' is a subcommand. --help and --version
+	// conventionally arrive as flags, so pick those up as subcommands too;
+	// otherwise they fall through to serve's flag parsing and print serve's
+	// usage alone.
 	if len(args) > 0 && (args[0][0] != '-' || isGlobalFlag(args[0])) {
 		cmd, args = args[0], args[1:]
 	}
@@ -72,21 +73,21 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprint(os.Stderr, `enghi — ローカル専用の Wiki + GTD
+	fmt.Fprint(os.Stderr, `enghi - local-only wiki and GTD
 
-  enghi [serve]          常駐サーバを起動する
-  enghi export [--dir D] Markdown に全件エクスポート
-  enghi doctor [--fix]   整合性検査。--fix で文字の正規化を直す
-  enghi backup [--dir D] DB のバックアップを取る
-  enghi files [--prune]  画像などの一覧。--prune で未参照のものを消す
-  enghi install-agent    常駐設定(launchd / systemd)を書き出す
-  enghi version          バージョンを表示する
+  enghi [serve]          start the resident server
+  enghi export [--dir D] export everything as Markdown
+  enghi doctor [--fix]   consistency checks; --fix repairs text normalization
+  enghi backup [--dir D] back up the database
+  enghi files [--prune]  list stored images; --prune removes unreferenced ones
+  enghi install-agent    write the service definition (launchd / systemd)
+  enghi version          print the version
 
-設定: `+config.Path()+`
+config: `+config.Path()+`
 `)
 }
 
-// openDB は設定を読み、DB を開く。
+// openDB loads the configuration and opens the database.
 func openDB(configPath string) (config.Config, *store.DB, error) {
 	cfg, err := config.Load(configPath)
 	if err != nil {
@@ -99,7 +100,7 @@ func openDB(configPath string) (config.Config, *store.DB, error) {
 	return cfg, db, nil
 }
 
-// openAll は本体 DB とファイル保管庫の両方を開く。
+// openAll opens both the main database and the file store.
 func openAll(configPath string) (config.Config, *store.DB, *filestore.Store, error) {
 	cfg, db, err := openDB(configPath)
 	if err != nil {
@@ -115,8 +116,8 @@ func openAll(configPath string) (config.Config, *store.DB, *filestore.Store, err
 
 func cmdServe(args []string) error {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
-	configPath := fs.String("config", "", "設定ファイルのパス")
-	port := fs.Int("port", 0, "ポート(設定ファイルより優先)")
+	configPath := fs.String("config", "", "path to the configuration file")
+	port := fs.Int("port", 0, "port (overrides the configuration file)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -131,15 +132,16 @@ func cmdServe(args []string) error {
 		cfg.Port = *port
 	}
 
-	// **起動時にも doctor を実行し、異常があれば警告を出す**(DESIGN 8-10)。
-	// 「正式名がちょうど1つ」は DB で表現できない不変条件なので、外から検査する経路が要る。
+	// **Run doctor at start-up too and warn about anything it finds**
+	// (DESIGN 8-10). "Exactly one canonical title" is an invariant the database
+	// cannot express, so it needs a path that checks it from outside.
 	if problems, err := store.Doctor(context.Background(), db); err != nil {
-		log.Printf("警告: 整合性検査に失敗した: %v", err)
+		log.Printf("warning: consistency check failed: %v", err)
 	} else if len(problems) > 0 {
-		log.Printf("警告: 整合性の問題が %d 件ある。`enghi doctor` で詳細を確認すること", len(problems))
+		log.Printf("warning: %d consistency problem(s); run `enghi doctor` for details", len(problems))
 		for i, p := range problems {
 			if i >= 5 {
-				log.Printf("  ... 他 %d 件", len(problems)-5)
+				log.Printf("  ... and %d more", len(problems)-5)
 				break
 			}
 			log.Printf("  %s", p)
@@ -151,32 +153,32 @@ func cmdServe(args []string) error {
 		return err
 	}
 
-	// 常駐中は1日1回バックアップを取る。
-	// 決まった時刻ではなく「その日のファイルが無ければ取る」で判断するので、
-	// サーバが止まっていた日があっても次に起きたときに取り返せる。
+	// Take a backup once a day while resident.
+	// The trigger is "there is no file for today" rather than a fixed time, so a
+	// day when the server was down is caught up the next time it runs.
 	backupCtx, stopBackup := context.WithCancel(context.Background())
 	defer stopBackup()
 	if cfg.BackupOn() {
 		go store.BackupDaemon(backupCtx, db, blobs, cfg.BackupDir, cfg.BackupKeep,
 			func(b *store.Backup, err error) {
 				if err != nil {
-					log.Printf("警告: バックアップに失敗した: %v", err)
+					log.Printf("warning: backup failed: %v", err)
 					return
 				}
-				msg := fmt.Sprintf("バックアップを取った: %s (%.1f MB)", b.Path, float64(b.Bytes)/(1<<20))
+				msg := fmt.Sprintf("backed up: %s (%.1f MB)", b.Path, float64(b.Bytes)/(1<<20))
 				if b.FilesPath != "" && !b.FilesSkip {
-					msg += fmt.Sprintf(" / 画像 %.1f MB", float64(b.FilesBytes)/(1<<20))
+					msg += fmt.Sprintf(" / images %.1f MB", float64(b.FilesBytes)/(1<<20))
 				}
 				log.Print(msg)
 			})
 	}
 
-	// **0.0.0.0 には bind できないようにする**(設定で指定されても拒否する。DESIGN 4.4)。
-	// config.validate() が先に弾くが、ここでも二重に守る。
+	// **Never bind to 0.0.0.0**, even if the configuration asks for it
+	// (DESIGN 4.4). config.validate() rejects it first; this is the second guard.
 	switch cfg.Host {
 	case "127.0.0.1", "localhost", "::1":
 	default:
-		return fmt.Errorf("host %q には bind しない。ループバックのみ", cfg.Host)
+		return fmt.Errorf("refusing to bind to host %q: loopback only", cfg.Host)
 	}
 	addr := net.JoinHostPort(cfg.Host, fmt.Sprint(cfg.Port))
 
@@ -184,17 +186,17 @@ func cmdServe(args []string) error {
 		Addr:              addr,
 		Handler:           srv.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
-		// /api/events は SSE なので WriteTimeout は設定しない(切断されてしまう)
+		// /api/events is SSE, so no WriteTimeout: it would cut the stream off
 		IdleTimeout: 120 * time.Second,
 	}
 
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
-		return fmt.Errorf("%s で待ち受けできない: %w", addr, err)
+		return fmt.Errorf("cannot listen on %s: %w", addr, err)
 	}
-	log.Printf("http://%s/ で待ち受け中 (db: %s)", addr, cfg.DBPath)
+	log.Printf("listening on http://%s/ (db: %s)", addr, cfg.DBPath)
 
-	// SIGTERM / SIGINT で落とす(launchd からの停止を含む)
+	// Shut down on SIGTERM / SIGINT (including a stop from launchd)
 	idle := make(chan struct{})
 	go func() {
 		sig := make(chan os.Signal, 1)
@@ -210,15 +212,16 @@ func cmdServe(args []string) error {
 		return err
 	}
 	<-idle
-	log.Print("停止した")
+	log.Print("stopped")
 	return nil
 }
 
 func cmdExport(args []string) error {
 	fs := flag.NewFlagSet("export", flag.ExitOnError)
-	configPath := fs.String("config", "", "設定ファイルのパス")
-	// **--dir を許すのは CLI だけ。POST /api/export はパスを受け取らない**(DESIGN 7 / 4.4)。
-	dir := fs.String("dir", "", "出力先(既定は設定の export_dir)")
+	configPath := fs.String("config", "", "path to the configuration file")
+	// **--dir is a CLI-only option. POST /api/export takes no path**
+	// (DESIGN 7 / 4.4).
+	dir := fs.String("dir", "", "output directory (defaults to export_dir from the config)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -237,18 +240,18 @@ func cmdExport(args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%s に記事 %d 件、画像 %d 件、あわせて %d ファイルを書き出した\n",
-		res.Dir, res.Pages, res.Images, res.Files)
+	fmt.Printf("wrote %d article(s) and %d image(s) as %d file(s) to %s\n",
+		res.Pages, res.Images, res.Files, res.Dir)
 	return nil
 }
 
 func cmdBackup(args []string) error {
 	fs := flag.NewFlagSet("backup", flag.ExitOnError)
-	configPath := fs.String("config", "", "設定ファイルのパス")
-	// --dir を許すのは CLI だけ。POST /api/backup はパスを受け取らない。
-	dir := fs.String("dir", "", "出力先(既定は設定の backup_dir)")
-	keep := fs.Int("keep", 0, "残す世代数(既定は設定の backup_keep)")
-	list := fs.Bool("list", false, "現存するバックアップを一覧する")
+	configPath := fs.String("config", "", "path to the configuration file")
+	// --dir is a CLI-only option. POST /api/backup takes no path.
+	dir := fs.String("dir", "", "output directory (defaults to backup_dir from the config)")
+	keep := fs.Int("keep", 0, "generations to keep (defaults to backup_keep from the config)")
+	list := fs.Bool("list", false, "list existing backups")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -274,7 +277,7 @@ func cmdBackup(args []string) error {
 			return err
 		}
 		if len(backups) == 0 {
-			fmt.Printf("%s にバックアップはまだ無い\n", out)
+			fmt.Printf("no backups in %s yet\n", out)
 			return nil
 		}
 		for _, b := range backups {
@@ -291,21 +294,21 @@ func cmdBackup(args []string) error {
 	fmt.Printf("%s (%.1f MB)\n", b.Path, float64(b.Bytes)/(1<<20))
 	if b.FilesPath != "" {
 		if b.FilesSkip {
-			fmt.Printf("%s は前回から変わっていないので取り直していない\n", b.FilesPath)
+			fmt.Printf("%s is unchanged since the last backup, so it was not retaken\n", b.FilesPath)
 		} else {
 			fmt.Printf("%s (%.1f MB)\n", b.FilesPath, float64(b.FilesBytes)/(1<<20))
 		}
 	}
 	if b.Removed > 0 {
-		fmt.Printf("古いバックアップを %d 件消した(%d 世代を残す)\n", b.Removed, n)
+		fmt.Printf("removed %d old backup(s), keeping %d generation(s)\n", b.Removed, n)
 	}
 	return nil
 }
 
 func cmdFiles(args []string) error {
 	fs := flag.NewFlagSet("files", flag.ExitOnError)
-	configPath := fs.String("config", "", "設定ファイルのパス")
-	prune := fs.Bool("prune", false, "どこからも参照されていないファイルを消す")
+	configPath := fs.String("config", "", "path to the configuration file")
+	prune := fs.Bool("prune", false, "delete files that nothing references")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -321,7 +324,7 @@ func cmdFiles(args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%d 件 / %.1f MB (%s)\n", count, float64(bytes)/(1<<20), blobs.Path)
+	fmt.Printf("%d file(s) / %.1f MB (%s)\n", count, float64(bytes)/(1<<20), blobs.Path)
 
 	unused, err := blobs.Unused(ctx, db.DB)
 	if err != nil {
@@ -332,31 +335,31 @@ func cmdFiles(args []string) error {
 		return err
 	}
 	if len(missing) > 0 {
-		fmt.Printf("本文から参照されているが実体が無いもの: %d 件\n", len(missing))
+		fmt.Printf("referenced from article bodies but missing: %d\n", len(missing))
 		for _, h := range missing {
 			fmt.Printf("  %s\n", h)
 		}
 	}
 	if len(unused) == 0 {
-		fmt.Println("未参照のファイルは無い")
+		fmt.Println("no unreferenced files")
 		return nil
 	}
 	if !*prune {
-		fmt.Printf("どこからも参照されていないもの: %d 件(--prune で消す)\n", len(unused))
+		fmt.Printf("referenced by nothing: %d (use --prune to delete)\n", len(unused))
 		return nil
 	}
 	n, freed, err := blobs.Prune(ctx, db.DB)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%d 件消した(%.1f MB)\n", n, float64(freed)/(1<<20))
+	fmt.Printf("deleted %d file(s) (%.1f MB)\n", n, float64(freed)/(1<<20))
 	return nil
 }
 
 func cmdDoctor(args []string) error {
 	fs := flag.NewFlagSet("doctor", flag.ExitOnError)
-	configPath := fs.String("config", "", "設定ファイルのパス")
-	fix := fs.Bool("fix", false, "直せる問題(文字の正規化)を直す")
+	configPath := fs.String("config", "", "path to the configuration file")
+	fix := fs.Bool("fix", false, "repair what can be repaired (text normalization)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -371,7 +374,7 @@ func cmdDoctor(args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("%d 件を正規化した\n", n)
+		fmt.Printf("normalized %d row(s)\n", n)
 	}
 
 	problems, err := store.Doctor(context.Background(), db)
@@ -379,11 +382,11 @@ func cmdDoctor(args []string) error {
 		return err
 	}
 	if len(problems) == 0 {
-		fmt.Println("問題なし")
+		fmt.Println("no problems found")
 		return nil
 	}
 	for _, p := range problems {
 		fmt.Println(p)
 	}
-	return fmt.Errorf("%d 件の問題が見つかった", len(problems))
+	return fmt.Errorf("found %d problem(s)", len(problems))
 }

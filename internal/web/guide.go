@@ -16,25 +16,29 @@ import (
 	"github.com/yuin/goldmark/renderer/html"
 )
 
-// 使い方ガイド。
+// The guide.
 //
-// 本文は docs/guide/<lang>/<topic>.md に置き、バイナリに埋め込む。
-// **Wiki ページとして DB に投入しない。** 利用者が編集・削除できてしまい、
-// 版を上げるたびに利用者の変更と衝突する。ガイドはプログラムの一部である。
+// The prose lives in docs/guide/<lang>/<topic>.md and is embedded in the binary.
+// **It is never loaded into the database as wiki pages.** The user could edit or
+// delete it, and every release would collide with those changes. The guide is
+// part of the program.
 //
-// 描画に wiki.Renderer を使わないのは、あちらが [[...]] を解決するためである。
-// ガイド本文がページの未解決リンクとして集計に混ざると、ダッシュボードが汚れる。
+// Rendering does not go through wiki.Renderer because that one resolves
+// [[...]]; guide prose counted as unresolved page links would pollute the
+// dashboard.
 
-// guideTopics はガイドの構成(表示順)。slug がそのまま URL になる。
+// guideTopics is the structure of the guide, in display order. The slug is the
+// URL.
 var guideTopics = []string{"gtd", "enghi"}
 
-// guideMD はガイド専用のレンダラ。
-// WithHeadingAttribute で `## 見出し {#id}` を有効にする。
-// **見出し ID を自動生成に任せない。**日本語見出しから作られる ID は
-// 英語版とずれるため、画面から張ったアンカーが言語を切り替えた途端に切れる。
-// WithUnsafe は図(inline SVG)のために要る。**ガイド本文は利用者の入力ではなく、
-// ビルド時にバイナリへ埋め込む自分の文書である。**記事本文のレンダラ(wiki.Renderer)
-// には付けないこと。
+// guideMD is the renderer used for the guide alone.
+// WithHeadingAttribute enables `## heading {#id}`.
+// **Heading IDs are never left to auto-generation**: IDs derived from Japanese
+// headings differ from the English ones, so an anchor linked from a screen
+// breaks the moment the language is switched.
+// WithUnsafe is needed for the diagrams (inline SVG). **The guide is not user
+// input; it is our own document, embedded at build time.** Never add it to the
+// renderer used for article bodies (wiki.Renderer).
 var guideMD = goldmark.New(
 	goldmark.WithExtensions(extension.GFM),
 	goldmark.WithParserOptions(parser.WithAutoHeadingID(), parser.WithHeadingAttribute()),
@@ -54,29 +58,31 @@ type guideTopic struct {
 }
 
 type guideData struct {
-	Topics []guideTopic // 目次(サイドバー)
-	Topic  *guideTopic  // 本文を出している topic。目次ページでは nil
+	Topics []guideTopic // the table of contents in the sidebar
+	Topic  *guideTopic  // the topic being shown; nil on the index page
 	HTML   template.HTML
 }
 
 var (
 	guideH1Re = regexp.MustCompile(`(?m)^# +(.+?)\s*$`)
 	guideH2Re = regexp.MustCompile(`(?m)^## +(.+?)\s*\{#([A-Za-z0-9_-]+)\}\s*$`)
-	// 機能タグ。設定で off の機能の節は本文ごと落とす。
-	// **見出しの行内には書かない。** 見出しの末尾は `{#id}` の位置であり、
-	// そこに注釈を足すと goldmark が ID を拾えなくなる。直前の行に置く:
+	// The feature tag. A section for a feature that is off is dropped entirely.
+	// **It never goes on the heading line.** The end of a heading is where `{#id}`
+	// lives, and a comment there stops goldmark picking the ID up. It goes on the
+	// line before:
 	//
 	//	<!--feature:contexts-->
 	//	### Contexts {#context}
 	guideFeatRe = regexp.MustCompile(`(?m)^<!--\s*feature:([a-z]+)\s*-->\n(#{1,6}) `)
-	// 節の切れ目(見出し行)。落とす範囲を決めるのに使う。
+	// Section boundaries (heading lines), used to decide what to drop.
 	guideHeadRe = regexp.MustCompile(`(?m)^(#{1,6}) `)
 )
 
-// guideFilter は、設定で off になっている機能の節を本文から取り除く。
+// guideFilter removes the sections of features that are turned off.
 //
-// **出し分けを画面だけでやると、ガイドだけが「無い機能」を説明し続ける。**
-// 節は、機能タグの次の見出しから、次に来る同位以上の見出しの手前までとする。
+// **Hiding a feature on the screens alone would leave the guide explaining
+// something that is not there.** A section runs from the heading after the
+// feature tag up to the next heading at the same level or higher.
 func guideFilter(src string, set settings.Settings) string {
 	on := map[string]bool{"contexts": set.Contexts, "areas": set.Areas}
 	heads := guideHeadRe.FindAllStringSubmatchIndex(src, -1)
@@ -105,8 +111,8 @@ func guideFilter(src string, set settings.Settings) string {
 	return out.String()
 }
 
-// guideSource は指定言語のガイド本文を返す。
-// その言語の訳が無ければ既定の言語にフォールバックする(文言と同じ方針)。
+// guideSource returns the guide in the requested language, falling back to the
+// default language when there is no translation - the same policy as messages.
 func guideSource(lang i18n.Lang, topic string) (string, bool) {
 	if !isGuideTopic(topic) {
 		return "", false
@@ -129,8 +135,9 @@ func isGuideTopic(topic string) bool {
 	return false
 }
 
-// guideOutline は本文から表題と節(H2)を拾う。
-// 節は `{#id}` を明示したものだけを拾う。guide_web_test が全 H2 に ID を要求する。
+// guideOutline picks the title and the sections (H2) out of the source.
+// Only sections with an explicit `{#id}` are picked up; guide_web_test requires
+// an ID on every H2.
 func guideOutline(slug, src string) guideTopic {
 	t := guideTopic{Slug: slug, Title: slug}
 	if m := guideH1Re.FindStringSubmatch(src); m != nil {
@@ -142,7 +149,7 @@ func guideOutline(slug, src string) guideTopic {
 	return t
 }
 
-// guideOutlines は全 topic の目次を作る(サイドバー用)。
+// guideOutlines builds the table of contents for every topic, for the sidebar.
 func (s *Server) guideOutlines(lang i18n.Lang, current string, set settings.Settings) []guideTopic {
 	out := make([]guideTopic, 0, len(guideTopics))
 	for _, slug := range guideTopics {
@@ -157,7 +164,7 @@ func (s *Server) guideOutlines(lang i18n.Lang, current string, set settings.Sett
 	return out
 }
 
-// viewGuideIndex は /guide。全 topic の目次だけを出す。
+// viewGuideIndex serves /guide, showing nothing but the contents of each topic.
 func (s *Server) viewGuideIndex(w http.ResponseWriter, r *http.Request) {
 	lang := s.langOf(r)
 	set := s.settings(r)
@@ -167,7 +174,7 @@ func (s *Server) viewGuideIndex(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// viewGuide は /guide/{topic}。
+// viewGuide serves /guide/{topic}.
 func (s *Server) viewGuide(w http.ResponseWriter, r *http.Request) {
 	topic := r.PathValue("topic")
 	lang := s.langOf(r)
@@ -188,7 +195,7 @@ func (s *Server) viewGuide(w http.ResponseWriter, r *http.Request) {
 	s.render(w, r, "guide.html", viewData{
 		Title: cur.Title, Nav: "guide",
 		Data: guideData{Topics: s.guideOutlines(lang, topic, set), Topic: &cur,
-			// 埋め込んだ自分の文書なので、goldmark の出力をそのまま信頼してよい。
+			// Our own embedded document, so goldmark's output can be trusted as is.
 			HTML: template.HTML(buf.String())},
 	})
 }

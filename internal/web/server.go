@@ -1,4 +1,4 @@
-// Package web は HTTP ハンドラ、テンプレート、静的ファイルを担う。
+// Package web owns the HTTP handlers, the templates and the static files.
 package web
 
 import (
@@ -23,7 +23,7 @@ import (
 	"github.com/wakamenod/enghi/internal/wiki"
 )
 
-// Server は HTTP 層。
+// Server is the HTTP layer.
 type Server struct {
 	cfg    config.Config
 	db     *store.DB
@@ -33,14 +33,15 @@ type Server struct {
 	search *search.Service
 	set    *settings.Service
 	hub    *Hub
-	// tmpl は言語ごとに1組。**テンプレートの関数は解析時に束縛されるので、
-	// リクエストごとに差し替えられない。**言語の数だけ作っておく。
+	// One template set per language. **Template functions are bound at parse
+	// time and cannot be swapped per request**, so we build as many sets as
+	// there are languages.
 	tmpl map[i18n.Lang]*template.Template
 	mux  *http.ServeMux
 }
 
-// New はサーバを組み立てる。
-// files は画像などの保管庫(本体 DB とは別ファイル)。
+// New assembles the server. files is the store for images and the like, a
+// separate file from the main database.
 func New(cfg config.Config, db *store.DB, files *filestore.Store) (*Server, error) {
 	tmpl := map[i18n.Lang]*template.Template{}
 	for _, lang := range i18n.All {
@@ -74,30 +75,32 @@ func parseTemplates(lang i18n.Lang) (*template.Template, error) {
 		"add":       func(a, b int) int { return a + b },
 		"snippet":   search.SnippetHTML,
 		"list":      func(vals ...string) []string { return vals },
-		// eqID は *int64 と int64 を比べる。テンプレートの eq は型が違うと実行時エラーになる。
+		// eqID compares *int64 with int64; the template eq fails at run time when
+		// the types differ.
 		"eqID": func(p *int64, id int64) bool { return p != nil && *p == id },
-		// t は文言を引く。解析時に言語が決まる。
+		// t looks a message up; the language is fixed at parse time.
 		"t":         func(key string, args ...any) string { return i18n.T(lang, key, args...) },
 		"kindLabel": func(kind string) string { return i18n.T(lang, "kind."+kind) },
 		"lang":      func() string { return string(lang) },
 		"langs":     func() []i18n.Lang { return i18n.All },
 		"langName":  func(l i18n.Lang) string { return i18n.Name[l] },
-		// asset は静的ファイルの URL に内容のハッシュを付ける(static.go)
+		// asset appends the content hash to a static file URL (static.go)
 		"asset": assetURL,
 	}
 	return template.New("").Funcs(funcs).ParseFS(enghi.TemplatesFS, "web/templates/*.html")
 }
 
-// Handler は 4.4 節のセキュリティ3層を通したハンドラを返す。
+// Handler returns the handler wrapped in the three security layers of
+// section 4.4.
 func (s *Server) Handler() http.Handler { return logErrors(s.secure(s.mux)) }
 
-// Hub は focus チャネル。CLI からの通知にも使う。
+// Hub is the focus channel, also used for notifications from the CLI.
 func (s *Server) Hub() *Hub { return s.hub }
 
 func (s *Server) routes() {
 	m := s.mux
 
-	// ---- 画面(すべてに安定した URL を割り当てる。DESIGN 4.1)
+	// ---- screens; every one gets a stable URL (DESIGN 4.1)
 	m.HandleFunc("GET /{$}", s.viewDashboard)
 	m.HandleFunc("GET /wiki", s.viewPageList)
 	m.HandleFunc("GET /wiki/new", s.viewPageNew)
@@ -123,7 +126,7 @@ func (s *Server) routes() {
 	m.HandleFunc("GET /guide", s.viewGuideIndex)
 	m.HandleFunc("GET /guide/{topic}", s.viewGuide)
 
-	// ---- UI からの form 送信(htmx / 素の form)
+	// ---- form posts from the UI (htmx and plain forms)
 	m.HandleFunc("POST /ui/pages", s.uiCreatePage)
 	m.HandleFunc("POST /ui/pages/{slug}", s.uiUpdatePage)
 	m.HandleFunc("POST /ui/pages/{slug}/delete", s.uiDeletePage)
@@ -148,12 +151,13 @@ func (s *Server) routes() {
 	m.HandleFunc("POST /ui/settings", s.uiUpdateSettings)
 	m.HandleFunc("POST /ui/backup", s.uiBackup)
 	m.HandleFunc("GET /ui/lang", s.handleSetLang)
-	m.HandleFunc("GET /ui/search", s.uiSearchFragment) // 打鍵ごとのインクリメンタル検索
-	m.HandleFunc("POST /ui/preview", s.uiPreview)      // 編集画面のプレビュー
+	m.HandleFunc("GET /ui/search", s.uiSearchFragment) // incremental search, per keystroke
+	m.HandleFunc("POST /ui/preview", s.uiPreview)      // preview on the edit screen
 
-	// ---- API(JSON。Emacs 層が依存するため独立に成立させる。DESIGN 4.2)
+	// ---- API (JSON). It stands on its own because the Emacs layer depends on
+	// it (DESIGN 4.2)
 	m.HandleFunc("GET /api/search", s.apiSearch)
-	m.HandleFunc("GET /api/titles", s.apiTitles) // [[...]] の補完候補
+	m.HandleFunc("GET /api/titles", s.apiTitles) // candidates for [[...]] completion
 	m.HandleFunc("GET /api/pages", s.apiListPages)
 	m.HandleFunc("POST /api/pages", s.apiCreatePage)
 	m.HandleFunc("GET /api/pages/{slug}", s.apiGetPage)
@@ -196,11 +200,11 @@ func (s *Server) routes() {
 	m.HandleFunc("GET /api/review", s.apiReview)
 	m.HandleFunc("GET /api/series", s.apiSeries)
 
-	// ---- 静的ファイル(内容のハッシュで ETag と ?v= を付ける。static.go)
+	// ---- static files, with an ETag and ?v= from the content hash (static.go)
 	m.HandleFunc("GET /static/", serveStatic)
 }
 
-// ---------------------------------------------------------------- 共通
+// ---------------------------------------------------------------- shared
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -214,10 +218,13 @@ func writeErr(w http.ResponseWriter, code int, errCode, msg string) {
 	writeJSON(w, code, map[string]any{"error": errCode, "message": msg})
 }
 
-// writeConflict は 409 を返す。
-// **error は機械可読なコードで2種を区別すること**(DESIGN 4.2):
-//   - version_conflict … 楽観ロックの版不一致。差分を提示してマージさせる。入力は捨てない
-//   - title_conflict   … タイトル衝突。別のタイトルを入力させる。本文は保持したまま
+// writeConflict answers 409.
+// **The error field distinguishes the two cases with a machine-readable code**
+// (DESIGN 4.2):
+//   - version_conflict ... optimistic-lock mismatch. Show the difference and let
+//     the user merge; never throw the input away
+//   - title_conflict   ... title collision. Ask for another title, keeping the
+//     body as it is
 func (s *Server) writeConflict(w http.ResponseWriter, r *http.Request, err error) bool {
 	switch e := err.(type) {
 	case *wiki.VersionConflictError:
@@ -231,7 +238,8 @@ func (s *Server) writeConflict(w http.ResponseWriter, r *http.Request, err error
 		writeJSON(w, http.StatusConflict, map[string]any{
 			"error":   "title_conflict",
 			"message": s.tr(r, "err.title_conflict"),
-			// 衝突相手を必ず返す。無いと利用者は該当ページへ行けない(DESIGN 4.2)。
+			// Always return what it collided with; without it the user cannot get
+			// to that page (DESIGN 4.2).
 			"conflicting_page": map[string]any{
 				"id": e.Conflicting.ID, "slug": e.Conflicting.Slug, "title": e.Conflicting.Title,
 			},
@@ -241,14 +249,15 @@ func (s *Server) writeConflict(w http.ResponseWriter, r *http.Request, err error
 	return false
 }
 
-// langOf はこのリクエストで使う言語。
+// langOf is the language for this request.
 func (s *Server) langOf(r *http.Request) i18n.Lang { return i18n.FromRequest(r) }
 
-// sideNav は左にタグの列を出す画面。
+// sideNav lists the screens that show the tag column on the left.
 var sideNav = map[string]bool{"dashboard": true, "wiki": true, "tags": true, "search": true}
 
-// settings はこのリクエストで使う設定。
-// **読めなくても画面は出す。**設定が引けないことと、画面が出ないことは別の問題である。
+// settings are the settings for this request.
+// **A screen still renders when they cannot be read.** Failing to read a
+// setting and failing to show a page are different problems.
 func (s *Server) settings(r *http.Request) settings.Settings {
 	set, err := s.set.Load(ctxOf(r))
 	if err != nil {
@@ -257,22 +266,22 @@ func (s *Server) settings(r *http.Request) settings.Settings {
 	return set
 }
 
-// tr はハンドラから文言を引く。
+// tr looks a message up from a handler.
 func (s *Server) tr(r *http.Request, key string, args ...any) string {
 	return i18n.T(s.langOf(r), key, args...)
 }
 
 func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, data any) {
-	// 言語と現在地は全画面で要るので、ここでまとめて埋める。
-	// 各ハンドラに書かせると必ずどこかで漏れる。
+	// The language and the current location are needed on every screen, so they
+	// are filled in here. Leaving it to each handler always misses one.
 	if vd, ok := data.(viewData); ok {
 		lang := s.langOf(r)
 		vd.LangCode = string(lang)
 		vd.Path = r.URL.RequestURI()
 		vd.Strings = template.JS(jsStrings(lang))
 		vd.Set = s.settings(r)
-		// 左のタグ列は記事系の画面にだけ出す。GTD とガイドには出さない
-		// (ガイドは自前の目次を左に持っている)。
+		// The tag column appears on article screens only, not on GTD or the guide
+		// (the guide has a table of contents of its own on the left).
 		if vd.Side = sideNav[vd.Nav]; vd.Side {
 			vd.SideTags, _ = s.pages.Tags(ctxOf(r))
 		}
@@ -291,8 +300,8 @@ func (s *Server) renderFragment(w http.ResponseWriter, r *http.Request, name str
 	}
 }
 
-// jsStrings は JS 側で使う文言を JSON にする。
-// **JS の中に文言を直書きしない。**片方だけ翻訳が漏れる。
+// jsStrings renders the messages used from JS as JSON.
+// **Never write messages inline in the JS**; one language ends up untranslated.
 func jsStrings(lang i18n.Lang) string {
 	keys := []string{
 		"theme.auto", "theme.light", "theme.dark", "theme.toggle", "gtd.capture_short",
@@ -312,8 +321,9 @@ func jsStrings(lang i18n.Lang) string {
 	return string(b)
 }
 
-// handleSetLang は言語の選択を cookie に覚えさせる。
-// **サーバ側で描画するので、選択はブラウザではなくリクエストと一緒に来る必要がある。**
+// handleSetLang remembers the language choice in a cookie.
+// **Rendering happens on the server, so the choice has to arrive with the
+// request, not stay in the browser.**
 func (s *Server) handleSetLang(w http.ResponseWriter, r *http.Request) {
 	l := r.URL.Query().Get("set")
 	if !i18n.Valid(l) {
@@ -364,7 +374,7 @@ func atoiDefault(s string, def int) int {
 	return n
 }
 
-// ctxOf はハンドラ用のコンテキスト(将来のタイムアウト設定の口)。
+// ctxOf is the context for handlers, and the place to add a timeout later.
 func ctxOf(r *http.Request) context.Context { return r.Context() }
 
 var _ = fmt.Sprintf

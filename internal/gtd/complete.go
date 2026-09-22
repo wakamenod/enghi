@@ -5,19 +5,23 @@ import (
 	"database/sql"
 )
 
-// CompleteResult は完了/skip の結果。Next があれば生成された次インスタンス。
+// CompleteResult is the result of completing or skipping. Next, when present,
+// is the instance that was generated.
 type CompleteResult struct {
 	Completed *Task `json:"completed"`
 	Next      *Task `json:"next,omitempty"`
 }
 
-// Complete はタスクを完了(または skip)し、定期タスクなら次の1件を生成する。
+// Complete completes (or skips) a task and, for a recurring one, generates the
+// next single instance.
 //
-// **スケジューラで先回りして複数件を materialize しない**(DESIGN 2.6)。
-// やると、消化できなかった分が溜まって Next Actions が定期タスクで埋まり、GTD が機能しなくなる。
-// **同じ系列で開いているインスタンスは常に高々1件**とする。
+// **Never materialize several instances ahead of time from a scheduler**
+// (DESIGN 2.6). Doing so piles up whatever was not done, fills next actions
+// with recurring tasks and stops GTD working.
+// **At most one open instance per series, always.**
 //
-// skip=true は「今回は飛ばす」。専用の state は設けず、現インスタンスを dropped にして次を生成する。
+// skip=true means "skip this one". There is no dedicated state: the current
+// instance is dropped and the next one generated.
 func (s *Service) Complete(ctx context.Context, id int64, skip bool) (*CompleteResult, error) {
 	res := &CompleteResult{}
 	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
@@ -27,7 +31,7 @@ func (s *Service) Complete(ctx context.Context, id int64, skip bool) (*CompleteR
 			return err
 		}
 
-		// 1. 現インスタンスを done(skip なら dropped)にする
+		// 1. Mark the current instance done, or dropped when skipping
 		newState := StateDone
 		if skip {
 			newState = StateDropped
@@ -39,7 +43,7 @@ func (s *Service) Complete(ctx context.Context, id int64, skip bool) (*CompleteR
 			return err
 		}
 
-		// recurrence が無ければここで終わり
+		// Without a recurrence, we are done
 		if cur.Recurrence == "" {
 			res.Completed, err = scanTask(tx.QueryRowContext(ctx,
 				`SELECT `+taskCols+` `+taskFrom+` WHERE t.id = ?`, id))
@@ -48,19 +52,19 @@ func (s *Service) Complete(ctx context.Context, id int64, skip bool) (*CompleteR
 
 		rule, err := ParseRecurrence(cur.Recurrence)
 		if err != nil {
-			// 規則が壊れていても完了自体は通す(次は作らない)。
-			// ここで失敗させると、壊れた規則のせいでタスクを閉じられなくなる。
+			// A broken rule still lets the completion through; it just generates
+			// nothing. Failing here would make the task impossible to close.
 			res.Completed, _ = scanTask(tx.QueryRowContext(ctx,
 				`SELECT `+taskCols+` `+taskFrom+` WHERE t.id = ?`, id))
 			return nil
 		}
 
-		// 2. 次回日付を計算する
+		// 2. Compute the next date
 		today := Today()
 		scheduled, _ := ParseDate(cur.ScheduledOn)
 		nextOn := rule.Next(scheduled, today, today)
 
-		// 3. recurrence_ends_on を過ぎていれば生成しない
+		// 3. Past recurrence_ends_on, generate nothing
 		if cur.RecurrenceEndsOn != "" {
 			if ends, err := ParseDate(cur.RecurrenceEndsOn); err == nil && nextOn.After(ends) {
 				res.Completed, err = scanTask(tx.QueryRowContext(ctx,
@@ -69,13 +73,15 @@ func (s *Service) Complete(ctx context.Context, id int64, skip bool) (*CompleteR
 			}
 		}
 
-		// 系列 id は最初のタスクの id。無ければ自分自身が系列の起点。
+		// The series id is the id of the first task; without one, this task is the
+		// start of the series.
 		seriesID := cur.ID
 		if cur.SeriesID != nil {
 			seriesID = *cur.SeriesID
 		}
 
-		// 同じ系列で開いているインスタンスが既にあるなら作らない(高々1件の不変条件)。
+		// If the series already has an open instance, generate nothing (the
+		// at-most-one invariant).
 		var open int
 		if err := tx.QueryRowContext(ctx,
 			`SELECT count(*) FROM tasks
@@ -88,9 +94,9 @@ func (s *Service) Complete(ctx context.Context, id int64, skip bool) (*CompleteR
 			return err
 		}
 
-		// 4. 同じ series_id で新しい行を1件だけ挿入する。
-		// **生成される次インスタンスの state は必ず scheduled とする。**
-		// next で作ってはいけない。weekly:tue,fri のゴミ出しが常時 Next Actions に居座る。
+		// 4. Insert exactly one new row with the same series_id.
+		// **The generated instance is always state=scheduled.**
+		// Never next: a weekly:tue,fri bin day would sit in next actions forever.
 		ins, err := tx.ExecContext(ctx,
 			`INSERT INTO tasks(title, note, state, project_id, context_id, area_id,
 			                   scheduled_on, energy, time_estimate, priority,
@@ -107,7 +113,8 @@ func (s *Service) Complete(ctx context.Context, id int64, skip bool) (*CompleteR
 			return err
 		}
 
-		// 起点タスク自身に series_id が無かった場合はここで埋める(系列を辿れるように)
+		// Fill in series_id on the starting task itself when it had none, so the
+		// series can be followed
 		if cur.SeriesID == nil {
 			if _, err := tx.ExecContext(ctx,
 				`UPDATE tasks SET series_id = ? WHERE id = ?`, seriesID, cur.ID); err != nil {
@@ -129,9 +136,9 @@ func (s *Service) Complete(ctx context.Context, id int64, skip bool) (*CompleteR
 	return res, nil
 }
 
-// EndSeries は系列そのものを終わらせる。
-// **先に recurrence を NULL にしてから完了/破棄する**という手順を1操作にしたもの(DESIGN 2.6)。
-// UI では「この回だけ」「この系列全体」を選ばせること。
+// EndSeries ends the series itself: the procedure **set recurrence to NULL
+// first, then complete or drop** as a single operation (DESIGN 2.6).
+// The UI must let the user choose between "this one" and "the whole series".
 func (s *Service) EndSeries(ctx context.Context, id int64) (*Task, error) {
 	var out *Task
 	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
@@ -150,8 +157,9 @@ func (s *Service) EndSeries(ctx context.Context, id int64) (*Task, error) {
 	return out, nil
 }
 
-// SeriesList は定期タスク系列の一覧。
-// **Weekly Review 画面に必ず設けること。**惰性で回り続けている系列の棚卸しは GTD 上重要(DESIGN 2.6)。
+// SeriesList lists the recurring series.
+// **The Weekly Review screen must include it.** Taking stock of series that are
+// only running out of inertia matters in GTD (DESIGN 2.6).
 func (s *Service) SeriesList(ctx context.Context) ([]Series, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`WITH sids AS (

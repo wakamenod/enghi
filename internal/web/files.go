@@ -10,20 +10,20 @@ import (
 	"github.com/wakamenod/enghi/internal/files"
 )
 
-// apiUploadFile は画像などを受け取る。
+// apiUploadFile receives an image or similar file.
 //
-// 本文は生のバイト列で、種別は Content-Type で渡す。
-// **受け付けるのは `files.MediaTypeAllowed` に載っている種別だけ。**
-// これらはいずれも CORS の simple request にはならないため、外部ページから
-// preflight 無しに投げ込まれる経路は無い。
+// The body is raw bytes and the kind comes in the Content-Type.
+// **Only the media types listed in `files.MediaTypeAllowed` are accepted.**
+// None of them can be a CORS simple request, so there is no path for an
+// external page to push one in without a preflight.
 func (s *Server) apiUploadFile(w http.ResponseWriter, r *http.Request) {
 	mediaType := mediaType(r.Header.Get("Content-Type"))
 	if !files.MediaTypeAllowed(mediaType) {
 		writeErr(w, http.StatusUnsupportedMediaType, "unsupported_media_type",
-			"この種別は受け付けません: "+mediaType)
+			s.tr(r, "err.file_unsupported", mediaType))
 		return
 	}
-	// 上限を超えた分は読まずに切る
+	// Cut off anything beyond the limit instead of reading it
 	data, err := io.ReadAll(io.LimitReader(r.Body, files.MaxBytes+1))
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
@@ -31,7 +31,7 @@ func (s *Server) apiUploadFile(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(data) > files.MaxBytes {
 		writeErr(w, http.StatusRequestEntityTooLarge, "too_large",
-			"ファイルが大きすぎます(上限 "+strconv.Itoa(files.MaxBytes/(1<<20))+" MB)")
+			s.tr(r, "err.file_too_large", files.MaxBytes/(1<<20)))
 		return
 	}
 
@@ -48,17 +48,18 @@ func (s *Server) apiUploadFile(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	// 記事に貼るための Markdown も返す(クライアント側で組み立てさせない)
+	// Return the Markdown to paste into an article as well, rather than making
+	// the client assemble it
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"file":     f,
-		"markdown": markdownFor(f),
+		"markdown": markdownFor(f, s.tr(r, "files.alt_default")),
 	})
 }
 
-func markdownFor(f *files.File) string {
+func markdownFor(f *files.File, fallbackAlt string) string {
 	alt := f.OriginalName
 	if alt == "" {
-		alt = "画像"
+		alt = fallbackAlt
 	}
 	if f.MediaType == "application/pdf" {
 		return "[" + alt + "](" + f.URL + ")"
@@ -66,13 +67,13 @@ func markdownFor(f *files.File) string {
 	return "![" + alt + "](" + f.URL + ")"
 }
 
-// serveFile は保管しているファイルを返す。
+// serveFile serves a stored file.
 //
-// 内容でアドレスしているので、中身が変われば URL も変わる。
-// したがって恒久的にキャッシュしてよい。
+// Storage is content-addressed, so different content means a different URL and
+// the response can be cached forever.
 func (s *Server) serveFile(w http.ResponseWriter, r *http.Request) {
 	hash := r.PathValue("hash")
-	// 拡張子付きの URL も受ける(/files/<hash>.png)
+	// URLs with an extension are accepted too (/files/<hash>.png)
 	if i := strings.IndexByte(hash, '.'); i > 0 {
 		hash = hash[:i]
 	}
@@ -98,8 +99,8 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Length", strconv.FormatInt(meta.Bytes, 10))
 	w.Header().Set("ETag", etag)
 	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-	// 保管しているのは利用者が貼ったファイルなので、種別の推測を止め、
-	// 万一 HTML と解釈されうる内容でも実行されないようにしておく。
+	// These are files the user pasted in, so turn content sniffing off: even if
+	// something could be read as HTML, it must not run.
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
 	if meta.MediaType == "application/pdf" && meta.OriginalName != "" {
@@ -124,7 +125,7 @@ func urlEscape(s string) string {
 	return b.String()
 }
 
-// apiListFiles は保管しているファイルの一覧。
+// apiListFiles lists the stored files.
 func (s *Server) apiListFiles(w http.ResponseWriter, r *http.Request) {
 	list, err := s.files.List(ctxOf(r), atoiDefault(r.URL.Query().Get("limit"), 100))
 	if err != nil {
@@ -137,11 +138,12 @@ func (s *Server) apiListFiles(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// apiDeleteFile は1件消す。本文からの参照が残っていても消す(参照側は壊れたリンクになる)。
+// apiDeleteFile deletes one file, even when a body still references it; that
+// reference becomes a broken link.
 func (s *Server) apiDeleteFile(w http.ResponseWriter, r *http.Request) {
 	if err := s.files.Delete(ctxOf(r), r.PathValue("hash")); err != nil {
 		if errors.Is(err, files.ErrNotFound) {
-			writeErr(w, http.StatusNotFound, "not_found", "ファイルが見つかりません")
+			writeErr(w, http.StatusNotFound, "not_found", s.tr(r, "err.not_found"))
 			return
 		}
 		writeErr(w, http.StatusInternalServerError, "delete_failed", err.Error())

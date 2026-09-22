@@ -11,16 +11,17 @@ import (
 	enghi "github.com/wakamenod/enghi"
 )
 
-// 使い方ガイド。本文は docs/guide/<lang>/<topic>.md、画面からは
-// /guide/<topic>#<anchor> で個別の節を指している。
+// The guide. The prose lives in docs/guide/<lang>/<topic>.md, and the screens
+// point at individual sections with /guide/<topic>#<anchor>.
 //
-// **このリンクは放っておくと静かに切れる。** 見出しを書き換えても、
-// 訳を片方だけ直しても、コンパイルは通るしテンプレートも壊れない。
-// ここで機械的に検査する。
+// **Those links break silently if nobody watches them.** Rewriting a heading, or
+// fixing only one translation, still compiles and still renders. So they are
+// checked mechanically here.
 
 var (
 	guideH2 = regexp.MustCompile(`(?m)^#{2,3} +(.+?)\s*$`)
-	// 画面から張られたガイドへのリンク(テンプレート内の /guide/... と help 部分テンプレート)
+	// Links into the guide from the screens: /guide/... in templates, and the
+	// help partial
 	guideLinkRe = regexp.MustCompile(`/guide/([a-z-]+)#([A-Za-z0-9_-]+)`)
 	guideHelpRe = regexp.MustCompile(`{{template "help" "([a-z-]+)#([A-Za-z0-9_-]+)"}}`)
 	anchorRe    = regexp.MustCompile(`\{#([A-Za-z0-9_-]+)\}\s*$`)
@@ -41,35 +42,36 @@ func guideFiles(t *testing.T) map[string]string {
 		return nil
 	})
 	if err != nil {
-		t.Fatalf("ガイドを読めない: %v", err)
+		t.Fatalf("cannot read the guide: %v", err)
 	}
 	if len(out) == 0 {
-		t.Fatal("ガイドが1つも埋め込まれていない")
+		t.Fatal("no guide file is embedded at all")
 	}
 	return out
 }
 
-// 見出しには必ず {#id} を書くこと。
-// **自動生成の ID に頼らない。** 日本語見出しから作られる ID は英語版とずれるため、
-// 画面から張ったアンカーが言語を切り替えた途端に切れる。
+// Every heading carries an explicit {#id}.
+// **Never rely on generated IDs.** An ID derived from a Japanese heading differs
+// from the English one, so an anchor linked from a screen breaks the moment the
+// language is switched.
 func TestGuideHeadingsHaveExplicitAnchors(t *testing.T) {
 	for name, src := range guideFiles(t) {
 		for _, m := range guideH2.FindAllStringSubmatch(src, -1) {
 			if !anchorRe.MatchString(m[1]) {
-				t.Errorf("%s: 見出しに {#id} が無い: %q", name, m[1])
+				t.Errorf("%s: heading without {#id}: %q", name, m[1])
 			}
 		}
 	}
 }
 
-// 言語をまたいで、同じ topic は同じアンカーを持つこと。
-// **片方だけ節を足すと、その言語でだけリンクが切れる。**
+// The same topic must carry the same anchors in every language.
+// **Adding a section to one language alone breaks the links in the other.**
 func TestGuideAnchorsMatchAcrossLanguages(t *testing.T) {
 	byTopic := map[string]map[string][]string{} // topic -> lang -> anchors
 	for name, src := range guideFiles(t) {
 		lang, topic, ok := strings.Cut(name, "/")
 		if !ok {
-			t.Fatalf("想定外のパス: %s", name)
+			t.Fatalf("unexpected path: %s", name)
 		}
 		topic = strings.TrimSuffix(topic, ".md")
 		if byTopic[topic] == nil {
@@ -89,7 +91,7 @@ func TestGuideAnchorsMatchAcrossLanguages(t *testing.T) {
 				continue
 			}
 			if strings.Join(anchors, ",") != strings.Join(langs[base], ",") {
-				t.Errorf("%s: アンカーが %s と %s で違う\n%s: %v\n%s: %v",
+				t.Errorf("%s: anchors differ between %s and %s\n%s: %v\n%s: %v",
 					topic, base, lang, base, langs[base], lang, anchors)
 			}
 		}
@@ -107,7 +109,7 @@ func guideAnchors(src string) []string {
 	return out
 }
 
-// 画面から張ったリンクの飛び先が実在すること。
+// Every link from a screen must point at something that exists.
 func TestGuideLinksFromScreensResolve(t *testing.T) {
 	files := guideFiles(t)
 	anchors := map[string]map[string]bool{} // topic -> anchor
@@ -124,15 +126,15 @@ func TestGuideLinksFromScreensResolve(t *testing.T) {
 
 	check := func(where, topic, anchor string) {
 		if anchors[topic] == nil {
-			t.Errorf("%s: ガイドに %q という topic が無い", where, topic)
+			t.Errorf("%s: the guide has no topic %q", where, topic)
 			return
 		}
 		if !anchors[topic][anchor] {
-			t.Errorf("%s: /guide/%s に #%s という節が無い", where, topic, anchor)
+			t.Errorf("%s: /guide/%s has no section #%s", where, topic, anchor)
 		}
 	}
 
-	// テンプレートから
+	// From the templates
 	tpls, err := fs.Glob(enghi.TemplatesFS, "web/templates/*.html")
 	if err != nil {
 		t.Fatal(err)
@@ -149,7 +151,7 @@ func TestGuideLinksFromScreensResolve(t *testing.T) {
 			check(p, m[1], m[2])
 		}
 	}
-	// ガイド本文どうしの相互リンクも同じ検査にかける
+	// Cross-links between guide pages go through the same check
 	for name, src := range files {
 		for _, m := range guideLinkRe.FindAllStringSubmatch(src, -1) {
 			check(name, m[1], m[2])
@@ -157,8 +159,9 @@ func TestGuideLinksFromScreensResolve(t *testing.T) {
 	}
 }
 
-// 描画したガイドに、見出しの id が実際に載っていること。
-// **`{#id}` の解釈を切ると、ID が消えるのではなく本文に文字列として出る。**
+// The rendered guide must actually carry the heading IDs.
+// **Turning `{#id}` off does not drop the ID; it prints it as text in the
+// body.**
 func TestGuideRendersHeadingIDs(t *testing.T) {
 	h := newServer(t)
 	w := do(h, req("GET", "/guide/enghi", ""))
@@ -167,17 +170,18 @@ func TestGuideRendersHeadingIDs(t *testing.T) {
 	}
 	body := w.Body.String()
 	if !strings.Contains(body, `id="states"`) {
-		t.Error(`見出しの id が出ていない(WithHeadingAttribute が効いていない)`)
+		t.Error(`no heading id in the output (WithHeadingAttribute is not in effect)`)
 	}
 	if strings.Contains(body, "{#") {
-		t.Error("アンカー記法が本文にそのまま出ている")
+		t.Error("the anchor notation is printed in the body")
 	}
 	if !strings.Contains(body, "</table>") {
-		t.Error("表が描画されていない(GFM が効いていない)")
+		t.Error("no table was rendered (GFM is not in effect)")
 	}
 }
 
-// 言語を切り替えても同じ節に飛べること(英語版が無ければ日本語にフォールバックする)。
+// The same sections are reachable in either language, falling back to Japanese
+// when there is no English text.
 func TestGuideServesEachLanguage(t *testing.T) {
 	h := newServer(t)
 	for _, lang := range []string{"ja", "en"} {
@@ -190,7 +194,7 @@ func TestGuideServesEachLanguage(t *testing.T) {
 				continue
 			}
 			if !strings.Contains(w.Body.String(), `id="`) {
-				t.Errorf("GET /guide/%s (%s): 本文が描画されていない", topic, lang)
+				t.Errorf("GET /guide/%s (%s): nothing was rendered", topic, lang)
 			}
 		}
 	}
@@ -201,20 +205,22 @@ func TestGuideUnknownTopicIs404(t *testing.T) {
 	if got := do(h, req("GET", "/guide/nonexistent", "")).Code; got != http.StatusNotFound {
 		t.Errorf("GET /guide/nonexistent → %d, want 404", got)
 	}
-	// topic は埋め込み FS のパスに入るので、脱出できないことを確かめる。
-	// (ServeMux がパスを正規化して弾くため 404 とは限らない。200 で何かを返さないことが要件)
+	// The topic goes into a path inside the embedded FS, so check that it cannot
+	// escape. (ServeMux normalizes and rejects, so it is not necessarily a 404;
+	// the requirement is that nothing is served with a 200.)
 	for _, p := range []string{"/guide/..%2fetc%2fpasswd", "/guide/gtd%2f..%2f..%2fschema.sql"} {
 		w := do(h, req("GET", p, ""))
 		if w.Code == http.StatusOK {
-			t.Errorf("GET %s → 200。埋め込み FS から外へ出られている", p)
+			t.Errorf("GET %s answered 200: it escaped the embedded FS", p)
 		}
 	}
 }
 
-// 図(inline SVG)が落ちていないこと。
-// **goldmark は既定で生の HTML を落とす。** WithUnsafe を外すと、図だけが
-// 静かに消えて本文は通る(テンプレートも型検査も何も言わない)。
-// 図の数が言語間で違うのも同じ理由で見つかりにくい。
+// The diagrams (inline SVG) must survive rendering.
+// **goldmark drops raw HTML by default.** Remove WithUnsafe and the diagrams
+// vanish silently while the prose still renders; neither the templates nor the
+// type checker say a word. A mismatch in the number of diagrams between
+// languages is just as hard to notice.
 func TestGuideDiagramsSurviveRendering(t *testing.T) {
 	h := newServer(t)
 	for _, lang := range []string{"ja", "en"} {
@@ -222,11 +228,11 @@ func TestGuideDiagramsSurviveRendering(t *testing.T) {
 		r.Header.Set("Accept-Language", lang)
 		body := do(h, r).Body.String()
 		if n := strings.Count(body, `<svg class="dg"`); n == 0 {
-			t.Errorf("/guide/gtd (%s): 図が描画されていない(WithUnsafe が外れている)", lang)
+			t.Errorf("/guide/gtd (%s): no diagram was rendered (WithUnsafe is missing)", lang)
 		}
 	}
 
-	counts := map[string]map[string]int{} // topic -> lang -> 図の数
+	counts := map[string]map[string]int{} // topic -> lang -> number of diagrams
 	for name, src := range guideFiles(t) {
 		lang, topic, _ := strings.Cut(name, "/")
 		topic = strings.TrimSuffix(topic, ".md")
@@ -244,17 +250,18 @@ func TestGuideDiagramsSurviveRendering(t *testing.T) {
 		}
 		for lang, n := range langs {
 			if n != want {
-				t.Errorf("%s: 図の数が言語で違う (%s=%d, 他=%d)", topic, lang, n, want)
+				t.Errorf("%s: the number of diagrams differs by language (%s=%d, others=%d)", topic, lang, n, want)
 			}
 		}
 	}
 }
 
-// 強調が壊れていないこと。
+// Emphasis must not be broken.
 //
-// **日本語の直前・直後に空白が無いと `**` が閉じられず、本文にそのまま出る。**
-// (CommonMark の規則: 閉じる側の区切りが左右どちらにも接していると閉じられない)
-// 文言を直すたびに起こりうるので、描画結果で見張る。
+// **Without a space before and after, `**` next to Japanese text never closes
+// and is printed literally.** (CommonMark rule: a closing delimiter run that is
+// flanked on both sides cannot close.) It can happen with any wording change,
+// so the rendered output is watched.
 func TestGuideHasNoRawMarkdown(t *testing.T) {
 	h := newServer(t)
 	enableFeatures(t, h)
@@ -265,7 +272,7 @@ func TestGuideHasNoRawMarkdown(t *testing.T) {
 			body := do(h, r).Body.String()
 			for _, bad := range []string{"**", "](/guide"} {
 				if strings.Contains(body, bad) {
-					t.Errorf("/guide/%s (%s): %q が描画結果に出ている", topic, lang, bad)
+					t.Errorf("/guide/%s (%s): %q appears in the rendered output", topic, lang, bad)
 				}
 			}
 		}

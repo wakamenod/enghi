@@ -23,7 +23,8 @@
   </ul>
 </section>
 
-{{/* この2項目がこのシステムの存在理由に直結する。他を削ってもこの2つは削らない(DESIGN 2.3) */}}
+{{/* These two are tied directly to why this system exists. Cut anything else,
+     but never these (DESIGN 2.3) */}}
 <section class="panel" id="review_projects">
   <h2>{{t "review.stalled"}}</h2>
   {{if $d.Stalled}}
@@ -119,7 +120,8 @@
 </section>
 </div>
 
-{{/* 惰性で回り続けているだけの系列を棚卸しする。ここは必ず設ける(DESIGN 2.6) */}}
+{{/* Take stock of series that only keep running out of inertia. This section
+     is required (DESIGN 2.6) */}}
 <section class="panel" id="review_recurring">
   <h2>{{t "review.series"}}</h2>
   <div class="meta">{{t "review.series_note"}}</div>

@@ -1,16 +1,18 @@
--- 0001_init.sql — docs/schema.sql より生成。PRAGMA は store 側で接続ごとに設定する。
--- enghi — スキーマ
--- SQLite 3.34+ (trigram tokenizer のため)
--- 方針は docs/DESIGN.md を参照。3 万件の実データによる計測を反映済み。
+-- 0001_init.sql - generated from docs/schema.sql. The PRAGMAs are set per
+-- connection on the store side.
+-- enghi - schema
+-- SQLite 3.34+ (for the trigram tokenizer)
+-- See docs/DESIGN.md for the reasoning. Reflects measurements on 30k real rows.
 --
--- 原則:
---   * pages は GTD を一切知らない。GTD 由来の列を足さないこと。
---   * 参照は GTD → Wiki の一方向のみ(projects.note_page_id など)。
---   * 種別をまたぐリンクはすべて links テーブルに集約する。
+-- Principles:
+--   * pages knows nothing about GTD. Never add a GTD-derived column to it.
+--   * References go one way only, GTD -> wiki (projects.note_page_id and such).
+--   * Every cross-kind link is collected in the links table.
 --
--- 【重要】PRAGMA foreign_keys は接続ごとの設定である。このファイルに書いても
---   コネクションプール内の各接続には効かない。DSN(例: _foreign_keys=on)または
---   接続初期化フックで必ず指定すること。journal_mode = WAL は永続なので一度でよい。
+-- **IMPORTANT** PRAGMA foreign_keys is a per-connection setting. Writing it in
+--   this file does not apply it to the connections in the pool. Set it in the
+--   DSN (_foreign_keys=on) or in a connection init hook. journal_mode = WAL is
+--   persistent, so once is enough.
 
 
 -- ============================================================
@@ -19,46 +21,50 @@
 
 CREATE TABLE pages (
   id          INTEGER PRIMARY KEY,
-  slug        TEXT    NOT NULL,               -- URL 用。**小文字に正規化して保存すること**
-  -- COLLATE NOCASE: [[emacs]] が「Emacs」に解決されるようにするため(DESIGN.md 2.5)。
-  -- ASCII にのみ効く照合なので日本語は影響を受けない。
+  slug        TEXT    NOT NULL,               -- for URLs. **Store it lower-cased**
+  -- COLLATE NOCASE so that [[emacs]] resolves to "Emacs" (DESIGN.md 2.5).
+  -- The collation only affects ASCII, so Japanese is untouched.
   title       TEXT    NOT NULL COLLATE NOCASE,
-  body        TEXT    NOT NULL DEFAULT '',    -- Markdown 原文
-  version     INTEGER NOT NULL DEFAULT 1,     -- 楽観ロック。本文/タイトル/タグのいずれかが変われば +1
+  body        TEXT    NOT NULL DEFAULT '',    -- raw Markdown
+  version     INTEGER NOT NULL DEFAULT 1,     -- optimistic lock; +1 when body, title or tags change
   archived    INTEGER NOT NULL DEFAULT 0,
   created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
   updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
 );
--- APFS は大小を区別しないため、Foo と foo を別ページにするとエクスポート時に衝突する。
+-- APFS is case-insensitive, so Foo and foo as separate pages collide on export.
 CREATE UNIQUE INDEX idx_pages_slug ON pages(slug COLLATE NOCASE);
 CREATE INDEX idx_pages_updated ON pages(updated_at DESC);
 CREATE INDEX idx_pages_created ON pages(created_at DESC);
--- title は一意。[[...]] の解決がタイトル照合である以上、同名ページはリンク先を非決定的にする。
--- 実効的な一意性は page_titles が担保するが、ここでも二重に守る。
+-- Titles are unique. Since [[...]] resolves by matching titles, two pages with
+-- the same name make link targets non-deterministic. page_titles provides the
+-- effective uniqueness; this is the second guard.
 CREATE UNIQUE INDEX idx_pages_title ON pages(title);
 
--- ページのタイトル名前空間そのもの。正式名(is_canonical=1)と別名(0)の両方を入れる。
--- title が PRIMARY KEY なので、以下が **すべて DB 制約で** 弾かれる:
---   * 同名ページの作成
---   * 既存ページ名と同じ別名の登録
---   * 別名と同名のページの作成
--- したがってアプリ側で名前空間の衝突を検査する必要はない。DESIGN.md 2.5 を参照。
+-- The title namespace itself: canonical titles (is_canonical=1) and aliases (0)
+-- live in the same table. Because title is the PRIMARY KEY, **the database
+-- constraint alone** rejects all of:
+--   * creating a page with an existing name
+--   * registering an alias equal to an existing page name
+--   * creating a page named like an existing alias
+-- So the application never has to check for namespace collisions.
+-- See DESIGN.md 2.5.
 --
--- [[...]] の解決は1クエリ:  SELECT page_id FROM page_titles WHERE title = ?;
--- pages.title は FTS の external content と表示のために残し、is_canonical=1 の行と
--- 常に一致させること(同一トランザクション内で更新)。
+-- Resolving [[...]] is one query: SELECT page_id FROM page_titles WHERE title = ?;
+-- pages.title stays for the FTS external content and for display, and must
+-- always match the is_canonical=1 row (updated in the same transaction).
 CREATE TABLE page_titles (
   title        TEXT    NOT NULL COLLATE NOCASE PRIMARY KEY,
   page_id      INTEGER NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
   is_canonical INTEGER NOT NULL DEFAULT 0 CHECK (is_canonical IN (0,1)),
   created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
 ) WITHOUT ROWID;
--- 正式名は1ページにつき常にちょうど1つ。
+-- Exactly one canonical title per page, always.
 CREATE UNIQUE INDEX idx_page_titles_canonical ON page_titles(page_id) WHERE is_canonical = 1;
 CREATE INDEX idx_page_titles_page ON page_titles(page_id);
 
--- 本文/タイトルが変わったときだけ作る(タグだけの変更では作らない)。
--- 直前のリビジョンが 10 分以内(設定可)なら、無条件にそれを上書きする。差分の大小は見ない。
+-- Created only when the body or title changes, never for a tag-only edit.
+-- If the previous revision is within 10 minutes (configurable) it is simply
+-- overwritten; the size of the change is not considered.
 CREATE TABLE page_revisions (
   id          INTEGER PRIMARY KEY,
   page_id     INTEGER NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
@@ -71,7 +77,7 @@ CREATE INDEX idx_revisions_page ON page_revisions(page_id, version DESC);
 
 CREATE TABLE tags (
   id    INTEGER PRIMARY KEY,
-  name  TEXT NOT NULL UNIQUE        -- 階層は "親/子" の命名規約で表現する(構造としては持たない)
+  name  TEXT NOT NULL UNIQUE        -- hierarchy is a "parent/child" naming convention, not structure
 );
 
 CREATE TABLE page_tags (
@@ -81,36 +87,42 @@ CREATE TABLE page_tags (
 );
 CREATE INDEX idx_page_tags_tag ON page_tags(tag_id);
 
--- 汎用リンク。Wiki 内リンクだけでなく、種別をまたぐ関連もここに集約する。
--- dst_id が NULL の行は「未解決リンク」= [[まだ存在しないページ]]。
+-- Generic links. Not only wiki-internal links: every cross-kind relation is
+-- collected here. A row with dst_id NULL is an unresolved link, i.e.
+-- [[a page that does not exist yet]].
 --
--- 【ライフサイクル】dst_id はポリモーフィックなので外部キーを張れない。アプリ側で管理すること:
---   * ページ保存時: (src_kind, src_id) の行を全削除 → 本文を再パースして再挿入。同一トランザクションで。
---   * ページ作成時: dst_title が一致する未解決行の dst_id を埋めて解決する。
---   * ページ削除時: そこを指す行は **削除せず dst_id = NULL に戻す**(未解決リンクへ降格)。
---                   そのページ発の行(src 側)は削除する。
---   * project / task / area の削除時も同様。
+-- **Lifecycle** dst_id is polymorphic, so no foreign key can be declared. The
+-- application manages it:
+--   * On page save: delete every row for (src_kind, src_id), re-parse the body
+--     and re-insert - in the same transaction.
+--   * On page create: resolve unresolved rows whose dst_title matches by
+--     filling in dst_id.
+--   * On page delete: rows pointing at it are **not deleted; dst_id goes back
+--     to NULL** (demoted to an unresolved link). Rows originating from that
+--     page (the src side) are deleted.
+--   * The same applies when a project / task / area is deleted.
 CREATE TABLE links (
   id         INTEGER PRIMARY KEY,
   src_kind   TEXT    NOT NULL CHECK (src_kind IN ('page','project','task','area')),
   src_id     INTEGER NOT NULL,
   dst_kind   TEXT    NOT NULL CHECK (dst_kind IN ('page','project','task','area')),
-  dst_id     INTEGER,                       -- NULL = 未解決
-  dst_title  TEXT    NOT NULL,              -- [[...]] に書かれた生の文字列。解決後も保持する
+  dst_id     INTEGER,                       -- NULL = unresolved
+  dst_title  TEXT    NOT NULL,              -- the raw string written in [[...]]; kept after resolving
   created_at TEXT    NOT NULL DEFAULT (datetime('now')),
-  UNIQUE (src_kind, src_id, dst_kind, dst_title)   -- 保存のたびの増殖を防ぐ
+  UNIQUE (src_kind, src_id, dst_kind, dst_title)   -- stops rows multiplying on every save
 );
 CREATE INDEX idx_links_src        ON links(src_kind, src_id);
-CREATE INDEX idx_links_dst        ON links(dst_kind, dst_id);       -- バックリンク用
+CREATE INDEX idx_links_dst        ON links(dst_kind, dst_id);       -- for backlinks
 CREATE INDEX idx_links_unresolved ON links(dst_title) WHERE dst_id IS NULL;
 
 -- ============================================================
 -- GTD
 -- ============================================================
 
--- 20,000ft: 責任範囲。完了しない。
--- Goals / Vision / Purpose(30,000ft 以上)は作らない。予約列も置かない
--- (SQLite は ALTER TABLE ADD COLUMN が安価なので、必要になってから足す)。
+-- 20,000ft: areas of responsibility. They never complete.
+-- Goals / Vision / Purpose (30,000ft and above) are not implemented, and no
+-- columns are reserved for them (ALTER TABLE ADD COLUMN is cheap in SQLite, so
+-- they can be added when actually needed).
 CREATE TABLE areas (
   id            INTEGER PRIMARY KEY,
   name          TEXT    NOT NULL UNIQUE,
@@ -122,8 +134,9 @@ CREATE TABLE areas (
   updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
--- GTD の Project = 1年以内に完了でき、2つ以上の行動ステップを要する望ましい結果。
--- outcome には「完了した状態」を書く(タイトルとは別に持つのが GTD の作法)。
+-- A GTD project: a desired outcome that can be finished within a year and takes
+-- more than one action step. outcome describes the finished state, kept
+-- separately from the title as GTD prescribes.
 CREATE TABLE projects (
   id            INTEGER PRIMARY KEY,
   title         TEXT    NOT NULL,
@@ -132,8 +145,9 @@ CREATE TABLE projects (
                   CHECK (status IN ('active','someday','done','dropped')),
   area_id       INTEGER REFERENCES areas(id) ON DELETE SET NULL,
   note_page_id  INTEGER REFERENCES pages(id) ON DELETE SET NULL,  -- Project Support Material
-  review_on     TEXT,    -- 'YYYY-MM-DD' 再検討日。someday に落としたものを浮上させる tickler。
-                         -- 日付が到来したものをダッシュボードに出すこと。無いと someday はゴミ箱になる
+  review_on     TEXT,    -- 'YYYY-MM-DD' review date: the tickler that resurfaces
+                         -- something parked in someday. Show the ones that have
+                         -- come due on the dashboard; without that, someday is a bin
   sort_order    INTEGER NOT NULL DEFAULT 0,
   version       INTEGER NOT NULL DEFAULT 1,
   completed_at  TEXT,
@@ -146,14 +160,16 @@ CREATE INDEX idx_projects_review ON projects(review_on) WHERE review_on IS NOT N
 
 CREATE TABLE contexts (
   id         INTEGER PRIMARY KEY,
-  name       TEXT    NOT NULL UNIQUE,   -- "@電話" "@オフィス" "@自宅" "@メール" など
+  name       TEXT    NOT NULL UNIQUE,   -- "@phone", "@office", "@home", "@email" and so on
   sort_order INTEGER NOT NULL DEFAULT 0,
   archived   INTEGER NOT NULL DEFAULT 0
 );
 
--- 行動。Next リストに載るのは「今すぐ物理的に実行できる単一行動」だけ。
--- state の 'filed' は「Inbox の項目が参照資料と判断され Wiki ページになった」状態。
--- GTD 的には完了でも破棄でもないため独立した状態として持つ(生成ページへは links で繋ぐ)。
+-- Actions. Only "a single action you can physically do right now" belongs on
+-- the next list. The state 'filed' means an inbox item was judged to be
+-- reference material and became a wiki page: in GTD terms that is neither done
+-- nor dropped, hence a state of its own (the generated page is linked through
+-- links).
 CREATE TABLE tasks (
   id            INTEGER PRIMARY KEY,
   title         TEXT    NOT NULL,
@@ -163,22 +179,23 @@ CREATE TABLE tasks (
                                    'someday','filed','done','dropped')),
   project_id    INTEGER REFERENCES projects(id) ON DELETE SET NULL,
   context_id    INTEGER REFERENCES contexts(id) ON DELETE SET NULL,
-  area_id       INTEGER REFERENCES areas(id)    ON DELETE SET NULL,  -- 単発行動を直接 Area に紐づける場合
+  area_id       INTEGER REFERENCES areas(id)    ON DELETE SET NULL,  -- for a one-off action attached straight to an area
 
-  scheduled_on  TEXT,      -- 'YYYY-MM-DD'。state='scheduled' のとき必須。tickler もこれで表現する
-  deadline_on   TEXT,      -- 'YYYY-MM-DD'。本当の締切だけに使う
-  waiting_for   TEXT,      -- state='waiting' のときの相手
-  delegated_at  TEXT,      -- 委譲した日。経過日数の警告に使う
+  scheduled_on  TEXT,      -- 'YYYY-MM-DD'; required when state='scheduled'. The tickler uses it too
+  deadline_on   TEXT,      -- 'YYYY-MM-DD'; only for a real deadline
+  waiting_for   TEXT,      -- who is being waited on when state='waiting'
+  delegated_at  TEXT,      -- the day it was delegated; used for the days-elapsed warning
 
   energy        TEXT CHECK (energy IN ('low','mid','high')),
-  time_estimate INTEGER,   -- 分
+  time_estimate INTEGER,   -- minutes
   priority      INTEGER NOT NULL DEFAULT 0,
-  -- 定期タスク。DESIGN.md 2.6 を参照。第1版で自動展開まで実装する。
-  -- 記法は org-mode のリピータ準拠: +1w(固定間隔) / ++1w(未来まで送る) / .+3d(完了日基準)
-  --                                weekly:mon,thu / monthly:25 / monthly:last / yearly:04-01
+  -- Recurring tasks; see DESIGN.md 2.6. Automatic expansion is in the first
+  -- version. The notation follows org-mode repeaters:
+  --   +1w (fixed interval) / ++1w (advance into the future) / .+3d (from the
+  --   completion date) / weekly:mon,thu / monthly:25 / monthly:last / yearly:04-01
   recurrence         TEXT,
-  series_id          INTEGER,  -- 系列の最初のタスクの id。系列の履歴を辿るのに使う
-  recurrence_ends_on TEXT,     -- 'YYYY-MM-DD'。これを過ぎたら次を生成しない
+  series_id          INTEGER,  -- id of the first task in the series; used to follow its history
+  recurrence_ends_on TEXT,     -- 'YYYY-MM-DD'; past this, no next instance is generated
 
   sort_order    INTEGER NOT NULL DEFAULT 0,
   version       INTEGER NOT NULL DEFAULT 1,
@@ -192,15 +209,15 @@ CREATE INDEX idx_tasks_context   ON tasks(context_id, state);
 CREATE INDEX idx_tasks_scheduled ON tasks(scheduled_on) WHERE scheduled_on IS NOT NULL;
 CREATE INDEX idx_tasks_deadline  ON tasks(deadline_on)  WHERE deadline_on  IS NOT NULL;
 CREATE INDEX idx_tasks_series    ON tasks(series_id)     WHERE series_id    IS NOT NULL;
--- 同じ系列で開いているインスタンスは常に高々1件に保つこと(先回り生成はしない。DESIGN.md 2.6)。
+-- Keep at most one open instance per series; never generate ahead (DESIGN.md 2.6).
 CREATE INDEX idx_tasks_recurring ON tasks(recurrence)    WHERE recurrence   IS NOT NULL;
 
--- Weekly Review。ウィザードは作らず、チェックリスト付きの画面1枚で運用する。
+-- Weekly Review. No wizard: one screen with a checklist on it.
 CREATE TABLE reviews (
   id           INTEGER PRIMARY KEY,
   started_at   TEXT NOT NULL DEFAULT (datetime('now')),
   completed_at TEXT,
-  -- JSON。キーは DESIGN.md 2.3 の標準チェックリストに対応させること:
+  -- JSON. The keys must match the standard checklist in DESIGN.md 2.3:
   --   collect_loose_papers / inbox_zero / empty_head / review_next_actions /
   --   review_past_calendar / review_upcoming_calendar / review_waiting_for /
   --   review_projects / review_someday / review_recurring
@@ -209,20 +226,25 @@ CREATE TABLE reviews (
 );
 
 -- ============================================================
--- 全文検索
+-- Full-text search
 -- ============================================================
--- 詳細と根拠は DESIGN.md 3 節(3 万件の実測に基づく)。要点:
---   * trigram の MATCH は実質的に部分一致。自然文クエリもそのまま渡してよい。
---     クエリを空白や句読点で分割して AND で結ぶ前処理は **してはいけない**(日本語で空振りする)。
---   * 全クエリは必ずフレーズリテラル化する: " を "" に置換し、全体を " で囲む。
---     これをしないと C++ や a"b で FTS5 構文エラーになる。
---   * 2 文字以下のクエリは trigram では引けない。titles_fts(bigram)+ 本文 LIKE '%q%' で対応する。
---     日本語は 2 文字語が主力なのでこの経路は常用される。
---   * ランキングは SQL 側で行う。bm25() は負値で小さいほど良いので ORDER BY は昇順のまま。
---     ORDER BY なしの LIMIT は rowid 順になりタイトル一致が落ちるので必ず付けること。
+-- Details and reasoning are in DESIGN.md section 3 (measured on 30k rows).
+-- The essentials:
+--   * A trigram MATCH is effectively a substring match, so a natural-language
+--     query can be passed through as is. **Never** pre-split the query on
+--     spaces or punctuation and AND the pieces together: it misses in Japanese.
+--   * Always turn the query into a phrase literal: replace " with "" and wrap
+--     the whole thing in ". Without that, C++ or a"b is an FTS5 syntax error.
+--   * Queries of two characters or fewer cannot be served by trigram. They go
+--     through titles_fts (bigram) plus a body LIKE '%q%'. Japanese is full of
+--     two-character words, so that path is in constant use.
+--   * Ranking happens in SQL. bm25() is negative and smaller is better, so
+--     ORDER BY stays ascending. A LIMIT without ORDER BY falls back to rowid
+--     order and drops title matches, so never omit it.
 
--- タグは FTS に載せない。trigram は 3 文字未満を索引できず、日本語のタグは 2 文字が主力のため
--- (実測: 「仕事」0 件 / 「議事録」1 件)。タグは tags / page_tags の完全一致 JOIN で引く。
+-- Tags are not in the FTS index. trigram cannot index anything shorter than
+-- three characters, and Japanese tags are mostly two (measured: 「仕事」 0 hits,
+-- 「議事録」 1 hit). Tags are matched exactly, by joining tags / page_tags.
 CREATE VIRTUAL TABLE pages_fts USING fts5(
   title, body,
   content = 'pages',
@@ -241,15 +263,16 @@ CREATE TRIGGER pages_au AFTER UPDATE ON pages BEGIN
   INSERT INTO pages_fts(rowid, title, body) VALUES (new.id, new.title, new.body);
 END;
 
--- 2 文字クエリ対策。title だけをアプリ側で bigram 分割して入れる(外部 content にしない)。
--- 例: "オフィス移転" → "オフ フィ ィス ス移 移転"
--- 検索時も同じ分割をクエリに適用してから MATCH に渡すこと。
--- タイトルは短いので索引の増分はほぼ無視できる。
--- 【重要】page_id を列として持たないこと。列を持つと rowid が自動採番になり、
--- 更新/削除のたびに DELETE ... WHERE page_id = ? が全走査になる(実測確認済み)。
--- rowid = pages.id を規約とする。
---   更新: DELETE FROM titles_fts WHERE rowid = ?;
---         INSERT INTO titles_fts(rowid, title_bigram) VALUES (?, ?);
+-- The two-character-query path. Only titles go in here, split into bigrams by
+-- the application (not an external content table).
+-- Example: "オフィス移転" -> "オフ フィ ィス ス移 移転"
+-- Apply the same split to the query before handing it to MATCH.
+-- Titles are short, so the extra index is close to free.
+-- **IMPORTANT** Do not add page_id as a column. With a column, rowid becomes
+-- auto-assigned and every update/delete turns DELETE ... WHERE page_id = ?
+-- into a full scan (measured). The convention is rowid = pages.id:
+--   update: DELETE FROM titles_fts WHERE rowid = ?;
+--           INSERT INTO titles_fts(rowid, title_bigram) VALUES (?, ?);
 CREATE VIRTUAL TABLE titles_fts USING fts5(
   title_bigram,
   tokenize = 'unicode61'
@@ -290,21 +313,22 @@ CREATE TRIGGER projects_au AFTER UPDATE ON projects BEGIN
 END;
 
 -- ============================================================
--- 代表クエリ
+-- Representative queries
 -- ============================================================
 
--- 3 文字以上の検索(ランキング込み)。実測: 1.6 万ヒットでも 4.5ms。
+-- Search of three characters or more, with ranking. Measured: 4.5ms even with
+-- 16k hits.
 --
 --   SELECT p.id, p.slug, p.title, p.updated_at,
 --          snippet(pages_fts, 1, '<mark>', '</mark>', '…', 12) AS snip,
---          bm25(pages_fts, 10.0, 1.0) AS score        -- title, body の列重み
+--          bm25(pages_fts, 10.0, 1.0) AS score        -- column weights for title, body
 --     FROM pages_fts JOIN pages p ON p.id = pages_fts.rowid
---    WHERE pages_fts MATCH ?          -- 必ずフレーズリテラル化した文字列
+--    WHERE pages_fts MATCH ?          -- always a phrase-literalized string
 --    ORDER BY score, p.updated_at DESC
 --    LIMIT 50;
 --
--- 停滞プロジェクト: アクティブだが Next Action が1つも無い。
--- ダッシュボードと Weekly Review の両方に必ず出すこと。
+-- Stalled projects: active but without a single next action.
+-- This must appear on both the dashboard and the Weekly Review.
 --
 --   SELECT p.* FROM projects p
 --   WHERE p.status = 'active'
@@ -313,38 +337,39 @@ END;
 --       WHERE t.project_id = p.id AND t.state IN ('next','waiting','scheduled')
 --     );
 --
--- 再検討日が到来した Someday プロジェクト:
+-- Someday projects whose review date has come:
 --
 --   SELECT * FROM projects
 --   WHERE status='someday' AND review_on IS NOT NULL AND review_on <= date('now');
 --
--- あるページへのバックリンク(種別を問わない):
+-- Backlinks to a page, of any kind:
 --
 --   SELECT src_kind, src_id FROM links WHERE dst_kind='page' AND dst_id=?;
 --
--- 未解決リンク(書くべき記事の示唆):
+-- Unresolved links, i.e. articles worth writing:
 --
 --   SELECT dst_title, COUNT(*) c FROM links
 --   WHERE dst_id IS NULL GROUP BY dst_title ORDER BY c DESC;
 --
--- [[...]] の解決(正式名・別名を区別せず1クエリ):
+-- Resolving [[...]] - canonical titles and aliases in one query:
 --
 --   SELECT page_id FROM page_titles WHERE title = ?;
 --
--- リネーム(この順序を守ること。DESIGN.md 2.5)。単一トランザクションで:
---   1. SELECT page_id FROM page_titles WHERE title = :new;  -- 他ページのものなら 409 で中断
+-- Renaming (keep this order; DESIGN.md 2.5), in a single transaction:
+--   1. SELECT page_id FROM page_titles WHERE title = :new;  -- another page's? stop with 409
 --   2. UPDATE page_titles SET is_canonical = 0 WHERE page_id = :id AND is_canonical = 1;
 --   3. INSERT INTO page_titles(title, page_id, is_canonical) VALUES (:new, :id, 1)
---        ON CONFLICT(title) DO UPDATE SET is_canonical = 1;   -- UPSERT。元の名前に戻す操作に必須
+--        ON CONFLICT(title) DO UPDATE SET is_canonical = 1;   -- UPSERT; required to rename back
 --   4. UPDATE pages SET title = :new WHERE id = :id;
---   5. SELECT count(*) FROM page_titles WHERE page_id=:id AND is_canonical=1;  -- 1 でなければ ROLLBACK
+--   5. SELECT count(*) FROM page_titles WHERE page_id=:id AND is_canonical=1;  -- not 1? ROLLBACK
 --
--- 整合性検査(enghi doctor / 起動時):
+-- Consistency checks (enghi doctor, and at start-up):
 --   SELECT id FROM pages WHERE id NOT IN (SELECT page_id FROM page_titles WHERE is_canonical=1);
---   -- COLLATE BINARY が必須。両列とも NOCASE なので、付けないと大小の食い違いを見逃す。
+--   -- COLLATE BINARY is required: both columns are NOCASE, so without it a
+--   -- difference in case slips through.
 --   SELECT p.id FROM pages p LEFT JOIN page_titles t
 --     ON t.page_id=p.id AND t.is_canonical=1 WHERE t.title IS NOT p.title COLLATE BINARY;
 --
--- あるページの別名一覧(/wiki/:slug/history の「別名」セクション):
+-- The aliases of a page (the "aliases" section of /wiki/:slug/history):
 --
 --   SELECT title FROM page_titles WHERE page_id = ? AND is_canonical = 0 ORDER BY created_at;

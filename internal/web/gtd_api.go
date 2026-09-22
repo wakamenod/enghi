@@ -28,11 +28,11 @@ func (s *Server) gtdErr(w http.ResponseWriter, err error) {
 	var vc *gtd.VersionConflictError
 	switch {
 	case errors.Is(err, gtd.ErrNotFound):
-		writeErr(w, http.StatusNotFound, "not_found", "見つかりません")
+		writeErr(w, http.StatusNotFound, "not_found", "not found")
 	case errors.As(err, &vc):
 		writeJSON(w, http.StatusConflict, map[string]any{
 			"error":   "version_conflict",
-			"message": "この項目は他の経路で更新されています",
+			"message": "this item was updated elsewhere",
 			"current": vc.Current,
 		})
 	default:
@@ -42,8 +42,8 @@ func (s *Server) gtdErr(w http.ResponseWriter, err error) {
 
 // ---------------------------------------------------------------- Task
 
-// apiListTasks は GET /api/tasks?state=&context=&project=&area=&due_before=
-// state=next_actions を指定すると 2.6 のビュー条件で引く。
+// apiListTasks is GET /api/tasks?state=&context=&project=&area=&due_before=
+// state=next_actions selects with the view condition of 2.6.
 func (s *Server) apiListTasks(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	tasks, err := s.gtd.QueryTasks(ctxOf(r), gtd.TaskQuery{
@@ -61,7 +61,7 @@ func (s *Server) apiListTasks(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"tasks": tasks})
 }
 
-// apiCreateTask は capture 用。**{title} だけで作れること**(DESIGN 4.2)。
+// apiCreateTask is capture. **{title} alone must be enough** (DESIGN 4.2).
 func (s *Server) apiCreateTask(w http.ResponseWriter, r *http.Request) {
 	var in gtd.CaptureInput
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
@@ -80,7 +80,7 @@ func (s *Server) apiCreateTask(w http.ResponseWriter, r *http.Request) {
 func (s *Server) apiGetTask(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, "bad_request", "id が不正です")
+		writeErr(w, http.StatusBadRequest, "bad_request", "invalid id")
 		return
 	}
 	t, err := s.gtd.Task(ctxOf(r), id)
@@ -92,11 +92,12 @@ func (s *Server) apiGetTask(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"task": t, "links": links})
 }
 
-// apiPatchTask は部分更新。**状態遷移もここを通る**(DESIGN 4.2)。
+// apiPatchTask is a partial update. **State transitions go through here too**
+// (DESIGN 4.2).
 func (s *Server) apiPatchTask(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, "bad_request", "id が不正です")
+		writeErr(w, http.StatusBadRequest, "bad_request", "invalid id")
 		return
 	}
 	var p gtd.TaskPatch
@@ -116,7 +117,7 @@ func (s *Server) apiPatchTask(w http.ResponseWriter, r *http.Request) {
 func (s *Server) apiDeleteTask(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, "bad_request", "id が不正です")
+		writeErr(w, http.StatusBadRequest, "bad_request", "invalid id")
 		return
 	}
 	if err := s.gtd.Delete(ctxOf(r), id); err != nil {
@@ -127,16 +128,18 @@ func (s *Server) apiDeleteTask(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
-// apiCompleteTask は完了/skip。定期タスクなら次の1件を生成して返す(DESIGN 2.6)。
+// apiCompleteTask completes or skips. For a recurring task it generates and
+// returns the next instance (DESIGN 2.6).
 func (s *Server) apiCompleteTask(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, "bad_request", "id が不正です")
+		writeErr(w, http.StatusBadRequest, "bad_request", "invalid id")
 		return
 	}
 	var in struct {
 		Skip bool `json:"skip"`
-		// EndSeries は「この系列全体」を終わらせる。UI では「この回だけ」と選ばせること。
+		// EndSeries ends the whole series. The UI must offer "this one" as the
+		// other choice.
 		EndSeries bool `json:"end_series"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&in)
@@ -156,12 +159,12 @@ func (s *Server) apiCompleteTask(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, res)
 }
 
-// apiFileAsReference は clarify の「資料」経路。
-// Wiki ページを作り、元タスクを filed にして links で繋ぐ(DESIGN 8-13)。
+// apiFileAsReference is the reference path of clarify: create a wiki page, set
+// the original task to filed and connect them through links (DESIGN 8-13).
 func (s *Server) apiFileAsReference(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, "bad_request", "id が不正です")
+		writeErr(w, http.StatusBadRequest, "bad_request", "invalid id")
 		return
 	}
 	var in gtd.FileAsReferenceInput
@@ -192,7 +195,8 @@ func (s *Server) apiListProjects(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"projects": ps})
 }
 
-// apiStalledProjects は Next Action の無いアクティブプロジェクト(DESIGN 2.4)。
+// apiStalledProjects returns the active projects with no next action
+// (DESIGN 2.4).
 func (s *Server) apiStalledProjects(w http.ResponseWriter, r *http.Request) {
 	ps, err := s.gtd.StalledProjects(ctxOf(r))
 	if err != nil {
@@ -205,7 +209,7 @@ func (s *Server) apiStalledProjects(w http.ResponseWriter, r *http.Request) {
 func (s *Server) apiGetProject(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, "bad_request", "id が不正です")
+		writeErr(w, http.StatusBadRequest, "bad_request", "invalid id")
 		return
 	}
 	p, err := s.gtd.Project(ctxOf(r), id)
@@ -236,7 +240,7 @@ func (s *Server) apiCreateProject(w http.ResponseWriter, r *http.Request) {
 func (s *Server) apiPatchProject(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, "bad_request", "id が不正です")
+		writeErr(w, http.StatusBadRequest, "bad_request", "invalid id")
 		return
 	}
 	var in gtd.ProjectInput
@@ -281,7 +285,7 @@ func (s *Server) apiCreateArea(w http.ResponseWriter, r *http.Request) {
 func (s *Server) apiPatchArea(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r)
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, "bad_request", "id が不正です")
+		writeErr(w, http.StatusBadRequest, "bad_request", "invalid id")
 		return
 	}
 	var in gtd.AreaInput
@@ -333,7 +337,7 @@ func (s *Server) apiReview(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, d)
 }
 
-// apiSeries は定期タスク系列の一覧(棚卸し用。DESIGN 2.6)。
+// apiSeries lists the recurring series, for taking stock (DESIGN 2.6).
 func (s *Server) apiSeries(w http.ResponseWriter, r *http.Request) {
 	list, err := s.gtd.SeriesList(ctxOf(r))
 	if err != nil {

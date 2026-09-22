@@ -9,9 +9,9 @@ import (
 	"github.com/wakamenod/enghi/internal/config"
 )
 
-// **db_path を変えたら画像用の DB もそれに追従すること。**
-// 既定値を先に入れてしまうと「未設定かどうか」が判別できなくなり、
-// 画像だけ別の場所に取り残される。
+// **Change db_path and the image database follows.**
+// Applying defaults too early makes "was this set?" impossible to answer, and
+// the images are left behind somewhere else.
 func TestFilesDBFollowsDBPath(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
@@ -28,7 +28,7 @@ func TestFilesDBFollowsDBPath(t *testing.T) {
 	}
 }
 
-// 明示した場合はそちらを使うこと。
+// An explicit value is used as given.
 func TestFilesDBExplicit(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
@@ -45,21 +45,21 @@ func TestFilesDBExplicit(t *testing.T) {
 	}
 }
 
-// 設定ファイルが無くても既定値で成立すること。
+// Without a configuration file, the defaults stand on their own.
 func TestDefaults(t *testing.T) {
 	c := config.Default()
 	if c.Port != 7777 || c.Host != "127.0.0.1" {
-		t.Fatalf("既定値が違う: %+v", c)
+		t.Fatalf("wrong defaults: %+v", c)
 	}
 	if !strings.HasSuffix(c.FilesDBPath, "-files.db") {
 		t.Fatalf("files_db_path = %q", c.FilesDBPath)
 	}
 	if c.BackupKeep != 7 || !c.BackupOn() {
-		t.Fatalf("バックアップの既定値が違う: keep=%d on=%v", c.BackupKeep, c.BackupOn())
+		t.Fatalf("wrong backup defaults: keep=%d on=%v", c.BackupKeep, c.BackupOn())
 	}
 }
 
-// ループバック以外には bind させないこと(DESIGN 4.4)。
+// Nothing but loopback may be bound (DESIGN 4.4).
 func TestRejectsNonLoopbackHost(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
@@ -67,13 +67,13 @@ func TestRejectsNonLoopbackHost(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := config.Load(path); err == nil {
-		t.Fatal("0.0.0.0 が通ってしまった")
+		t.Fatal("0.0.0.0 was accepted")
 	}
 }
 
-// allowed_hosts は「名前を1つずつ」だけ受け付ける。
-// Host 検証は DNS rebinding に対する唯一有効な防御なので(DESIGN 4.4)、
-// ワイルドカードで緩められる口を作らない。
+// allowed_hosts accepts literal names only, one at a time.
+// Host validation is the only effective defense against DNS rebinding
+// (DESIGN 4.4), so there is no wildcard through which to loosen it.
 func TestAllowedHostsRejectsWildcard(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
@@ -81,11 +81,11 @@ func TestAllowedHostsRejectsWildcard(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := config.Load(path); err == nil {
-		t.Fatal("ワイルドカードが通ってしまった")
+		t.Fatal("a wildcard was accepted")
 	}
 }
 
-// 書かれた名前は、大小とポートを無視して比較できる形になること。
+// The names written down become comparable, ignoring case and any port.
 func TestAllowedHostsNormalized(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
@@ -102,10 +102,10 @@ func TestAllowedHostsNormalized(t *testing.T) {
 	}
 }
 
-// 既定では空。設定しない限り挙動は変わらない。
+// Empty by default: nothing changes unless it is configured.
 func TestAllowedHostsEmptyByDefault(t *testing.T) {
 	c := config.Default()
 	if len(c.NormalizedAllowedHosts()) != 0 {
-		t.Fatalf("既定で許可リストが空でない: %v", c.AllowedHosts)
+		t.Fatalf("the allow list is not empty by default: %v", c.AllowedHosts)
 	}
 }

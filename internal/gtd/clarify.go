@@ -10,21 +10,24 @@ import (
 	"github.com/wakamenod/enghi/internal/wiki"
 )
 
-// FileAsReferenceInput は「Inbox の項目は行動ではなく参照資料だった」場合の入力。
+// FileAsReferenceInput is the input for "this inbox item was reference
+// material, not an action".
 type FileAsReferenceInput struct {
 	Title string   `json:"title"`
 	Body  string   `json:"body"`
 	Tags  []string `json:"tags"`
 }
 
-// FileAsReference は Inbox の1件を Wiki ページにする(clarify フロー。DESIGN 8-13)。
+// FileAsReference turns one inbox item into a wiki page (the clarify flow;
+// DESIGN 8-13):
 //
-//  1. Wiki ページを生成する
-//  2. 元タスクを state='filed' にする — **done にも dropped にもしないこと。**
-//     GTD 的には完了でも破棄でもないため独立した状態として持つ(DESIGN 2.2)
-//  3. links で新ページへ繋ぐ
+//  1. create the wiki page
+//  2. set the original task to state='filed' - **never done, never dropped.**
+//     In GTD terms it is neither, hence a state of its own (DESIGN 2.2)
+//  3. link to the new page through links
 //
-// 参照は GTD → Wiki の一方向のみ。pages 側には GTD 由来の列を足さない。
+// References go one way only, GTD -> wiki. No GTD-derived column is added to
+// pages.
 func (s *Service) FileAsReference(ctx context.Context, pages *wiki.Service, taskID int64,
 	in FileAsReferenceInput) (*Task, *wiki.Page, error) {
 
@@ -41,13 +44,13 @@ func (s *Service) FileAsReference(ctx context.Context, pages *wiki.Service, task
 		body = cur.Note
 	}
 
-	// 1. ページを作る(wiki 側の単一トランザクション)
+	// 1. Create the page (a single transaction on the wiki side)
 	page, err := pages.Create(ctx, wiki.CreateInput{Title: title, Body: body, Tags: in.Tags})
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// 2-3. タスクを filed にして、links で繋ぐ
+	// 2-3. Mark the task filed and link it
 	err = s.db.Tx(ctx, func(tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx,
 			`UPDATE tasks SET state = 'filed', version = version + 1, updated_at = datetime('now')
@@ -66,7 +69,7 @@ func (s *Service) FileAsReference(ctx context.Context, pages *wiki.Service, task
 	return t, page, err
 }
 
-// LinkedPages はタスク/プロジェクト/Area から繋がっている Wiki ページ。
+// LinkedPages are the wiki pages linked from a task, project or area.
 func (s *Service) LinkedPages(ctx context.Context, kind string, id int64) ([]wiki.Link, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT l.dst_id, l.dst_title, COALESCE(p.slug,'')
@@ -96,7 +99,8 @@ func (s *Service) LinkedPages(ctx context.Context, kind string, id int64) ([]wik
 
 // ---------------------------------------------------------------- Weekly Review
 
-// CurrentReview は未完了のレビューを返す。無ければ新しく始める。
+// CurrentReview returns the unfinished review, starting a new one if there is
+// none.
 func (s *Service) CurrentReview(ctx context.Context) (*Review, error) {
 	r, err := s.latestOpenReview(ctx)
 	if err == nil {
@@ -126,7 +130,7 @@ func (s *Service) latestOpenReview(ctx context.Context) (*Review, error) {
 	return s.Review(ctx, id)
 }
 
-// Review は1件。
+// Review returns one review.
 func (s *Service) Review(ctx context.Context, id int64) (*Review, error) {
 	var r Review
 	var completed sql.NullString
@@ -146,8 +150,8 @@ func (s *Service) Review(ctx context.Context, id int64) (*Review, error) {
 	return &r, nil
 }
 
-// SetChecklistItem はチェック項目を1つ切り替える。
-// キーは DESIGN 2.3 の標準チェックリストに対応させること。
+// SetChecklistItem toggles one checklist item. The keys must match the standard
+// checklist in DESIGN 2.3.
 func (s *Service) SetChecklistItem(ctx context.Context, reviewID int64, key string, val bool) (*Review, error) {
 	known := false
 	for _, c := range ChecklistKeys {
@@ -157,7 +161,7 @@ func (s *Service) SetChecklistItem(ctx context.Context, reviewID int64, key stri
 		}
 	}
 	if !known {
-		return nil, errors.New("チェックリストのキーが不正です: " + key)
+		return nil, errors.New("invalid checklist key: " + key)
 	}
 	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
 		var raw string
@@ -181,7 +185,7 @@ func (s *Service) SetChecklistItem(ctx context.Context, reviewID int64, key stri
 	return s.Review(ctx, reviewID)
 }
 
-// CompleteReview はレビューを終える。
+// CompleteReview finishes a review.
 func (s *Service) CompleteReview(ctx context.Context, reviewID int64, note string) (*Review, error) {
 	if _, err := s.db.ExecContext(ctx,
 		`UPDATE reviews SET completed_at = datetime('now'), note = ? WHERE id = ?`,
@@ -191,7 +195,7 @@ func (s *Service) CompleteReview(ctx context.Context, reviewID int64, note strin
 	return s.Review(ctx, reviewID)
 }
 
-// PastReviews は過去のレビュー。
+// PastReviews are the reviews already finished.
 func (s *Service) PastReviews(ctx context.Context, limit int) ([]*Review, error) {
 	if limit <= 0 {
 		limit = 10

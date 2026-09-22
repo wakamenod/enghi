@@ -1,7 +1,7 @@
-// Package settings は利用者が画面から切り替える設定を読み書きする。
+// Package settings reads and writes the settings the user toggles on screen.
 //
-// **行が無い = 既定値。** 既定値を DB に書かないので、既定を変えるときは
-// コードを直すだけで済み、既存の DB を書き換える移行が要らない。
+// **No row means the default.** Defaults are never written to the database, so
+// changing one is a code change and needs no migration over existing data.
 package settings
 
 import (
@@ -11,32 +11,33 @@ import (
 	"github.com/wakamenod/enghi/internal/store"
 )
 
-// 設定の key。値は "1" / "0" の文字列で持つ。
+// The setting keys. Values are stored as the strings "1" and "0".
 const (
 	KeyContexts = "gtd.contexts"
 	KeyAreas    = "gtd.areas"
 )
 
-// Settings は画面の描画に必要な設定をまとめたもの。
+// Settings gathers what the screens need in order to render.
 //
-// **Context と Area は GTD の中では任意の道具である。** 場所や道具で絞り込む
-// 必要が無いうちは、選択肢が増えるだけで邪魔になる。そのため既定は off とし、
-// 必要になった人だけが設定画面で on にする。
+// **Contexts and areas are optional tools within GTD.** Until there is a reason
+// to filter by place or tool, they only add choices to wade through. So they
+// are off by default, and whoever needs them turns them on in the settings.
 type Settings struct {
 	Contexts bool `json:"contexts"`
 	Areas    bool `json:"areas"`
 }
 
-// Keys は画面から切り替えられる設定の一覧(表示順)。
+// Keys lists the settings that can be toggled on screen, in display order.
 var Keys = []string{KeyContexts, KeyAreas}
 
 type Service struct{ db *store.DB }
 
 func New(db *store.DB) *Service { return &Service{db: db} }
 
-// Load は現在の設定を返す。読めなかった場合も既定値で返す(画面を落とさない)。
+// Load returns the current settings. On a read error it still returns the
+// defaults, so a screen never dies because of this.
 func (s *Service) Load(ctx context.Context) (Settings, error) {
-	out := Settings{} // 既定はすべて off
+	out := Settings{} // everything is off by default
 	rows, err := s.db.QueryContext(ctx, `SELECT key, value FROM settings`)
 	if err != nil {
 		return out, err
@@ -58,7 +59,7 @@ func (s *Service) Load(ctx context.Context) (Settings, error) {
 	return out, rows.Err()
 }
 
-// Set は1つの設定を書き換える。
+// Set writes one setting.
 func (s *Service) Set(ctx context.Context, key string, on bool) error {
 	if !valid(key) {
 		return sql.ErrNoRows

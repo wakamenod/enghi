@@ -47,8 +47,8 @@ func has(rs []search.Result, title string) bool {
 	return false
 }
 
-// 3.3: C++ や a"b を素で MATCH に渡すと FTS5 の構文エラーになる。
-// **全クエリをフレーズリテラル化すること。**
+// 3.3: passing C++ or a"b to MATCH as is, is an FTS5 syntax error.
+// **Every query must be turned into a phrase literal.**
 func TestQueryEscapingNeverErrors(t *testing.T) {
 	s, w := setup(t)
 	ctx := context.Background()
@@ -56,7 +56,7 @@ func TestQueryEscapingNeverErrors(t *testing.T) {
 
 	for _, q := range []string{`C++`, `a"b`, `"`, `""`, `AND OR NOT`, `*`, `foo(bar)`, `a b`, `:`, `^x`} {
 		if _, err := s.Search(ctx, q, nil, 10, 0); err != nil {
-			t.Errorf("Search(%q) がエラー: %v", q, err)
+			t.Errorf("Search(%q) failed: %v", q, err)
 		}
 	}
 	rs, err := s.Search(ctx, `C++`, nil, 10, 0)
@@ -64,12 +64,13 @@ func TestQueryEscapingNeverErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !has(rs, "C++ の話") {
-		t.Fatalf(`"C++" が引けない: %v`, titles(rs))
+		t.Fatalf(`"C++" is not found: %v`, titles(rs))
 	}
 }
 
-// 3.2: trigram の MATCH は実質的に部分一致。自然文クエリもそのまま渡してよい。
-// **クエリを空白や句読点で分割して AND で結ぶ前処理をしてはいけない。**
+// 3.2: a trigram MATCH is effectively a substring match, so natural-language
+// queries can be passed through as is.
+// **Never pre-split the query on spaces or punctuation and AND the pieces.**
 func TestNaturalLanguageQueryMatchesSubstring(t *testing.T) {
 	s, w := setup(t)
 	ctx := context.Background()
@@ -80,12 +81,13 @@ func TestNaturalLanguageQueryMatchesSubstring(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !has(rs, "オフィス移転の記録") {
-		t.Fatalf("自然文クエリが引けない: %v", titles(rs))
+		t.Fatalf("a natural-language query finds nothing: %v", titles(rs))
 	}
 }
 
-// 3.4: 2 文字以下は trigram で引けない。titles_fts(bigram)+ 本文 LIKE で対応する。
-// **日本語は 2 文字語が主力なのでこれは常用経路。**
+// 3.4: two characters or fewer cannot be matched by trigram; titles_fts
+// (bigram) plus a body LIKE covers them.
+// **Japanese is full of two-character words, so this path is in constant use.**
 func TestTwoCharJapaneseQuery(t *testing.T) {
 	s, w := setup(t)
 	ctx := context.Background()
@@ -97,16 +99,16 @@ func TestTwoCharJapaneseQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !has(rs, "移転の計画") || !has(rs, "無関係な記事") {
-		t.Fatalf("2 文字クエリで両方引けていない: %v", titles(rs))
+		t.Fatalf("a two-character query did not find both: %v", titles(rs))
 	}
-	// マージ規則: titles_fts のヒットを先頭に置く
+	// Merge rule: titles_fts hits go first
 	if rs[0].Title != "移転の計画" {
-		t.Fatalf("タイトル一致が先頭に来ていない: %v", titles(rs))
+		t.Fatalf("title hits are not at the head: %v", titles(rs))
 	}
 }
 
-// 3.4: ASCII 2 文字クエリは語境界で再フィルタする。
-// LIKE '%go%' は algorithm や going に当たるため。
+// 3.4: two-character ASCII queries are re-filtered on word boundaries, because
+// LIKE '%go%' matches algorithm and going.
 func TestASCIITwoCharWordBoundary(t *testing.T) {
 	s, w := setup(t)
 	ctx := context.Background()
@@ -118,14 +120,15 @@ func TestASCIITwoCharWordBoundary(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !has(rs, "Go の話") {
-		t.Fatalf("Go が引けない: %v", titles(rs))
+		t.Fatalf("Go is not found: %v", titles(rs))
 	}
 	if has(rs, "アルゴリズム") {
-		t.Fatalf("語境界フィルタが効いていない(algorithm/going に当たった): %v", titles(rs))
+		t.Fatalf("the word-boundary filter is not working (algorithm/going matched): %v", titles(rs))
 	}
 }
 
-// 日本語 2 文字クエリには語境界フィルタを適用しない(適用すると全部落ちる)。
+// The word-boundary filter is never applied to two Japanese characters:
+// everything would be dropped.
 func TestJapaneseTwoCharNotFilteredByWordBoundary(t *testing.T) {
 	s, w := setup(t)
 	ctx := context.Background()
@@ -136,12 +139,13 @@ func TestJapaneseTwoCharNotFilteredByWordBoundary(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !has(rs, "議事録") {
-		t.Fatalf("日本語 2 文字が語境界フィルタで落ちている: %v", titles(rs))
+		t.Fatalf("two Japanese characters were dropped by the word-boundary filter: %v", titles(rs))
 	}
 }
 
-// 3.1: タグは FTS に載せず完全一致/前方一致で引き、結果の先頭に足す。
-// trigram は日本語の 2 文字タグに対して何も機能しないため。
+// 3.1: tags are matched exactly or by prefix, outside the FTS index, and put at
+// the head of the results - trigram does nothing for a two-character Japanese
+// tag.
 func TestTagMatchComesFirst(t *testing.T) {
 	s, w := setup(t)
 	ctx := context.Background()
@@ -153,14 +157,15 @@ func TestTagMatchComesFirst(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(rs) == 0 || rs[0].Title != "タグ付きの記事" {
-		t.Fatalf("タグ一致が先頭に来ていない: %v", titles(rs))
+		t.Fatalf("tag hits are not at the head: %v", titles(rs))
 	}
 	if rs[0].Via != "tag" {
 		t.Fatalf("via = %q, want tag", rs[0].Via)
 	}
 }
 
-// 3.6: 別名は FTS に載らないので直接照合する。放置すると「イーマックス」で引けない。
+// 3.6: aliases are not in the FTS index and are matched directly. Without
+// that, 「イーマックス」 finds nothing.
 func TestAliasIsSearchable(t *testing.T) {
 	s, w := setup(t)
 	ctx := context.Background()
@@ -174,23 +179,24 @@ func TestAliasIsSearchable(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !has(rs, "Emacs") {
-		t.Fatalf("別名で引けない: %v", titles(rs))
+		t.Fatalf("an alias finds nothing: %v", titles(rs))
 	}
 	if rs[0].Via != "alias" {
 		t.Fatalf("via = %q, want alias", rs[0].Via)
 	}
-	// 部分一致であること(前方一致だけにしない)
+	// It is a substring match, not only a prefix match
 	rs, _ = s.Search(ctx, "マック", nil, 10, 0)
 	if !has(rs, "Emacs") {
-		t.Fatalf("別名の部分一致で引けない: %v", titles(rs))
+		t.Fatalf("a substring of an alias finds nothing: %v", titles(rs))
 	}
 }
 
-// 3.5: ランキングは SQL 側。ORDER BY なしの LIMIT だとタイトル一致が落ちる。
+// 3.5: ranking happens in SQL. A LIMIT without ORDER BY drops title hits.
 func TestTitleMatchRanksAboveBodyMatch(t *testing.T) {
 	s, w := setup(t)
 	ctx := context.Background()
-	// 本文にだけ語を持つ記事を先に作る(rowid 順なら先頭に来る)
+	// Create articles with the word only in the body first, so they would come
+	// first in rowid order
 	for i := 0; i < 30; i++ {
 		create(t, w, "雑多な記事"+string(rune('A'+i)), "オフィスの移転について少し触れた")
 	}
@@ -201,11 +207,11 @@ func TestTitleMatchRanksAboveBodyMatch(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !has(rs, "オフィス移転の総括") {
-		t.Fatalf("タイトル一致が上位に入っていない: %v", titles(rs))
+		t.Fatalf("title hits are not near the top: %v", titles(rs))
 	}
 }
 
-// 3.4: 0 件のときはクエリを後ろから切り詰めて再試行する(2 段まで)。
+// 3.4: with no hits, retry with the query trimmed from the end (two steps).
 func TestTruncationFallback(t *testing.T) {
 	s, w := setup(t)
 	ctx := context.Background()
@@ -216,7 +222,7 @@ func TestTruncationFallback(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(rs) == 0 {
-		t.Fatal("切り詰めフォールバックが効いていない")
+		t.Fatal("the truncation fallback is not working")
 	}
 }
 
@@ -230,14 +236,14 @@ func TestSnippetIsEscapedNotInjected(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(rs) == 0 {
-		t.Fatal("引けていない")
+		t.Fatal("nothing was found")
 	}
 	html := string(search.SnippetHTML(rs[0].Snippet))
 	if strings.Contains(html, "<script>") {
-		t.Fatalf("本文の HTML がエスケープされずに出ている: %q", html)
+		t.Fatalf("HTML from the body came through unescaped: %q", html)
 	}
 	if !strings.Contains(html, "<mark>") {
-		t.Fatalf("強調が失われている: %q", html)
+		t.Fatalf("the highlight was lost: %q", html)
 	}
 }
 
@@ -246,16 +252,16 @@ func TestPhraseAndBoundaryHelpers(t *testing.T) {
 		t.Errorf("Phrase = %q", got)
 	}
 	if !search.IsASCII2("Go") || search.IsASCII2("移転") || search.IsASCII2("abc") {
-		t.Error("IsASCII2 の判定が違う")
+		t.Error("IsASCII2 judged wrongly")
 	}
 	if search.WordBoundaryMatch("algorithm", "go") {
-		t.Error("algorithm が go に当たっている")
+		t.Error("algorithm matched go")
 	}
 	if !search.WordBoundaryMatch("Go は速い", "go") {
-		t.Error("語頭の Go が落ちている")
+		t.Error("a leading Go was dropped")
 	}
 	if !search.WordBoundaryMatch("using Go.", "Go") {
-		t.Error("句点の前の Go が落ちている")
+		t.Error("a Go before a full stop was dropped")
 	}
 }
 
@@ -270,13 +276,13 @@ func TestLimitAndOffset(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(first) != 3 {
-		t.Fatalf("limit が効いていない: %d 件", len(first))
+		t.Fatalf("limit is not honoured: %d results", len(first))
 	}
 	second, err := s.Search(ctx, "共通の検索語", nil, 3, 3)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(second) != 3 || second[0].Title == first[0].Title {
-		t.Fatalf("offset が効いていない: %v / %v", titles(first), titles(second))
+		t.Fatalf("offset is not honoured: %v / %v", titles(first), titles(second))
 	}
 }

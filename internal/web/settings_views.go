@@ -7,17 +7,18 @@ import (
 	"github.com/wakamenod/enghi/internal/store"
 )
 
-// 設定画面。
+// The settings screen.
 //
-// **Context と Area は既定で off。** GTD の中では任意の道具であり、
-// 絞り込む必要が無いうちは選択肢が増えるだけになる。必要になった人が
-// ここで on にすると、画面にも使い方ガイドにも現れる。
+// **Contexts and areas are off by default.** They are optional tools within GTD,
+// and until there is a reason to filter by them they only add choices. Whoever
+// needs them turns them on here, and they then appear both in the app and in
+// the guide.
 
 type settingsData struct {
 	Set     settings.Settings
 	Backups []store.Backup
-	Export  string // エクスポート先
-	Dir     string // バックアップ先
+	Export  string // where exports are written
+	Dir     string // where backups are written
 }
 
 func (s *Server) viewSettings(w http.ResponseWriter, r *http.Request) {
@@ -26,9 +27,9 @@ func (s *Server) viewSettings(w http.ResponseWriter, r *http.Request) {
 	s.render(w, r, "settings.html", viewData{Title: s.tr(r, "settings.title"), Nav: "settings", Data: d})
 }
 
-// uiUpdateSettings は設定画面のフォームを受ける。
-// **チェックボックスは off のとき送られてこない。** 出ている項目を hidden で
-// 明示し、その集合について on/off を書き込む(送られてこない = off)。
+// uiUpdateSettings receives the settings form.
+// **An unchecked checkbox is not submitted at all**, so the handler writes every
+// known key, treating "absent" as off.
 func (s *Server) uiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, s.tr(r, "err.bad_request"), http.StatusBadRequest)
@@ -43,7 +44,7 @@ func (s *Server) uiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/settings", http.StatusSeeOther)
 }
 
-// uiBackup は設定画面からの手動バックアップ。
+// uiBackup is the manual backup from the settings screen.
 func (s *Server) uiBackup(w http.ResponseWriter, r *http.Request) {
 	if _, err := store.RunBackup(ctxOf(r), s.db, s.files, s.cfg.BackupDir, s.cfg.BackupKeep); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -52,9 +53,10 @@ func (s *Server) uiBackup(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/settings", http.StatusSeeOther)
 }
 
-// featureOff は、設定で off にしている機能の画面に来たときの応答。
-// **404 にする。** その機能を on にしていない人にとって、この画面は存在しない。
-// ただし設定への入口は示す(設定の存在を知らないと戻れないため)。
+// featureOff answers a request for a screen belonging to a feature that is off.
+// **It is a 404**: for someone who has not turned the feature on, the screen
+// does not exist. It still points at the settings, because without knowing they
+// exist there is no way back.
 func (s *Server) featureOff(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
 	s.render(w, r, "featureoff.html", viewData{

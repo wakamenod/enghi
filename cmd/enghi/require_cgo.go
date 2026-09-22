@@ -1,12 +1,11 @@
 //go:build !cgo
 
-// このファイルは CGO_ENABLED=0 のときだけコンパイル対象になり、
-// 必ずコンパイルエラーになる。
+// This file is compiled only when CGO_ENABLED=0, and it always fails to build.
 //
-// go-sqlite3 は cgo 無しでも「実行すると必ず失敗するスタブ」としてコンパイルが
-// 通るため、放っておくと壊れたバイナリが配布物に混ざる。
-// なお Go はクロスコンパイル時に CGO_ENABLED を既定で 0 にするので、
-// GOOS を跨いだビルドはここで止まる(各 OS の runner でビルドすること)。
+// Without cgo, go-sqlite3 still compiles as a stub that fails at run time, so a
+// broken binary would quietly end up in a release. Note that Go defaults
+// CGO_ENABLED to 0 when cross compiling, so a build across GOOS stops here —
+// build on each OS's own runner.
 package main
 
 func init() {

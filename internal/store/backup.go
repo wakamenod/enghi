@@ -10,38 +10,41 @@ import (
 	"time"
 )
 
-// Backup は1回のバックアップの結果。
+// Backup is the result of a single backup run.
 type Backup struct {
 	Path      string `json:"path"`
 	Bytes     int64  `json:"bytes"`
 	CreatedAt string `json:"created_at"`
-	Removed   int    `json:"removed"` // 世代の上限を超えて削除した数
+	Removed   int    `json:"removed"` // how many were deleted beyond the keep limit
 
-	// FilesPath は画像用 DB の控え。世代は持たない(下記)。
+	// FilesPath is the copy of the image database. It keeps no generations (below).
 	FilesPath  string `json:"files_path,omitempty"`
 	FilesBytes int64  `json:"files_bytes,omitempty"`
-	FilesSkip  bool   `json:"files_skipped,omitempty"` // 前回から変わっていないので取らなかった
+	FilesSkip  bool   `json:"files_skipped,omitempty"` // unchanged since last time, so not retaken
 }
 
-// VacuumIntoer は一貫したスナップショットを書き出せるもの(画像用 DB)。
+// VacuumIntoer is anything that can write out a consistent snapshot (the image
+// database).
 type VacuumIntoer interface {
 	VacuumInto(ctx context.Context, path string) error
 	SourcePath() string
 }
 
-// FilesBackupName は画像用 DB の控えの名前。
+// FilesBackupName is the name of the image database copy.
 //
-// **画像には世代を持たせない。**内容でアドレスしていて追記しかされないため、
-// 古い世代を残しても「消したファイルを戻せる」以上の意味が無い。
-// 代わりに、前回から変わっていなければ取り直さない。
+// **Images keep no generations.** They are content-addressed and append-only,
+// so older generations would buy nothing beyond "restore a deleted file".
+// Instead, the copy is not retaken when nothing has changed.
 const FilesBackupName = "enghi-files.db"
 
-// backupName は日付で1つに決まる名前。同じ日に2回走っても増えない。
+// backupName is determined by the date, so running twice in a day does not add
+// a second file.
 func backupName(t time.Time) string {
 	return fmt.Sprintf("enghi-%s.db", t.Format("2006-01-02"))
 }
 
-// BackupFiles は画像用 DB の控えを取る。前回から変わっていなければ何もしない。
+// BackupFiles copies the image database, doing nothing when it has not changed
+// since the last copy.
 func BackupFiles(ctx context.Context, blobs VacuumIntoer, dir string) (path string, size int64, skipped bool, err error) {
 	if blobs == nil {
 		return "", 0, true, nil
@@ -51,7 +54,8 @@ func BackupFiles(ctx context.Context, blobs VacuumIntoer, dir string) (path stri
 	}
 	dst := filepath.Join(dir, FilesBackupName)
 
-	// 元が控えより新しくなければ取り直さない(画像は大きいので毎日コピーしたくない)
+	// Skip unless the source is newer than the copy: images are large and we do
+	// not want to copy them every day.
 	if src, err := os.Stat(blobs.SourcePath()); err == nil {
 		if prev, err := os.Stat(dst); err == nil && !src.ModTime().After(prev.ModTime()) {
 			return dst, prev.Size(), true, nil
@@ -67,11 +71,12 @@ func BackupFiles(ctx context.Context, blobs VacuumIntoer, dir string) (path stri
 	return dst, info.Size(), false, nil
 }
 
-// RunBackup は dir へバックアップを取り、keep 世代を残して古いものを消す。
+// RunBackup writes a backup into dir, keeping `keep` generations and deleting
+// the older ones.
 //
-// **`VACUUM INTO` を使う。**単なるファイルコピーは WAL の内容を取りこぼし、
-// 書き込みの途中を掴むと壊れた複製になる。`VACUUM INTO` は読み取りトランザクション
-// の中で一貫したスナップショットを書き出し、同時に断片化も解消する。
+// **Use `VACUUM INTO`.** A plain file copy misses the contents of the WAL, and
+// catching a write half-way produces a corrupt duplicate. `VACUUM INTO` writes
+// a consistent snapshot inside a read transaction, and defragments on the way.
 func RunBackup(ctx context.Context, db *DB, blobs VacuumIntoer, dir string, keep int) (*Backup, error) {
 	if keep <= 0 {
 		keep = 7
@@ -82,16 +87,17 @@ func RunBackup(ctx context.Context, db *DB, blobs VacuumIntoer, dir string, keep
 	now := time.Now()
 	path := filepath.Join(dir, backupName(now))
 
-	// VACUUM INTO は出力先が既に存在すると失敗する。同じ日の取り直しを許す。
+	// VACUUM INTO fails when the destination exists. Allow retaking it the same day.
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
-	// パスはリクエストから来ない(設定の値)が、念のため引用符を潰しておく
+	// The path comes from the configuration, not from a request, but strip quotes
+	// anyway.
 	if strings.ContainsAny(path, "'\x00") {
-		return nil, fmt.Errorf("バックアップ先のパスに使えない文字がある: %q", path)
+		return nil, fmt.Errorf("backup path contains characters that cannot be used: %q", path)
 	}
 	if _, err := db.ExecContext(ctx, fmt.Sprintf("VACUUM INTO '%s'", path)); err != nil {
-		return nil, fmt.Errorf("バックアップに失敗した (%s): %w", path, err)
+		return nil, fmt.Errorf("backup failed (%s): %w", path, err)
 	}
 
 	info, err := os.Stat(path)
@@ -108,17 +114,17 @@ func RunBackup(ctx context.Context, db *DB, blobs VacuumIntoer, dir string, keep
 		CreatedAt: now.Format("2006-01-02 15:04:05"),
 		Removed:   removed,
 	}
-	// 画像用 DB の控えも取る。
-	// **分けた以上、両方を控えないと「バックアップがある」と言えない。**
+	// Copy the image database too.
+	// **Having split them, a backup of only one of the two is not a backup.**
 	fp, fb, skipped, err := BackupFiles(ctx, blobs, dir)
 	if err != nil {
-		return nil, fmt.Errorf("画像のバックアップに失敗した: %w", err)
+		return nil, fmt.Errorf("image backup failed: %w", err)
 	}
 	out.FilesPath, out.FilesBytes, out.FilesSkip = fp, fb, skipped
 	return out, nil
 }
 
-// pruneBackups は新しい keep 個を残して削除する。
+// pruneBackups deletes everything but the newest `keep` files.
 func pruneBackups(dir string, keep int) (int, error) {
 	names, err := listBackups(dir)
 	if err != nil {
@@ -137,7 +143,8 @@ func pruneBackups(dir string, keep int) (int, error) {
 	return removed, nil
 }
 
-// listBackups は新しい順に返す(名前が日付なので文字列の降順でよい)。
+// listBackups returns them newest first (the names are dates, so a descending
+// string sort is enough).
 func listBackups(dir string) ([]string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -157,7 +164,7 @@ func listBackups(dir string) ([]string, error) {
 	return names, nil
 }
 
-// Backups は現存するバックアップを新しい順に返す。
+// Backups returns the existing backups, newest first.
 func Backups(dir string) ([]Backup, error) {
 	names, err := listBackups(dir)
 	if err != nil {
@@ -179,23 +186,24 @@ func Backups(dir string) ([]Backup, error) {
 	return out, nil
 }
 
-// BackupDaemon は常駐中に1日1回バックアップを取る。
+// BackupDaemon takes one backup a day while the server is resident.
 //
-// **決まった時刻に1回だけ実行する方式は採らない。**その時刻にサーバが動いていないと
-// その日の分が丸ごと飛ぶ。定期タスクの抽出条件と同じ考え方で、
-// **「その日のファイルが無ければ取る」**という条件で判断する。
+// **It does not run once at a fixed time.** If the server happens to be down at
+// that moment, that day is lost entirely. Following the same idea as the
+// recurring-task query, the condition is **"take one if there is no file for
+// today"**.
 func BackupDaemon(ctx context.Context, db *DB, blobs VacuumIntoer, dir string, keep int, onResult func(*Backup, error)) {
 	check := func() {
 		path := filepath.Join(dir, backupName(time.Now()))
 		if _, err := os.Stat(path); err == nil {
-			return // 今日の分はもうある
+			return // today is already covered
 		}
 		b, err := RunBackup(ctx, db, blobs, dir, keep)
 		if onResult != nil {
 			onResult(b, err)
 		}
 	}
-	check() // 起動直後にも確かめる(前回の停止中に日付が変わっていることがある)
+	check() // also check right after start-up: the date may have rolled over while down
 
 	ticker := time.NewTicker(time.Hour)
 	defer ticker.Stop()

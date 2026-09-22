@@ -9,8 +9,9 @@ import (
 
 var verbRe = regexp.MustCompile(`%[-+ #0]*[0-9]*(?:\.[0-9]+)?[a-zA-Z]`)
 
-// 対応しているすべての言語が、同じ key を持っていること。
-// **片方だけ足すと、もう片方の画面が key むき出しになる。**
+// Every supported language must carry the same keys.
+// **Adding one to a single language leaves the key showing on the other's
+// screens.**
 func TestAllLanguagesHaveSameKeys(t *testing.T) {
 	for _, key := range i18n.Keys() {
 		for _, lang := range i18n.All {
@@ -21,8 +22,9 @@ func TestAllLanguagesHaveSameKeys(t *testing.T) {
 	}
 }
 
-// 書式(%s / %d)が言語をまたいで一致していること。
-// **同じ引数を渡すので、種類と個数と順序が違うと表示が壊れる。**
+// The format verbs (%s / %d) must match across languages.
+// **The same arguments are passed to both, so a different kind, count or order
+// breaks the output.**
 func TestFormatVerbsMatchAcrossLanguages(t *testing.T) {
 	for _, key := range i18n.Keys() {
 		want := verbRe.FindAllString(i18n.T(i18n.JA, key), -1)
@@ -63,7 +65,8 @@ func TestAcceptLanguage(t *testing.T) {
 	}
 }
 
-// 未登録の key は key そのものを返すこと(画面が空欄になるより分かりやすい)。
+// An unregistered key returns the key itself, which is clearer than a blank
+// spot on the screen.
 func TestMissingKeyReturnsKey(t *testing.T) {
 	if got := i18n.T(i18n.JA, "これは.存在しない"); got != "これは.存在しない" {
 		t.Errorf("T = %q", got)

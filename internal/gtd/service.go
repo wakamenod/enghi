@@ -10,12 +10,12 @@ import (
 	"github.com/wakamenod/enghi/internal/store"
 )
 
-// Service は GTD 側のすべての読み書き。
+// Service is every read and write on the GTD side.
 type Service struct{ db *store.DB }
 
 func New(db *store.DB) *Service { return &Service{db: db} }
 
-// ---------------------------------------------------------------- Task 読み取り
+// ---------------------------------------------------------------- task reads
 
 const taskCols = `t.id, t.title, t.note, t.state, t.project_id, t.context_id, t.area_id,
 	COALESCE(t.scheduled_on,''), COALESCE(t.deadline_on,''), COALESCE(t.waiting_for,''),
@@ -65,24 +65,25 @@ func (s *Service) tasks(ctx context.Context, where string, args ...any) ([]*Task
 	return out, rows.Err()
 }
 
-// Task は1件取得。
+// Task returns one task.
 func (s *Service) Task(ctx context.Context, id int64) (*Task, error) {
 	return scanTask(s.db.QueryRowContext(ctx, `SELECT `+taskCols+` `+taskFrom+` WHERE t.id = ?`, id))
 }
 
-// Inbox は未処理の項目。
+// Inbox are the unprocessed items.
 func (s *Service) Inbox(ctx context.Context) ([]*Task, error) {
 	return s.tasks(ctx, `WHERE t.state = 'inbox' ORDER BY t.created_at`)
 }
 
-// nextActionsWhere は Next Actions の抽出条件。
+// nextActionsWhere is the condition that selects next actions.
 //
-// **state='scheduled' のタスクは scheduled_on <= today になったらこのリストに現れる。**
-// これはビューの条件で表現し、**state を書き換えるバッチ処理は作らない**(DESIGN 2.6)。
-// 常駐サーバが落ちていた日にタスクが消える、という壊れ方を避けるため。
+// **A task with state='scheduled' appears in this list once
+// scheduled_on <= today.** That is expressed as a query condition; **there is no
+// batch job that rewrites state** (DESIGN 2.6), so a day when the server was
+// down cannot make tasks disappear.
 const nextActionsWhere = `(t.state = 'next' OR (t.state = 'scheduled' AND t.scheduled_on <= date('now')))`
 
-// NextActions はコンテキストで絞り込める Next Action 一覧。
+// NextActions lists next actions, optionally filtered by context.
 func (s *Service) NextActions(ctx context.Context, contextID *int64) ([]*Task, error) {
 	where := `WHERE ` + nextActionsWhere
 	args := []any{}
@@ -94,22 +95,22 @@ func (s *Service) NextActions(ctx context.Context, contextID *int64) ([]*Task, e
 	return s.tasks(ctx, where, args...)
 }
 
-// Waiting は他者待ち。経過日数付き。
+// Waiting are the items waiting on someone else, with days elapsed.
 func (s *Service) Waiting(ctx context.Context) ([]*Task, error) {
 	return s.tasks(ctx, `WHERE t.state = 'waiting' ORDER BY t.delegated_at, t.id`)
 }
 
-// Scheduled は日付付き(まだ来ていないものも含む)。
+// Scheduled are the dated items, including those still in the future.
 func (s *Service) Scheduled(ctx context.Context) ([]*Task, error) {
 	return s.tasks(ctx, `WHERE t.state = 'scheduled' ORDER BY t.scheduled_on, t.id`)
 }
 
-// Someday はいつかやる/たぶんやる。
+// Someday are the someday/maybe items.
 func (s *Service) Someday(ctx context.Context) ([]*Task, error) {
 	return s.tasks(ctx, `WHERE t.state = 'someday' ORDER BY t.updated_at DESC`)
 }
 
-// TasksOfProject はプロジェクト配下のタスク。
+// TasksOfProject are the tasks under a project.
 func (s *Service) TasksOfProject(ctx context.Context, projectID int64) ([]*Task, error) {
 	return s.tasks(ctx, `WHERE t.project_id = ? ORDER BY
 		CASE t.state WHEN 'next' THEN 0 WHEN 'scheduled' THEN 1 WHEN 'waiting' THEN 2
@@ -117,7 +118,7 @@ func (s *Service) TasksOfProject(ctx context.Context, projectID int64) ([]*Task,
 		t.sort_order, t.id`, projectID)
 }
 
-// TaskQuery は /api/tasks の絞り込み。
+// TaskQuery is the filter of /api/tasks.
 type TaskQuery struct {
 	State     string
 	ContextID *int64
@@ -127,7 +128,7 @@ type TaskQuery struct {
 	Limit     int
 }
 
-// QueryTasks は API 用の汎用検索。
+// QueryTasks is the general-purpose query behind the API.
 func (s *Service) QueryTasks(ctx context.Context, q TaskQuery) ([]*Task, error) {
 	var conds []string
 	var args []any
@@ -136,7 +137,7 @@ func (s *Service) QueryTasks(ctx context.Context, q TaskQuery) ([]*Task, error) 
 		conds = append(conds, nextActionsWhere)
 	case q.State != "":
 		if !validStates[q.State] {
-			return nil, fmt.Errorf("state が不正です: %q", q.State)
+			return nil, fmt.Errorf("invalid state: %q", q.State)
 		}
 		conds = append(conds, `t.state = ?`)
 		args = append(args, q.State)
@@ -169,14 +170,15 @@ func (s *Service) QueryTasks(ctx context.Context, q TaskQuery) ([]*Task, error) 
 	return s.tasks(ctx, where, args...)
 }
 
-// CompletedBetween は期間内に完了したタスク(週次レビューの「先週の振り返り」)。
+// CompletedBetween are the tasks completed in a period, for the weekly
+// review's look back at last week.
 func (s *Service) CompletedBetween(ctx context.Context, from, to string) ([]*Task, error) {
 	return s.tasks(ctx,
 		`WHERE t.completed_at IS NOT NULL AND date(t.completed_at) >= ? AND date(t.completed_at) <= ?
 		 ORDER BY t.completed_at DESC`, from, to)
 }
 
-// UpcomingBetween は今後の予定と締切。
+// UpcomingBetween are the upcoming scheduled dates and deadlines.
 func (s *Service) UpcomingBetween(ctx context.Context, from, to string) ([]*Task, error) {
 	return s.tasks(ctx,
 		`WHERE t.state NOT IN ('done','dropped','filed')
@@ -185,8 +187,10 @@ func (s *Service) UpcomingBetween(ctx context.Context, from, to string) ([]*Task
 		 ORDER BY COALESCE(t.scheduled_on, t.deadline_on)`, from, to, from, to)
 }
 
-// Today は今日やるもの: 締切または予定日が今日以前(DESIGN 5)。
-// **`=` にしないこと。** 見なかった日に予定されていたタスクが翌日以降に消える。
+// Today is what to do today: a deadline or scheduled date of today or earlier
+// (DESIGN 5).
+// **Never use `=`.** A task scheduled for a day nobody looked at would vanish
+// from then on.
 func (s *Service) Today(ctx context.Context) ([]*Task, error) {
 	return s.tasks(ctx,
 		`WHERE t.state NOT IN ('done','dropped','filed','someday')
@@ -195,7 +199,8 @@ func (s *Service) Today(ctx context.Context) ([]*Task, error) {
 		 ORDER BY COALESCE(t.deadline_on, t.scheduled_on), t.priority DESC`)
 }
 
-// WaitingOverdue は委譲から一定日数が経過した Waiting For(既定 7 日)。
+// WaitingOverdue are waiting-for items delegated more than a number of days
+// ago (7 by default).
 func (s *Service) WaitingOverdue(ctx context.Context, days int) ([]*Task, error) {
 	if days <= 0 {
 		days = 7

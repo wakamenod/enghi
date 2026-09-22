@@ -1,5 +1,6 @@
-// Package search は横断検索を実装する。
-// **DESIGN.md 3 節は 3 万件の実データによる計測に基づく確定仕様である。推測で簡略化しないこと。**
+// Package search implements search across everything.
+// **Section 3 of DESIGN.md is a settled specification based on measurements over
+// 30k real rows. Do not simplify it on a hunch.**
 package search
 
 import (
@@ -7,30 +8,33 @@ import (
 	"unicode"
 )
 
-// Phrase はクエリを FTS5 のフレーズリテラルにする(DESIGN 3.3)。
-//  1. クエリ内の " を "" に置換する
-//  2. 全体を " で囲む
+// Phrase turns a query into an FTS5 phrase literal (DESIGN 3.3):
+//  1. replace " with "" inside the query
+//  2. wrap the whole thing in "
 //
-// これをしないと C++ や a"b で FTS5 の構文エラーになり 500 を返す。
-// 結果として常にフレーズ検索になるが、trigram では部分一致と等価なのでそれが望ましい。
+// Without this, C++ or a"b is an FTS5 syntax error and the request 500s.
+// Everything therefore becomes a phrase search, which with trigram is the same
+// as a substring match - exactly what we want.
 //
-// **クエリを空白や句読点で分割して AND で結ぶ前処理をしてはいけない**(DESIGN 3.2)。
-// 日本語クエリには空白がないため空振りし、英数字クエリでは意図せず精度を落とす。
+// **Never pre-split the query on spaces or punctuation and AND the pieces
+// together** (DESIGN 3.2). Japanese queries have no spaces, so it misses
+// entirely, and for alphanumeric queries it silently lowers precision.
 func Phrase(q string) string {
 	return `"` + strings.ReplaceAll(q, `"`, `""`) + `"`
 }
 
-// LikeEscape は LIKE のワイルドカードを無効化する。ESCAPE '\' と併用すること(DESIGN 3.6)。
+// LikeEscape neutralizes LIKE wildcards; pair it with ESCAPE '\\' (DESIGN 3.6).
 func LikeEscape(q string) string {
 	r := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 	return r.Replace(q)
 }
 
-// RuneLen はクエリ長(文字数)。バイト数ではないので注意。日本語の2文字は 6 バイトある。
+// RuneLen is the query length in characters, not bytes: two Japanese
+// characters are six bytes.
 func RuneLen(q string) int { return len([]rune(q)) }
 
-// IsASCII2 は「ASCII 2 文字のクエリ」かどうか。
-// Go / UI / DB / AI のような技術メモで日常的なクエリが該当する(DESIGN 3.4)。
+// IsASCII2 reports whether the query is two ASCII characters - Go, UI, DB, AI
+// and the like, which are everyday queries in technical notes (DESIGN 3.4).
 func IsASCII2(q string) bool {
 	rs := []rune(q)
 	if len(rs) != 2 {
@@ -44,10 +48,11 @@ func IsASCII2(q string) bool {
 	return true
 }
 
-// WordBoundaryMatch は s の中に q が語境界で現れるかを判定する。
-// **ASCII 2 文字クエリにのみ適用すること**(DESIGN 3.4)。
-// LIKE '%go%' は algorithm や going に当たるため、アプリ側で落とす必要がある。
-// 日本語 2 文字クエリに適用してはいけない(語境界の概念がないため全部落ちる)。
+// WordBoundaryMatch reports whether q appears in s at a word boundary.
+// **Apply it to two-character ASCII queries only** (DESIGN 3.4).
+// LIKE '%go%' matches algorithm and going, so those have to be dropped in the
+// application. Never apply it to a two-character Japanese query: there is no
+// concept of a word boundary there, so everything would be dropped.
 func WordBoundaryMatch(s, q string) bool {
 	ls, lq := strings.ToLower(s), strings.ToLower(q)
 	for i := 0; ; {
@@ -69,10 +74,10 @@ func WordBoundaryMatch(s, q string) bool {
 
 func isWordByte(b byte, ok bool) bool {
 	if !ok {
-		return false // 文字列の端は語境界
+		return false // the ends of the string are word boundaries
 	}
 	return b == '_' || (b >= '0' && b <= '9') || (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') ||
-		b >= 0x80 // マルチバイト文字の隣接は語の一部とみなす
+		b >= 0x80 // an adjacent multi-byte character counts as part of the word
 }
 
 func prevByte(s string, i int) (byte, bool) {
@@ -89,13 +94,16 @@ func nextByte(s string, i int) (byte, bool) {
 	return s[i], true
 }
 
-// Truncations は 0 件時のフォールバック用に、クエリを後ろから切り詰めた候補を返す。
-// 「オフィスの移転について」→「オフィスの移転」→「オフィス」。**2 段までとする**(DESIGN 3.4)。
+// Truncations returns progressively shorter queries, trimmed from the end, as a
+// fallback when there are no hits:
+// 「オフィスの移転について」 -> 「オフィスの移転」 -> 「オフィス」.
+// **Two steps at most** (DESIGN 3.4).
 func Truncations(q string) []string {
 	rs := []rune(q)
 	var out []string
 	for i := 0; i < 2; i++ {
-		// 3 分の 2 ずつに切り詰める。3 文字を下回ったら打ち切り(trigram で引けなくなるため)
+		// Cut to two thirds each time, stopping below three characters (trigram
+		// cannot match shorter than that)
 		n := len(rs) * 2 / 3
 		if n < 3 || n >= len(rs) {
 			break

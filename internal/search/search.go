@@ -10,7 +10,8 @@ import (
 	"github.com/wakamenod/enghi/internal/wiki"
 )
 
-// Result は検索結果1件。種別バッジ付きで1つのリストに混ぜて返す(DESIGN 3.1)。
+// Result is one search hit. Every kind is mixed into a single list, each with
+// its own badge (DESIGN 3.1).
 type Result struct {
 	Kind      string  `json:"kind"` // page / project / task / area
 	ID        int64   `json:"id"`
@@ -18,14 +19,15 @@ type Result struct {
 	Title     string  `json:"title"`
 	Snippet   string  `json:"snippet,omitempty"`
 	UpdatedAt string  `json:"updated_at,omitempty"`
-	Via       string  `json:"via"` // tag / title / alias / body — どの経路で当たったか
+	Via       string  `json:"via"` // tag / title / alias / body - which path matched
 	Score     float64 `json:"score,omitempty"`
 
 	bucket int // 0:tag 1:title 2:alias 3:body
-	korder int // 種別の安定順
+	korder int // stable order between kinds
 }
 
-// Service は検索。**ランキングは SQL 側で行う。アプリ側スコアリングはしない**(DESIGN 3.5)。
+// Service is search. **Ranking happens in SQL; there is no scoring in the
+// application** (DESIGN 3.5).
 type Service struct{ db *store.DB }
 
 func New(db *store.DB) *Service { return &Service{db: db} }
@@ -37,15 +39,15 @@ const (
 	bucketBody
 )
 
-// Search は横断検索。kind が空なら全種別。
+// Search searches across everything. An empty kind means every kind.
 func (s *Service) Search(ctx context.Context, q string, kinds []string, limit, offset int) ([]Result, error) {
-	// 入力経路によって NFD で来ることがあるので、索引と同じ NFC に揃える
+	// Some input paths deliver NFD, so normalize to NFC as the index is
 	q = textnorm.NFC(strings.TrimSpace(q))
 	if q == "" {
 		return []Result{}, nil
 	}
 	if limit <= 0 || limit > 200 {
-		limit = 50 // 既定 50 件(DESIGN 3.7)
+		limit = 50 // default of 50 (DESIGN 3.7)
 	}
 	want := func(k string) bool {
 		if len(kinds) == 0 {
@@ -58,7 +60,7 @@ func (s *Service) Search(ctx context.Context, q string, kinds []string, limit, o
 		}
 		return false
 	}
-	// 必要分より多めに集めてから合成する。SQL 側の LIMIT は外さない。
+	// Collect more than needed and combine. The LIMIT in SQL stays.
 	fetch := limit + offset
 	if fetch < 50 {
 		fetch = 50
@@ -97,8 +99,8 @@ func (s *Service) Search(ctx context.Context, q string, kinds []string, limit, o
 		all = append(all, rs...)
 	}
 
-	// bucket → 種別 → 元の順(SQL 側のランキング)の安定ソート。
-	// bm25 は表をまたいで比較できないので、スコアの大小で混ぜない。
+	// Stable sort by bucket, then kind, then the original order (SQL's ranking).
+	// bm25 is not comparable across tables, so scores never decide the mix.
 	sort.SliceStable(all, func(i, j int) bool {
 		if all[i].bucket != all[j].bucket {
 			return all[i].bucket < all[j].bucket
@@ -106,7 +108,8 @@ func (s *Service) Search(ctx context.Context, q string, kinds []string, limit, o
 		return all[i].korder < all[j].korder
 	})
 
-	// 種別をまたいだ重複除去(同一種別・同一 ID は先勝ち = より良い bucket が残る)
+	// Deduplicate across kinds: same kind and id, first wins, which keeps the
+	// better bucket
 	seen := map[string]bool{}
 	out := make([]Result, 0, len(all))
 	for _, r := range all {
@@ -127,25 +130,27 @@ func (s *Service) Search(ctx context.Context, q string, kinds []string, limit, o
 	return out, nil
 }
 
-// searchPages は 3.4 のフォールバックの梯子と 3.4/3.6 のマージ規則を実装する。
+// searchPages implements the fallback ladder of 3.4 and the merge rules of
+// 3.4 / 3.6.
 func (s *Service) searchPages(ctx context.Context, q string, fetch int) ([]Result, error) {
 	var out []Result
 
-	// (1) タグは FTS に載せない。完全一致/前方一致で別途引き、結果の先頭に足す(DESIGN 3.1)。
+	// (1) Tags are not in the FTS index. They are matched exactly or by prefix
+	//     separately and put at the head of the results (DESIGN 3.1).
 	tagHits, err := s.pagesByTagMatch(ctx, q, fetch)
 	if err != nil {
 		return nil, err
 	}
 	out = append(out, tagHits...)
 
-	// (2) 本体の検索経路。クエリ長で分岐する。
+	// (2) The main search path, which branches on query length.
 	var core []Result
 	if RuneLen(q) >= 3 {
 		core, err = s.pagesFTS(ctx, q, fetch)
 		if err != nil {
 			return nil, err
 		}
-		// 0 件のときはクエリを後ろから切り詰めて再試行する(2 段まで)。
+		// With no hits, retry with the query trimmed from the end (two steps).
 		if len(core) == 0 {
 			for _, t := range Truncations(q) {
 				core, err = s.pagesFTS(ctx, t, fetch)
@@ -164,8 +169,9 @@ func (s *Service) searchPages(ctx context.Context, q string, fetch int) ([]Resul
 		}
 	}
 
-	// (3) 別名は FTS に載らないので直接照合する(DESIGN 3.6)。
-	//     合流位置は「正式タイトルのヒットの直後」= bucketAlias。
+	// (3) Aliases are not in the FTS index, so they are matched directly
+	//     (DESIGN 3.6). They join right after canonical-title hits, as
+	//     bucketAlias.
 	aliasHits, err := s.pagesByAlias(ctx, q, fetch)
 	if err != nil {
 		return nil, err
@@ -176,7 +182,8 @@ func (s *Service) searchPages(ctx context.Context, q string, fetch int) ([]Resul
 	return out, nil
 }
 
-// pagesFTS は 3 文字以上の経路。ランキングは SQL 側(bm25)で行う(DESIGN 3.5)。
+// pagesFTS is the path for three characters or more. Ranking is done in SQL by
+// bm25 (DESIGN 3.5).
 func (s *Service) pagesFTS(ctx context.Context, q string, fetch int) ([]Result, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT p.id, p.slug, p.title, p.updated_at,
@@ -197,7 +204,7 @@ func (s *Service) pagesFTS(ctx context.Context, q string, fetch int) ([]Result, 
 			return nil, err
 		}
 		r.Kind, r.korder = "page", 0
-		// タイトルに含まれるものは「タイトルのヒット」として前に出す。
+		// Hits whose title contains the query move up as title hits.
 		if containsFold(r.Title, q) {
 			r.bucket, r.Via = bucketTitle, "title"
 		} else {
@@ -208,16 +215,18 @@ func (s *Service) pagesFTS(ctx context.Context, q string, fetch int) ([]Result, 
 	return out, rows.Err()
 }
 
-// pagesShortQuery は 2 文字以下の経路。trigram では引けないため
-// titles_fts(bigram)と本文 LIKE の2つの結果集合を合成する(DESIGN 3.4)。
-// **日本語は2文字語が主力なので、これは例外ではなく常用経路である。**
+// pagesShortQuery is the path for two characters or fewer. trigram cannot match
+// those, so it combines two result sets: titles_fts (bigram) and a body LIKE
+// (DESIGN 3.4).
+// **Japanese is full of two-character words, so this is not an edge case but an
+// everyday path.**
 func (s *Service) pagesShortQuery(ctx context.Context, q string, fetch int) ([]Result, error) {
 	ascii2 := IsASCII2(q)
 
-	// 1. titles_fts のヒットを bm25 昇順で全件、先頭に置く
+	// 1. Every titles_fts hit, bm25 ascending, at the head
 	match := Phrase(wiki.Bigrams(q))
 	if RuneLen(q) == 1 {
-		// 1 文字は bigram トークンにならないので前方一致で引く
+		// A single character is not a bigram token, so match by prefix
 		match = Phrase(q) + "*"
 	}
 	rows, err := s.db.QueryContext(ctx,
@@ -237,8 +246,8 @@ func (s *Service) pagesShortQuery(ctx context.Context, q string, fetch int) ([]R
 			rows.Close()
 			return nil, err
 		}
-		// ASCII 2 文字のときだけ語境界で再フィルタする(algorithm が go に当たるのを防ぐ)。
-		// 日本語 2 文字には適用しない。
+		// Re-filter on word boundaries for two-character ASCII only, so that
+		// algorithm does not match go. Never for two Japanese characters.
 		if ascii2 && !WordBoundaryMatch(r.Title, q) {
 			continue
 		}
@@ -251,8 +260,9 @@ func (s *Service) pagesShortQuery(ctx context.Context, q string, fetch int) ([]R
 		return nil, err
 	}
 
-	// 2. その後ろに本文 LIKE のヒットを updated_at 降順で置く
-	//    3. 両方に現れるページはタイトル側を採用し、本文側から除く
+	// 2. Then the body LIKE hits, updated_at descending.
+	// 3. A page in both sets keeps its title hit and is dropped from the body
+	//    set.
 	rows, err = s.db.QueryContext(ctx,
 		`SELECT p.id, p.slug, p.title, p.updated_at, p.body
 		   FROM pages p
@@ -282,8 +292,9 @@ func (s *Service) pagesShortQuery(ctx context.Context, q string, fetch int) ([]R
 	return out, rows.Err()
 }
 
-// pagesByAlias は page_titles の別名を直接照合する。**部分一致とする**(DESIGN 3.6)。
-// LIKE は ASCII について既定で大小を区別しない。%  と _ は必ずエスケープする。
+// pagesByAlias matches aliases in page_titles directly, **as a substring match**
+// (DESIGN 3.6). LIKE is case-insensitive for ASCII by default. % and _ must
+// always be escaped.
 func (s *Service) pagesByAlias(ctx context.Context, q string, fetch int) ([]Result, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT t.page_id, t.title, p.slug, p.title, p.updated_at
@@ -305,14 +316,17 @@ func (s *Service) pagesByAlias(ctx context.Context, q string, fetch int) ([]Resu
 			continue
 		}
 		r.Kind, r.korder, r.bucket, r.Via = "page", 0, bucketAlias, "alias"
-		r.Snippet = "別名: " + alias
+		// The label ("alias match") comes from i18n on the template side; only
+		// the value belongs here.
+		r.Snippet = alias
 		out = append(out, r)
 	}
 	return out, rows.Err()
 }
 
-// pagesByTagMatch はクエリ文字列を tags.name と完全一致/前方一致で照合する。
-// **FTS には任せない**(DESIGN 3.1)。trigram は日本語の 2 文字タグに対して何も機能しない。
+// pagesByTagMatch matches the query against tags.name exactly or by prefix.
+// **Never leave this to FTS** (DESIGN 3.1): trigram does nothing at all for a
+// two-character Japanese tag.
 func (s *Service) pagesByTagMatch(ctx context.Context, q string, fetch int) ([]Result, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT DISTINCT p.id, p.slug, p.title, p.updated_at, t.name
@@ -331,13 +345,15 @@ func (s *Service) pagesByTagMatch(ctx context.Context, q string, fetch int) ([]R
 			return nil, err
 		}
 		r.Kind, r.korder, r.bucket, r.Via = "page", 0, bucketTag, "tag"
-		r.Snippet = "タグ: " + tag
+		// As above: the label lives in i18n, keyed off Via.
+		r.Snippet = tag
 		out = append(out, r)
 	}
 	return out, rows.Err()
 }
 
-// searchSimpleFTS は tasks / projects 用。列構成が同じなので共通化する。
+// searchSimpleFTS serves tasks and projects, which share the same column
+// layout.
 func (s *Service) searchSimpleFTS(ctx context.Context, kind, table, ftsTable, secondCol, q string, fetch int) ([]Result, error) {
 	korder := 1
 	if kind == "task" {
@@ -371,7 +387,8 @@ func (s *Service) searchSimpleFTS(ctx context.Context, kind, table, ftsTable, se
 		}
 		return out, rows.Err()
 	}
-	// 2 文字以下: これらの表は件数が桁違いに少ないので LIKE で十分。
+	// Two characters or fewer: these tables are orders of magnitude smaller, so
+	// LIKE is enough.
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, title, updated_at, `+secondCol+`
 		   FROM `+table+`
@@ -402,7 +419,7 @@ func (s *Service) searchSimpleFTS(ctx context.Context, kind, table, ftsTable, se
 	return out, rows.Err()
 }
 
-// searchAreas は areas を名前で引く(FTS 表は持たない。件数が少ないため)。
+// searchAreas looks areas up by name. They have no FTS table, being few.
 func (s *Service) searchAreas(ctx context.Context, q string, fetch int) ([]Result, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, name, description, updated_at FROM areas
@@ -438,7 +455,8 @@ func containsFold(s, q string) bool {
 	return strings.Contains(strings.ToLower(s), strings.ToLower(q))
 }
 
-// excerpt は LIKE 経路のための簡易スニペット(FTS の snippet() が使えないため)。
+// excerpt is a simple snippet for the LIKE paths, where FTS snippet() is not
+// available.
 func excerpt(body, q string) string {
 	i := strings.Index(strings.ToLower(body), strings.ToLower(q))
 	if i < 0 {
@@ -449,7 +467,7 @@ func excerpt(body, q string) string {
 		return body
 	}
 	rs := []rune(body)
-	// バイト位置を文字位置に直す
+	// Convert a byte offset into a character offset
 	pos := len([]rune(body[:i]))
 	start := pos - 20
 	if start < 0 {

@@ -8,10 +8,10 @@ import (
 	"github.com/wakamenod/enghi/internal/textnorm"
 )
 
-// FixNormalization は NFD で入っている行を NFC に直す。
+// FixNormalization rewrites rows stored as NFD into NFC.
 //
-// **doctor が見つけても自動では直さない。**タイトルは名前空間そのものなので、
-// 書き換えは利用者が明示的に選ぶ操作にする。
+// **doctor reports these but never repairs them on its own.** Titles are the
+// namespace itself, so rewriting them stays an action the user chooses.
 func FixNormalization(ctx context.Context, db *DB) (int, error) {
 	fixed := 0
 	err := db.Tx(ctx, func(tx *sql.Tx) error {
@@ -59,7 +59,7 @@ func FixNormalization(ctx context.Context, db *DB) (int, error) {
 	return fixed, err
 }
 
-// Problem は doctor が見つけた不整合1件。
+// Problem is one inconsistency found by doctor.
 type Problem struct {
 	Kind   string `json:"kind"`
 	PageID int64  `json:"page_id,omitempty"`
@@ -73,13 +73,14 @@ func (p Problem) String() string {
 	return fmt.Sprintf("[%s] %s", p.Kind, p.Detail)
 }
 
-// Doctor は DB で表現できない不変条件を外から検査する(DESIGN 2.5)。
-// 「正式名はちょうど1つ」は部分 UNIQUE インデックスでは「高々1つ」しか保証できないため、
-// ここで必ず検査する。起動時にも実行すること。
+// Doctor checks, from outside, the invariants the database cannot express
+// (DESIGN 2.5). A partial UNIQUE index can only guarantee "at most one"
+// canonical title, never "exactly one", so that is checked here. Run it at
+// start-up as well.
 func Doctor(ctx context.Context, db *DB) ([]Problem, error) {
 	var problems []Problem
 
-	// 正式名を持たないページ
+	// Pages with no canonical title
 	rows, err := db.QueryContext(ctx,
 		`SELECT id, title FROM pages
 		  WHERE id NOT IN (SELECT page_id FROM page_titles WHERE is_canonical = 1)`)
@@ -94,15 +95,16 @@ func Doctor(ctx context.Context, db *DB) ([]Problem, error) {
 			return nil, err
 		}
 		problems = append(problems, Problem{Kind: "no_canonical_title", PageID: id,
-			Detail: fmt.Sprintf("正式タイトルの行が page_titles に無い (pages.title=%q)", title)})
+			Detail: fmt.Sprintf("no canonical row in page_titles (pages.title=%q)", title)})
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
-	// pages.title と page_titles の不一致。
-	// COLLATE BINARY が必須 — 両列とも NOCASE のため、付けないと大小の食い違いを見逃す。
+	// Mismatch between pages.title and page_titles.
+	// COLLATE BINARY is required: both columns are NOCASE, so without it a
+	// difference in case slips through.
 	rows, err = db.QueryContext(ctx,
 		`SELECT p.id, p.title, COALESCE(t.title, '')
 		   FROM pages p
@@ -119,20 +121,20 @@ func Doctor(ctx context.Context, db *DB) ([]Problem, error) {
 			return nil, err
 		}
 		problems = append(problems, Problem{Kind: "title_mismatch", PageID: id,
-			Detail: fmt.Sprintf("pages.title=%q だが page_titles の正式名は %q", pt, tt)})
+			Detail: fmt.Sprintf("pages.title=%q but the canonical title in page_titles is %q", pt, tt)})
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
-	// 正規化されていない行(macOS 由来の NFD)。
-	// 見た目が同じでも別の文字列なので、タイトルで引けなくなる。
+	// Rows that are not normalized (NFD, typically from macOS).
+	// They look identical but are different strings, so lookups by title fail.
 	for _, c := range []struct{ table, col, label string }{
-		{"pages", "title", "記事のタイトル"},
-		{"pages", "slug", "記事の slug"},
-		{"page_titles", "title", "タイトル/別名"},
-		{"tags", "name", "タグ"},
+		{"pages", "title", "article title"},
+		{"pages", "slug", "article slug"},
+		{"page_titles", "title", "title/alias"},
+		{"tags", "name", "tag"},
 	} {
 		rows, err := db.QueryContext(ctx,
 			fmt.Sprintf(`SELECT %s FROM %s`, c.col, c.table))
@@ -156,11 +158,11 @@ func Doctor(ctx context.Context, db *DB) ([]Problem, error) {
 		}
 		for _, v := range bad {
 			problems = append(problems, Problem{Kind: "not_nfc",
-				Detail: fmt.Sprintf("%s が正規化されていない(NFD): %q — `enghi doctor --fix` で直せる", c.label, v)})
+				Detail: fmt.Sprintf("%s is not normalized (NFD): %q - repair with `enghi doctor --fix`", c.label, v)})
 		}
 	}
 
-	// titles_fts の欠落(2 文字クエリ経路が静かに壊れるため)
+	// Missing titles_fts rows (the two-character query path breaks silently)
 	var missing int
 	if err := db.QueryRowContext(ctx,
 		`SELECT count(*) FROM pages p WHERE NOT EXISTS
@@ -169,7 +171,7 @@ func Doctor(ctx context.Context, db *DB) ([]Problem, error) {
 	}
 	if missing > 0 {
 		problems = append(problems, Problem{Kind: "titles_fts_missing",
-			Detail: fmt.Sprintf("titles_fts に行の無いページが %d 件ある(2 文字検索が効かない)", missing)})
+			Detail: fmt.Sprintf("%d page(s) have no titles_fts row (two-character search will not match)", missing)})
 	}
 
 	return problems, nil

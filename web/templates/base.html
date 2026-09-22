@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{.Title}} — enghi</title>
 <script>
-// 描画前にテーマを当てる(後から当てると一瞬もとの配色が見える)
+// Apply the theme before painting; doing it later flashes the other palette
 (function () {
   try {
     var t = localStorage.getItem("enghi-theme");
@@ -18,9 +18,10 @@
 <script src="{{asset "/static/htmx.min.js"}}" defer></script>
 </head>
 <body data-strings='{{.Strings}}'>
-{{/* アイコンは1か所に定義して <use> で参照する。外部 SVG ファイルへの <use href>
-     は Chrome / Safari では効かないので、ここに直接置く。
-     装飾なので aria-hidden。意味は必ず文字側に持たせること。 */}}
+{{/* Icons are defined once here and referenced with <use>. A <use href> into an
+     external SVG file does not work in Chrome or Safari, so they live inline.
+     They are decorative, hence aria-hidden: the meaning always belongs to the
+     text beside them. */}}
 <svg class="sprite" aria-hidden="true" width="0" height="0">
   <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></symbol>
   <symbol id="i-auto" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5a5.5 5.5 0 0 0 0 11z" fill="currentColor" stroke="none"/></symbol>
@@ -53,7 +54,8 @@
   </div>
 </header>
 <main class="wrap{{if .Side}} with-side{{end}}">
-{{/* 記事系の画面では、左にタグを常に並べる(ヘッダーからは外した) */}}
+{{/* On article screens the tags always sit on the left; they were taken out
+     of the header. */}}
 {{if .Side}}
 <aside class="side">
   <a class="side-head{{if eq .Nav "wiki"}} on{{end}}" href="/wiki">{{t "nav.articles"}}</a>
@@ -67,7 +69,7 @@
 {{if .Flash}}<div class="notice">{{.Flash}}</div>{{end}}
 {{end}}
 
-{{/* help は見出しの脇に置く「?」。href はガイドの節へのアンカー。 */}}
+{{/* help is the "?" beside a heading; href anchors into a guide section. */}}
 {{define "icon"}}<svg class="ic ic-{{.}}" aria-hidden="true" focusable="false"><use href="#i-{{.}}"/></svg>{{end}}
 
 {{define "help"}}<a class="help" href="/guide/{{.}}" title="{{t "guide.help"}}" aria-label="{{t "guide.help"}}">?</a>{{end}}

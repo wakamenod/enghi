@@ -13,22 +13,22 @@ import (
 	"github.com/wakamenod/enghi/internal/wiki"
 )
 
-// viewData は全画面の共通部分。
+// viewData is what every screen has in common.
 type viewData struct {
 	Title string
-	Nav   string // ハイライトするナビ項目
+	Nav   string // which nav item to highlight
 	Query string
 	Flash string
 	Err   string
 	Data  any
 
-	// 以下は render がまとめて埋める(各ハンドラに書かせると必ずどこかで漏れる)
-	LangCode string            // 現在の言語
-	Path     string            // 言語を切り替えた後に戻る先
-	Strings  template.JS       // JS 側で使う文言(JSON)
-	Set      settings.Settings // 画面の出し分けに使う設定
-	Side     bool              // 左にタグの列を出すか(記事系の画面だけ)
-	SideTags []wiki.TagCount   // その中身
+	// render fills in the rest; leaving it to each handler always misses one
+	LangCode string            // the current language
+	Path     string            // where to return after switching language
+	Strings  template.JS       // messages used from JS, as JSON
+	Set      settings.Settings // settings that decide what a screen shows
+	Side     bool              // whether to show the tag column, on article screens
+	SideTags []wiki.TagCount   // its contents
 }
 
 func (s *Server) viewDashboard(w http.ResponseWriter, r *http.Request) {
@@ -73,7 +73,8 @@ func (s *Server) viewPage(w http.ResponseWriter, r *http.Request) {
 	p, err := s.pages.BySlug(ctxOf(r), slug)
 	if err != nil {
 		if errors.Is(err, wiki.ErrNotFound) {
-			// タイトル(別名を含む)でも引いてみる。Emacs から [[...]] で飛んできた場合に効く。
+			// Try the title too, aliases included. This is what makes a [[...]]
+			// jump from Emacs land.
 			if p2, err2 := s.pages.ByTitle(ctxOf(r), slug); err2 == nil {
 				http.Redirect(w, r, "/wiki/"+p2.Slug, http.StatusSeeOther)
 				return
@@ -197,7 +198,8 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 		Data: searchData{Query: q, Results: results}})
 }
 
-// uiSearchFragment は htmx 用。打鍵ごとに呼ばれるので軽く保つ(DESIGN 6)。
+// uiSearchFragment serves htmx. It is called on every keystroke, so it stays
+// cheap (DESIGN 6).
 func (s *Server) uiSearchFragment(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
 	if strings.TrimSpace(q) == "" {
@@ -212,7 +214,7 @@ func (s *Server) uiSearchFragment(w http.ResponseWriter, r *http.Request) {
 	s.renderFragment(w, r, "search_suggest.html", searchData{Query: q, Results: results})
 }
 
-// ---------------------------------------------------------------- form 送信
+// ---------------------------------------------------------------- form posts
 
 func (s *Server) uiCreatePage(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
@@ -255,7 +257,8 @@ func (s *Server) uiUpdatePage(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/wiki/"+p.Slug, http.StatusSeeOther)
 }
 
-// renderEditError は編集画面に戻す。**入力は絶対に捨てない**(DESIGN 4.2)。
+// renderEditError returns to the edit screen. **The input is never thrown
+// away** (DESIGN 4.2).
 func (s *Server) renderEditError(w http.ResponseWriter, r *http.Request, err error,
 	cur *wiki.Page, isNew bool) {
 
@@ -311,8 +314,9 @@ func (s *Server) uiDeleteAlias(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/wiki/"+p.Slug+"/history", http.StatusSeeOther)
 }
 
-// uiRewriteReferences は参照元の本文を一括置換する。
-// **ユーザが明示的に実行する操作であり、自動では絶対にやらない**(DESIGN 2.5)。
+// uiRewriteReferences rewrites the bodies of referring pages in bulk.
+// **The user runs this explicitly; it never happens automatically**
+// (DESIGN 2.5).
 func (s *Server) uiRewriteReferences(w http.ResponseWriter, r *http.Request) {
 	p, err := s.pages.BySlug(ctxOf(r), r.PathValue("slug"))
 	if err != nil {

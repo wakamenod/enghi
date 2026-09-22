@@ -8,25 +8,27 @@ import (
 	"strings"
 )
 
-// CaptureInput は POST /api/tasks。**{title} だけで作れること**(DESIGN 4.2)。
+// CaptureInput is POST /api/tasks. **{title} alone must be enough**
+// (DESIGN 4.2).
 type CaptureInput struct {
 	Title string `json:"title"`
 	Note  string `json:"note,omitempty"`
-	State string `json:"state,omitempty"` // 省略時は inbox
+	State string `json:"state,omitempty"` // inbox when omitted
 }
 
-// Capture は Inbox に1件入れる。どこからでも1行を投げ込めるのが GTD の前提。
+// Capture puts one item in the inbox. Being able to throw a line in from
+// anywhere is the premise of GTD.
 func (s *Service) Capture(ctx context.Context, in CaptureInput) (*Task, error) {
 	title := strings.TrimSpace(in.Title)
 	if title == "" {
-		return nil, errors.New("タイトルが空です")
+		return nil, errors.New("the title is empty")
 	}
 	state := in.State
 	if state == "" {
 		state = StateInbox
 	}
 	if !validStates[state] {
-		return nil, fmt.Errorf("state が不正です: %q", state)
+		return nil, fmt.Errorf("invalid state: %q", state)
 	}
 	res, err := s.db.ExecContext(ctx,
 		`INSERT INTO tasks(title, note, state) VALUES (?, ?, ?)`, title, in.Note, state)
@@ -40,7 +42,7 @@ func (s *Service) Capture(ctx context.Context, in CaptureInput) (*Task, error) {
 	return s.Task(ctx, id)
 }
 
-// TaskPatch は PATCH /api/tasks/:id。nil のフィールドは触らない。
+// TaskPatch is PATCH /api/tasks/:id. nil fields are left alone.
 type TaskPatch struct {
 	Title            *string `json:"title,omitempty"`
 	Note             *string `json:"note,omitempty"`
@@ -58,37 +60,39 @@ type TaskPatch struct {
 	Recurrence       *string `json:"recurrence,omitempty"`
 	RecurrenceEndsOn *string `json:"recurrence_ends_on,omitempty"`
 	SortOrder        *int    `json:"sort_order,omitempty"`
-	// ClearProject などは明示的に null を送る代わりのフラグ。
+	// ClearProject and friends are flags standing in for an explicit null.
 	ClearProject bool `json:"clear_project,omitempty"`
 	ClearContext bool `json:"clear_context,omitempty"`
 	ClearArea    bool `json:"clear_area,omitempty"`
 	Version      int  `json:"version"`
 }
 
-// setBuilder は UPDATE の SET 句を組み立てる。
-// 列と値の対応を1箇所に閉じ込める(手で set と args を並行に触ると必ずずれる)。
+// setBuilder builds the SET clause of an UPDATE, keeping the column-to-value
+// mapping in one place. Maintaining set and args by hand in parallel always
+// drifts apart eventually.
 type setBuilder struct {
 	parts []string
 	args  []any
 }
 
-// Set は「col = ?」と値を積む。
+// Set appends "col = ?" together with its value.
 func (b *setBuilder) Set(col string, v any) {
 	b.parts = append(b.parts, col+" = ?")
 	b.args = append(b.args, v)
 }
 
-// Raw は値を伴わない式を積む(col = NULL, col = date('now') など)。
+// Raw appends an expression with no value, such as col = NULL or
+// col = date('now').
 func (b *setBuilder) Raw(expr string) { b.parts = append(b.parts, expr) }
 
-// Date は空文字を NULL として扱う日付列。
+// Date is a date column where an empty string means NULL.
 func (b *setBuilder) Date(col, val string) error {
 	if val == "" {
 		b.Raw(col + " = NULL")
 		return nil
 	}
 	if _, err := ParseDate(val); err != nil {
-		return fmt.Errorf("%s は YYYY-MM-DD 形式です: %q", col, val)
+		return fmt.Errorf("%s must be YYYY-MM-DD: %q", col, val)
 	}
 	b.Set(col, val)
 	return nil
@@ -96,7 +100,8 @@ func (b *setBuilder) Date(col, val string) error {
 
 func (b *setBuilder) Empty() bool { return len(b.parts) == 0 }
 
-// Patch はタスクを部分更新する。状態遷移もここを通る。
+// Patch applies a partial update to a task. State transitions go through here
+// as well.
 func (s *Service) Patch(ctx context.Context, id int64, p TaskPatch) (*Task, error) {
 	var out *Task
 	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
@@ -104,8 +109,8 @@ func (s *Service) Patch(ctx context.Context, id int64, p TaskPatch) (*Task, erro
 		if err != nil {
 			return err
 		}
-		// version は省略可(UI からの単発の状態変更では不要)。
-		// 送られてきた場合は必ず突き合わせる。
+		// version may be omitted: a one-off state change from the UI does not need
+		// it. When it is sent, it is always checked.
 		if p.Version != 0 && p.Version != cur.Version {
 			return &VersionConflictError{Current: cur}
 		}
@@ -114,7 +119,7 @@ func (s *Service) Patch(ctx context.Context, id int64, p TaskPatch) (*Task, erro
 
 		if p.Title != nil {
 			if strings.TrimSpace(*p.Title) == "" {
-				return errors.New("タイトルが空です")
+				return errors.New("the title is empty")
 			}
 			b.Set("title", strings.TrimSpace(*p.Title))
 		}
@@ -123,7 +128,7 @@ func (s *Service) Patch(ctx context.Context, id int64, p TaskPatch) (*Task, erro
 		}
 		if p.State != nil {
 			if !validStates[*p.State] {
-				return fmt.Errorf("state が不正です: %q", *p.State)
+				return fmt.Errorf("invalid state: %q", *p.State)
 			}
 			b.Set("state", *p.State)
 			switch *p.State {
@@ -132,7 +137,8 @@ func (s *Service) Patch(ctx context.Context, id int64, p TaskPatch) (*Task, erro
 					b.Raw("completed_at = datetime('now')")
 				}
 			case StateWaiting:
-				// 委譲日が無ければ今日を入れる。経過日数の警告に使う
+				// Without a delegation date, use today; the days-elapsed warning
+				// needs it
 				if cur.DelegatedAt == "" && p.DelegatedAt == nil {
 					b.Raw("delegated_at = date('now')")
 				}
@@ -179,7 +185,7 @@ func (s *Service) Patch(ctx context.Context, id int64, p TaskPatch) (*Task, erro
 			case "low", "mid", "high":
 				b.Set("energy", *p.Energy)
 			default:
-				return fmt.Errorf("energy が不正です: %q", *p.Energy)
+				return fmt.Errorf("invalid energy: %q", *p.Energy)
 			}
 		}
 		if p.TimeEstimate != nil {
@@ -190,7 +196,8 @@ func (s *Service) Patch(ctx context.Context, id int64, p TaskPatch) (*Task, erro
 		}
 		if p.Recurrence != nil {
 			if *p.Recurrence == "" {
-				// **系列を終わらせたい場合は、先に recurrence を NULL にしてから完了/破棄する**
+				// **To end a series, set recurrence to NULL first, then complete or
+				// drop the task**
 				b.Raw("recurrence = NULL")
 			} else {
 				if _, err := ParseRecurrence(*p.Recurrence); err != nil {
@@ -226,7 +233,7 @@ func (s *Service) Patch(ctx context.Context, id int64, p TaskPatch) (*Task, erro
 	return out, nil
 }
 
-// validateTask は状態と列の整合を確かめる。
+// validateTask checks that the state and the columns agree.
 func validateTask(ctx context.Context, tx *sql.Tx, id int64) error {
 	var state, sched string
 	if err := tx.QueryRowContext(ctx,
@@ -234,12 +241,13 @@ func validateTask(ctx context.Context, tx *sql.Tx, id int64) error {
 		return err
 	}
 	if state == StateScheduled && sched == "" {
-		return errors.New("state='scheduled' には scheduled_on が必要です")
+		return errors.New("state='scheduled' requires scheduled_on")
 	}
 	return nil
 }
 
-// Delete はタスクを消す。links のライフサイクルはアプリ側で管理する(DESIGN 2.1)。
+// Delete removes a task. Link lifecycle is managed here, not by the database
+// (DESIGN 2.1).
 func (s *Service) Delete(ctx context.Context, id int64) error {
 	return s.db.Tx(ctx, func(tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx,

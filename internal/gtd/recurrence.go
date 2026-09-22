@@ -1,4 +1,4 @@
-// Package gtd は area / project / context / task / review を扱う。
+// Package gtd handles areas, projects, contexts, tasks and reviews.
 package gtd
 
 import (
@@ -8,10 +8,10 @@ import (
 	"time"
 )
 
-// DateLayout は日付列の形式。'YYYY-MM-DD'。
+// DateLayout is the format of date columns: 'YYYY-MM-DD'.
 const DateLayout = "2006-01-02"
 
-// ParseDate は 'YYYY-MM-DD' を読む。空文字は零値。
+// ParseDate reads 'YYYY-MM-DD'. An empty string gives the zero value.
 func ParseDate(s string) (time.Time, error) {
 	if s == "" {
 		return time.Time{}, nil
@@ -19,38 +19,38 @@ func ParseDate(s string) (time.Time, error) {
 	return time.Parse(DateLayout, s)
 }
 
-// FormatDate は 'YYYY-MM-DD' にする。
+// FormatDate renders 'YYYY-MM-DD'.
 func FormatDate(t time.Time) string { return t.Format(DateLayout) }
 
-// Today はローカルの今日(時刻を落としたもの)。
+// Today is the local date with the time dropped.
 func Today() time.Time {
 	n := time.Now()
 	return time.Date(n.Year(), n.Month(), n.Day(), 0, 0, 0, 0, time.UTC)
 }
 
-// Recurrence は org-mode のリピータ記法を解釈したもの(DESIGN 2.6)。
+// Recurrence is a parsed org-mode repeater (DESIGN 2.6).
 //
-//	+1d +2w +1m +1y   固定間隔。前回の予定日 + 間隔。1回分だけ進める
-//	++1w              固定間隔。前回の予定日 + 間隔を、今日より後になるまで繰り返し加算
-//	.+3d              完了日基準。完了した日 + 間隔
-//	weekly:mon,thu    毎週の指定曜日(複数可)
-//	monthly:25        毎月25日
-//	monthly:last      毎月末
-//	yearly:04-01      毎年
+//	+1d +2w +1m +1y   fixed interval: previous scheduled date + interval, once
+//	++1w              fixed interval, added repeatedly until it is past today
+//	.+3d              from the completion date: completed + interval
+//	weekly:mon,thu    the given weekdays, every week
+//	monthly:25        the 25th of every month
+//	monthly:last      the last day of every month
+//	yearly:04-01      once a year
 type Recurrence struct {
 	Raw string
 
 	Kind     string // interval / weekly / monthly / yearly
-	Catchup  bool   // ++ 。今日より後になるまで進める
-	FromDone bool   // .+ 。完了日を基準にする
+	Catchup  bool   // ++ : advance until it is past today
+	FromDone bool   // .+ : count from the completion date
 
-	N    int  // 間隔の数
+	N    int  // the number in the interval
 	Unit byte // d / w / m / y
 	Days []time.Weekday
-	Dom  int  // monthly:25 の 25
+	Dom  int  // the 25 of monthly:25
 	Last bool // monthly:last
-	Mon  int  // yearly:04-01 の 4
-	MDay int  // yearly:04-01 の 1
+	Mon  int  // the 4 of yearly:04-01
+	MDay int  // the 1 of yearly:04-01
 }
 
 var weekdayNames = map[string]time.Weekday{
@@ -58,11 +58,11 @@ var weekdayNames = map[string]time.Weekday{
 	"thu": time.Thursday, "fri": time.Friday, "sat": time.Saturday,
 }
 
-// ParseRecurrence は recurrence 列の文字列を解釈する。
+// ParseRecurrence parses the string in the recurrence column.
 func ParseRecurrence(s string) (*Recurrence, error) {
 	s = strings.TrimSpace(strings.ToLower(s))
 	if s == "" {
-		return nil, fmt.Errorf("繰り返し規則が空です")
+		return nil, fmt.Errorf("the recurrence rule is empty")
 	}
 	r := &Recurrence{Raw: s}
 
@@ -72,12 +72,12 @@ func ParseRecurrence(s string) (*Recurrence, error) {
 		for _, name := range strings.Split(strings.TrimPrefix(s, "weekly:"), ",") {
 			wd, ok := weekdayNames[strings.TrimSpace(name)]
 			if !ok {
-				return nil, fmt.Errorf("曜日が読めません: %q", name)
+				return nil, fmt.Errorf("cannot read the weekday: %q", name)
 			}
 			r.Days = append(r.Days, wd)
 		}
 		if len(r.Days) == 0 {
-			return nil, fmt.Errorf("weekly: に曜日がありません")
+			return nil, fmt.Errorf("weekly: has no weekday")
 		}
 		return r, nil
 
@@ -90,7 +90,7 @@ func ParseRecurrence(s string) (*Recurrence, error) {
 		}
 		n, err := strconv.Atoi(arg)
 		if err != nil || n < 1 || n > 31 {
-			return nil, fmt.Errorf("monthly: の日が読めません: %q", arg)
+			return nil, fmt.Errorf("cannot read the day of monthly:: %q", arg)
 		}
 		r.Dom = n
 		return r, nil
@@ -100,18 +100,18 @@ func ParseRecurrence(s string) (*Recurrence, error) {
 		arg := strings.TrimPrefix(s, "yearly:")
 		parts := strings.Split(arg, "-")
 		if len(parts) != 2 {
-			return nil, fmt.Errorf("yearly: は MM-DD の形式です: %q", arg)
+			return nil, fmt.Errorf("yearly: must be MM-DD: %q", arg)
 		}
 		mon, err1 := strconv.Atoi(parts[0])
 		day, err2 := strconv.Atoi(parts[1])
 		if err1 != nil || err2 != nil || mon < 1 || mon > 12 || day < 1 || day > 31 {
-			return nil, fmt.Errorf("yearly: の月日が読めません: %q", arg)
+			return nil, fmt.Errorf("cannot read the month and day of yearly:: %q", arg)
 		}
 		r.Mon, r.MDay = mon, day
 		return r, nil
 	}
 
-	// 間隔系: +1d / ++1w / .+3d
+	// Interval forms: +1d / ++1w / .+3d
 	rest := s
 	switch {
 	case strings.HasPrefix(rest, ".+"):
@@ -123,36 +123,38 @@ func ParseRecurrence(s string) (*Recurrence, error) {
 	case strings.HasPrefix(rest, "+"):
 		rest = rest[1:]
 	default:
-		return nil, fmt.Errorf("繰り返し規則が読めません: %q", s)
+		return nil, fmt.Errorf("cannot read the recurrence rule: %q", s)
 	}
 	if len(rest) < 2 {
-		return nil, fmt.Errorf("繰り返し規則が読めません: %q", s)
+		return nil, fmt.Errorf("cannot read the recurrence rule: %q", s)
 	}
 	unit := rest[len(rest)-1]
 	if unit != 'd' && unit != 'w' && unit != 'm' && unit != 'y' {
-		return nil, fmt.Errorf("単位は d/w/m/y のいずれかです: %q", s)
+		return nil, fmt.Errorf("the unit must be one of d/w/m/y: %q", s)
 	}
 	n, err := strconv.Atoi(rest[:len(rest)-1])
 	if err != nil || n < 1 {
-		return nil, fmt.Errorf("間隔が読めません: %q", s)
+		return nil, fmt.Errorf("cannot read the interval: %q", s)
 	}
 	r.Kind, r.N, r.Unit = "interval", n, unit
 	return r, nil
 }
 
-// Next は次回の予定日を計算する。
+// Next computes the next scheduled date.
 //
-//	scheduled … 現インスタンスの scheduled_on(無ければ零値)
-//	completed … 完了(または skip)した日
-//	today     … 今日
+//	scheduled ... scheduled_on of the current instance (zero if absent)
+//	completed ... the day it was completed (or skipped)
+//	today     ... today
 //
-// **存在しない日付(31日の無い月、閏日)はその月の最終日に丸める**(DESIGN 2.6)。
+// **A date that does not exist (a month without a 31st, a leap day) is clamped
+// to the last day of that month** (DESIGN 2.6).
 func (r *Recurrence) Next(scheduled, completed, today time.Time) time.Time {
 	switch r.Kind {
 	case "interval":
 		base := scheduled
 		if r.FromDone || base.IsZero() {
-			// .+ は完了日基準。予定日が無い場合も完了日で代用する
+			// .+ counts from the completion date, which also stands in when there
+			// is no scheduled date
 			base = completed
 		}
 		if base.IsZero() {
@@ -160,8 +162,8 @@ func (r *Recurrence) Next(scheduled, completed, today time.Time) time.Time {
 		}
 		next := addInterval(base, r.N, r.Unit)
 		if r.Catchup {
-			// **今日より後になるまで繰り返し加算する。**
-			// 長期放置した固定日タスクを現在まで一気に追いつかせるためのもの。
+			// **Add the interval repeatedly until it is past today.**
+			// This is what catches a long-neglected fixed-date task up to now.
 			for !next.After(today) {
 				next = addInterval(next, r.N, r.Unit)
 			}
@@ -178,11 +180,11 @@ func (r *Recurrence) Next(scheduled, completed, today time.Time) time.Time {
 				}
 			}
 		}
-		return base.AddDate(0, 0, 7) // 到達しないが保険
+		return base.AddDate(0, 0, 7) // unreachable, kept as a safety net
 
 	case "monthly":
 		base := laterOf(scheduled, today)
-		// 当月の候補が base より後ならそれ、さもなくば翌月
+		// This month's candidate if it is after base, otherwise next month
 		cand := monthlyCandidate(base.Year(), base.Month(), r)
 		if !cand.After(base) {
 			y, m := nextMonth(base.Year(), base.Month())
@@ -215,8 +217,9 @@ func addInterval(t time.Time, n int, unit byte) time.Time {
 	return t
 }
 
-// addMonthsClamped は月を足す。**AddDate は 1/31 + 1ヶ月 を 3/3 に繰り上げてしまうので使えない。**
-// 存在しない日付はその月の最終日に丸める(1/31 + 1ヶ月 = 2/28)。
+// addMonthsClamped adds months. **AddDate cannot be used: it turns 1/31 plus a
+// month into 3/3.** A date that does not exist is clamped to the last day of
+// that month (1/31 plus a month = 2/28).
 func addMonthsClamped(t time.Time, months int) time.Time {
 	y := t.Year()
 	m := int(t.Month()) - 1 + months
@@ -229,7 +232,8 @@ func addMonthsClamped(t time.Time, months int) time.Time {
 	return clampDay(y, time.Month(m+1), t.Day())
 }
 
-// clampDay は y年m月d日を作る。d がその月に無ければ月末に丸める。
+// clampDay builds year y, month m, day d, clamping d to the end of the month
+// when that day does not exist.
 func clampDay(y int, m time.Month, d int) time.Time {
 	last := daysInMonth(y, m)
 	if d > last {

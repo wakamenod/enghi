@@ -10,14 +10,15 @@ import (
 	"testing"
 )
 
-// すべての画面が最後まで描画されること。
-// **HTTP 200 だけでは足りない。** テンプレートの実行時エラーは、
-// head を書き出した後に body の途中で止まるため 200 のまま壊れた HTML が返る。
+// Every screen must render to the end.
+// **HTTP 200 alone is not enough.** A template error at run time stops partway
+// through the body, after the head has been written, so broken HTML comes back
+// with a 200.
 func TestAllScreensRenderCompletely(t *testing.T) {
 	h := newServer(t)
 	enableFeatures(t, h)
 
-	// 各画面に中身がある状態を作る(空のときだけ通る、という取りこぼしを避ける)
+	// Give every screen something to show, so nothing passes only when empty
 	mustJSON(t, h, "POST", "/api/pages", `{"title":"参考資料","body":"本文"}`)
 	mustJSON(t, h, "POST", "/api/contexts", `{"name":"@電話"}`)
 	mustJSON(t, h, "POST", "/api/areas", `{"name":"経理"}`)
@@ -50,21 +51,22 @@ func TestAllScreensRenderCompletely(t *testing.T) {
 		}
 		body := w.Body.Bytes()
 		if !bytes.Contains(body, []byte("</html>")) {
-			// テンプレートのエラーは途中で混ざるので、末尾を出すと原因が分かる
+			// A template error is mixed in partway through, so the tail shows the
+			// cause
 			tail := string(body)
 			if len(tail) > 300 {
 				tail = tail[len(tail)-300:]
 			}
-			t.Errorf("GET %s: HTML が途中で切れている。末尾:\n%s", path, tail)
+			t.Errorf("GET %s: the HTML is cut off. Tail:\n%s", path, tail)
 		}
 		if bytes.Contains(body, []byte("can't evaluate field")) ||
 			bytes.Contains(body, []byte("no such template")) {
-			t.Errorf("GET %s: テンプレートのエラーが本文に出ている", path)
+			t.Errorf("GET %s: a template error is printed in the body", path)
 		}
 	}
 }
 
-// 2.6: 完了すると次の1件が scheduled で生成される(API 経由)。
+// 2.6: completing generates the next instance as scheduled, through the API.
 func TestCompleteRecurringViaAPI(t *testing.T) {
 	h := newServer(t)
 	mustJSON(t, h, "POST", "/api/tasks", `{"title":"ゴミ出し"}`)
@@ -81,17 +83,17 @@ func TestCompleteRecurringViaAPI(t *testing.T) {
 	}
 	json.Unmarshal(w.Body.Bytes(), &res)
 	if res.Completed["state"] != "done" {
-		t.Errorf("完了後 = %v", res.Completed["state"])
+		t.Errorf("after completion = %v", res.Completed["state"])
 	}
 	if res.Next == nil {
-		t.Fatal("次インスタンスが返っていない")
+		t.Fatal("no next instance was returned")
 	}
 	if res.Next["state"] != "scheduled" {
-		t.Errorf("次インスタンス = %v, want scheduled", res.Next["state"])
+		t.Errorf("next instance = %v, want scheduled", res.Next["state"])
 	}
 }
 
-// 8-13: 資料化すると Wiki ページができ、タスクは filed になる。
+// 8-13: filing as reference creates a wiki page and leaves the task filed.
 func TestFileAsReferenceViaAPI(t *testing.T) {
 	h := newServer(t)
 	mustJSON(t, h, "POST", "/api/tasks", `{"title":"読むべき記事"}`)
@@ -109,15 +111,15 @@ func TestFileAsReferenceViaAPI(t *testing.T) {
 		t.Errorf("state = %v, want filed", res.Task["state"])
 	}
 	if res.Page["slug"] == nil {
-		t.Error("ページが作られていない")
+		t.Error("no page was created")
 	}
-	// 作られたページが実際に開けること
+	// The created page must actually open
 	if got := do(h, req("GET", "/wiki/"+res.Page["slug"].(string), "")).Code; got != http.StatusOK {
-		t.Errorf("生成されたページが開けない: %d", got)
+		t.Errorf("the generated page does not open: %d", got)
 	}
 }
 
-// ダッシュボードは必要な集計を1発で返す(個別に N 本投げない)。
+// The dashboard returns every aggregate in one call, not N separate queries.
 func TestDashboardIncludesGTD(t *testing.T) {
 	h := newServer(t)
 	mustJSON(t, h, "POST", "/api/projects", `{"title":"止まっているプロジェクト"}`)
@@ -139,27 +141,28 @@ func TestDashboardIncludesGTD(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !d.GTD.Enabled {
-		t.Error("GTD のデータがあるのに enabled=false")
+		t.Error("enabled=false although there is GTD data")
 	}
 	if d.GTD.InboxCount != 1 {
 		t.Errorf("inbox_count = %d, want 1", d.GTD.InboxCount)
 	}
 	if len(d.GTD.Stalled) != 1 {
-		t.Errorf("停滞プロジェクト = %d 件, want 1", len(d.GTD.Stalled))
+		t.Errorf("stalled projects = %d, want 1", len(d.GTD.Stalled))
 	}
 }
 
-// GTD を一切使っていなくても Wiki は完全に機能し、画面も崩れない(DESIGN 0)。
+// Without GTD in use at all, the wiki still works fully and the screens hold
+// up (DESIGN 0).
 func TestWikiWorksWithoutGTD(t *testing.T) {
 	h := newServer(t)
 	mustJSON(t, h, "POST", "/api/pages", `{"title":"記事","body":"本文"}`)
 
 	w := do(h, req("GET", "/", ""))
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "</html>") {
-		t.Fatalf("ダッシュボード → %d", w.Code)
+		t.Fatalf("dashboard -> %d", w.Code)
 	}
 	if !strings.Contains(w.Body.String(), "まだ何もありません") {
-		t.Error("GTD 領域が空であることが示されていない")
+		t.Error("the GTD area does not say that it is empty")
 	}
 	var d struct {
 		GTD struct {
@@ -168,7 +171,7 @@ func TestWikiWorksWithoutGTD(t *testing.T) {
 	}
 	json.Unmarshal(do(h, req("GET", "/api/dashboard", "")).Body.Bytes(), &d)
 	if d.GTD.Enabled {
-		t.Error("GTD のデータが無いのに enabled=true")
+		t.Error("enabled=true although there is no GTD data")
 	}
 }
 
@@ -180,7 +183,7 @@ func mustJSON(t *testing.T, h http.Handler, method, path, body string) {
 	}
 }
 
-// 英語でも全画面が最後まで描画され、日本語が残っていないこと。
+// In English too, every screen renders to the end with no Japanese left on it.
 func TestEnglishScreensHaveNoJapanese(t *testing.T) {
 	h := newServer(t)
 	enableFeatures(t, h)
@@ -207,51 +210,52 @@ func TestEnglishScreensHaveNoJapanese(t *testing.T) {
 		}
 		body := w.Body.String()
 		if !strings.Contains(body, "</html>") {
-			t.Errorf("GET %s: HTML が途中で切れている", path)
+			t.Errorf("GET %s: the HTML is cut off", path)
 			continue
 		}
-		// 言語切り替えのリンクは、切り替え先の言語名をその言語で出すので除く
+		// The language switcher prints the other language's name in that
+		// language, so it is excluded
 		body = regexp.MustCompile(`(?s)<div class="lang-switch".*?</div>`).ReplaceAllString(body, "")
 		if m := japanese.FindString(body); m != "" {
-			// 記事の中身に日本語があるのは正常なので、画面の骨格だけを見る
+			// Japanese inside an article is normal, so only the chrome is checked
 			idx := japanese.FindStringIndex(body)
 			from := idx[0] - 60
 			if from < 0 {
 				from = 0
 			}
-			t.Errorf("GET %s: 英語表示に日本語が残っている: …%s…", path, body[from:idx[1]+20])
+			t.Errorf("GET %s: Japanese left in the English rendering: ...%s...", path, body[from:idx[1]+20])
 		}
 	}
 }
 
-// Accept-Language と cookie で言語が決まること。cookie が優先されること。
+// The language comes from Accept-Language and the cookie, the cookie winning.
 func TestLanguageSelection(t *testing.T) {
 	h := newServer(t)
 
 	r := req("GET", "/", "")
 	r.Header.Set("Accept-Language", "en")
 	if body := do(h, r).Body.String(); !strings.Contains(body, "Dashboard") {
-		t.Error("Accept-Language: en が効いていない")
+		t.Error("Accept-Language: en had no effect")
 	}
 
 	r = req("GET", "/", "")
 	r.Header.Set("Accept-Language", "ja")
 	if body := do(h, r).Body.String(); !strings.Contains(body, "ダッシュボード") {
-		t.Error("Accept-Language: ja が効いていない")
+		t.Error("Accept-Language: ja had no effect")
 	}
 
-	// 明示的な選択(cookie)は Accept-Language より優先する
+	// The explicit choice in the cookie outranks Accept-Language
 	r = req("GET", "/", "")
 	r.Header.Set("Accept-Language", "ja")
 	r.AddCookie(&http.Cookie{Name: "enghi-lang", Value: "en"})
 	if body := do(h, r).Body.String(); !strings.Contains(body, "Dashboard") {
-		t.Error("cookie の選択が Accept-Language より優先されていない")
+		t.Error("the cookie choice did not outrank Accept-Language")
 	}
 
-	// 切り替えの導線
+	// The switcher itself
 	w := do(h, req("GET", "/ui/lang?set=en&return_to=/wiki", ""))
 	if w.Code != http.StatusSeeOther {
-		t.Fatalf("言語切り替え → %d", w.Code)
+		t.Fatalf("language switch -> %d", w.Code)
 	}
 	var found bool
 	for _, c := range w.Result().Cookies() {
@@ -260,14 +264,14 @@ func TestLanguageSelection(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Error("cookie が設定されていない")
+		t.Error("no cookie was set")
 	}
 	if loc := w.Header().Get("Location"); loc != "/wiki" {
-		t.Errorf("戻り先 = %q", loc)
+		t.Errorf("redirect target = %q", loc)
 	}
 }
 
-// エラーメッセージも言語に従うこと。
+// Error messages follow the language too.
 func TestErrorMessagesAreLocalized(t *testing.T) {
 	h := newServer(t)
 	mustJSON(t, h, "POST", "/api/pages", `{"title":"Conflict","body":"x"}`)
@@ -282,12 +286,12 @@ func TestErrorMessagesAreLocalized(t *testing.T) {
 	json.Unmarshal(w.Body.Bytes(), &res)
 	msg, _ := res["message"].(string)
 	if regexp.MustCompile(`[ぁ-んァ-ヶ一-龠]`).MatchString(msg) {
-		t.Errorf("英語のはずが日本語: %q", msg)
+		t.Errorf("Japanese where English was expected: %q", msg)
 	}
 }
 
-// enableFeatures は Context と Area を on にする。
-// **既定は off なので、これを呼ばない画面テストは 404 を見ることになる。**
+// enableFeatures turns contexts and areas on.
+// **They are off by default, so a screen test that skips this sees a 404.**
 func enableFeatures(t *testing.T, h http.Handler) {
 	t.Helper()
 	form := strings.NewReader("gtd.contexts=1&gtd.areas=1")

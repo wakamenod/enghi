@@ -7,7 +7,7 @@ import (
 	"net/http"
 )
 
-// statusRecorder は書かれたステータスを覚えておく。
+// statusRecorder remembers the status that was written.
 type statusRecorder struct {
 	http.ResponseWriter
 	status int
@@ -25,16 +25,17 @@ func (w *statusRecorder) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
-// Flush は streaming のために透過させる。
+// Flush is passed through for streaming.
 func (w *statusRecorder) Flush() {
 	if f, ok := w.ResponseWriter.(http.Flusher); ok {
 		f.Flush()
 	}
 }
 
-// Hijack は WebSocket の Upgrade に必要。
-// **包んだ時点で元の ResponseWriter が持っていた機能は失われる。**
-// 透過させないと /api/events が張れなくなる(テストで検出した)。
+// Hijack is needed for a WebSocket upgrade.
+// **Wrapping a ResponseWriter drops whatever the original could do.**
+// Without passing this through, /api/events cannot be established - a test
+// caught it.
 func (w *statusRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	h, ok := w.ResponseWriter.(http.Hijacker)
 	if !ok {
@@ -43,11 +44,11 @@ func (w *statusRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return h.Hijack()
 }
 
-// logErrors は 400 以上の応答だけを記録する。
+// logErrors records only responses of 400 and above.
 //
-// **成功したリクエストは記録しない。**常駐するものなので、
-// 普段は静かにしておき、うまくいかなかったものだけを残す。
-// 「開いたはずのページが出ない」ときに、何を要求したのかが分からないと切り分けられない。
+// **Successful requests are not logged.** This runs all day, so it stays quiet
+// and keeps only what went wrong. When "the page I opened did not come up",
+// knowing what was actually requested is what makes it diagnosable.
 func logErrors(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rec := &statusRecorder{ResponseWriter: w}

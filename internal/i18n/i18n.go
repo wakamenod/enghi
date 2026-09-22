@@ -1,4 +1,4 @@
-// Package i18n は画面とメッセージの多言語化を担う。
+// Package i18n localizes the screens and the messages.
 package i18n
 
 import (
@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// Lang は対応している言語。
+// Lang is a supported language.
 type Lang string
 
 const (
@@ -15,19 +15,19 @@ const (
 	EN Lang = "en"
 )
 
-// Default は判定できなかったときの言語。
+// Default is the language used when none could be determined.
 const Default = JA
 
-// All は対応している言語(表示順)。
+// All is every supported language, in display order.
 var All = []Lang{JA, EN}
 
-// Name は言語の表示名(その言語自身で書く)。
+// Name is the display name of a language, written in that language.
 var Name = map[Lang]string{JA: "日本語", EN: "English"}
 
-// CookieName は選択を覚えておく cookie の名前。
+// CookieName is the cookie that remembers the choice.
 const CookieName = "enghi-lang"
 
-// Valid は対応している言語かどうか。
+// Valid reports whether the language is supported.
 func Valid(l string) bool {
 	for _, x := range All {
 		if string(x) == l {
@@ -37,8 +37,8 @@ func Valid(l string) bool {
 	return false
 }
 
-// FromRequest はリクエストから言語を決める。
-// 明示的な選択(cookie)を最優先し、無ければ Accept-Language を見る。
+// FromRequest decides the language from a request: an explicit choice in the
+// cookie wins, and otherwise Accept-Language is consulted.
 func FromRequest(r *http.Request) Lang {
 	if c, err := r.Cookie(CookieName); err == nil && Valid(c.Value) {
 		return Lang(c.Value)
@@ -46,8 +46,8 @@ func FromRequest(r *http.Request) Lang {
 	return FromAcceptLanguage(r.Header.Get("Accept-Language"))
 }
 
-// FromAcceptLanguage は Accept-Language ヘッダから言語を決める。
-// 品質値(q=)の大小は見るが、同値なら先に書かれたものを採る。
+// FromAcceptLanguage decides the language from the Accept-Language header. It
+// honours quality values (q=), and on a tie takes whichever came first.
 func FromAcceptLanguage(header string) Lang {
 	best, bestQ := Default, -1.0
 	for _, part := range strings.Split(header, ",") {
@@ -62,7 +62,7 @@ func FromAcceptLanguage(header string) Lang {
 				q = 1.0
 			}
 		}
-		// ja-JP のような地域付きも拾う
+		// Pick up region-tagged forms such as ja-JP too
 		base := strings.ToLower(tag)
 		if i := strings.Index(base, "-"); i >= 0 {
 			base = base[:i]
@@ -80,14 +80,14 @@ func FromAcceptLanguage(header string) Lang {
 	return best
 }
 
-// T は key に対応する文言を返す。args があれば fmt.Sprintf で埋める。
+// T returns the message for a key, filling in args with fmt.Sprintf.
 //
-// **key が無い場合は key そのものを返す。**画面が空欄になるより、
-// 何が足りないかが見えるほうが直しやすい。
+// **A missing key returns the key itself.** Seeing what is missing is easier to
+// fix than a blank spot on the screen.
 func T(lang Lang, key string, args ...any) string {
 	msg, ok := lookup(lang, key)
 	if !ok {
-		// 対応する言語に無ければ既定の言語で探す
+		// Fall back to the default language when this one has no entry
 		if msg, ok = lookup(Default, key); !ok {
 			return key
 		}
@@ -107,7 +107,7 @@ func lookup(lang Lang, key string) (string, bool) {
 	return "", false
 }
 
-// Keys は登録されている key をすべて返す(検査用)。
+// Keys returns every registered key, for checks.
 func Keys() []string {
 	out := make([]string, 0, len(catalog[Default]))
 	for k := range catalog[Default] {
@@ -116,7 +116,7 @@ func Keys() []string {
 	return out
 }
 
-// catalog は言語ごとの文言。ja.go / en.go で定義する。
+// catalog holds the messages per language, defined in ja.go and en.go.
 var catalog = map[Lang]map[string]string{}
 
 func register(lang Lang, m map[string]string) { catalog[lang] = m }

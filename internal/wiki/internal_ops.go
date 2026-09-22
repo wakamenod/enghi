@@ -9,8 +9,9 @@ import (
 	"github.com/wakamenod/enghi/internal/textnorm"
 )
 
-// syncTitlesFTS は titles_fts を更新する。
-// 【重要】rowid = pages.id を規約とし、page_id 列は作らない(DESIGN 3.4)。
+// syncTitlesFTS updates titles_fts.
+// **IMPORTANT** The convention is rowid = pages.id; never add a page_id column
+// (DESIGN 3.4).
 func syncTitlesFTS(ctx context.Context, tx *sql.Tx, pageID int64, title string) error {
 	if _, err := tx.ExecContext(ctx, `DELETE FROM titles_fts WHERE rowid = ?`, pageID); err != nil {
 		return fmtErr("titles_fts delete", err)
@@ -48,7 +49,7 @@ func sameTags(a, b []string) bool {
 	return true
 }
 
-// syncTags はページのタグを入れ替える。未使用になったタグ行は掃除する。
+// syncTags replaces a page's tags and cleans up tag rows that fall out of use.
 func syncTags(ctx context.Context, tx *sql.Tx, pageID int64, tags []string) error {
 	if _, err := tx.ExecContext(ctx, `DELETE FROM page_tags WHERE page_id = ?`, pageID); err != nil {
 		return err
@@ -77,15 +78,17 @@ func syncTags(ctx context.Context, tx *sql.Tx, pageID int64, tags []string) erro
 	return err
 }
 
-// saveLinks は「(src_kind, src_id) の行を全削除 → 本文を再パースして再挿入」を行う。
-// **呼び出し側と同一トランザクションであること**。これをしないとリンク行が増殖する(DESIGN 2.1)。
+// saveLinks deletes every row for (src_kind, src_id), re-parses the body and
+// re-inserts. **It must run in the caller's transaction**; otherwise link rows
+// multiply on every save (DESIGN 2.1).
 func saveLinks(ctx context.Context, tx *sql.Tx, srcKind string, srcID int64, body string) error {
 	if _, err := tx.ExecContext(ctx,
 		`DELETE FROM links WHERE src_kind = ? AND src_id = ?`, srcKind, srcID); err != nil {
 		return fmtErr("links delete", err)
 	}
 	for _, l := range ParseLinks(body) {
-		// [[...]] の解決は1クエリ。正式名・別名を区別しない(DESIGN 2.5)。
+		// Resolving [[...]] is one query, canonical titles and aliases alike
+		// (DESIGN 2.5).
 		var dstID sql.NullInt64
 		var id int64
 		err := tx.QueryRowContext(ctx, `SELECT page_id FROM page_titles WHERE title = ?`, l.Title).Scan(&id)
@@ -93,7 +96,7 @@ func saveLinks(ctx context.Context, tx *sql.Tx, srcKind string, srcID int64, bod
 		case err == nil:
 			dstID = sql.NullInt64{Int64: id, Valid: true}
 		case err == sql.ErrNoRows:
-			// 未解決リンクとして保持する
+			// Keep it as an unresolved link
 		default:
 			return err
 		}
@@ -106,8 +109,8 @@ func saveLinks(ctx context.Context, tx *sql.Tx, srcKind string, srcID int64, bod
 	return nil
 }
 
-// resolveIncoming は、与えられたタイトル(正式名でも別名でもよい)を指していた
-// 未解決リンクを解決する。
+// resolveIncoming resolves the unresolved links that pointed at the given title
+// (canonical or alias).
 func resolveIncoming(ctx context.Context, tx *sql.Tx, pageID int64, title string) error {
 	_, err := tx.ExecContext(ctx,
 		`UPDATE links SET dst_id = ?
@@ -115,8 +118,8 @@ func resolveIncoming(ctx context.Context, tx *sql.Tx, pageID int64, title string
 	return fmtErr("resolve incoming links", err)
 }
 
-// replaceWikilinkTarget は本文中の [[old]] / [[old|label]] の参照先だけを置換する。
-// 本文の他の箇所(単なる文字列としての出現)には触れない。
+// replaceWikilinkTarget rewrites only the target of [[old]] / [[old|label]] in a
+// body, leaving other occurrences of the same string alone.
 func replaceWikilinkTarget(body, oldTitle, newTitle string) string {
 	return wikilinkRe.ReplaceAllStringFunc(body, func(m string) string {
 		sub := wikilinkRe.FindStringSubmatch(m)

@@ -6,13 +6,14 @@ import (
 	"runtime/debug"
 )
 
-// version はリリースビルドで -ldflags から埋める(Makefile / CI 参照)。
-// go install で入れた場合はここが "dev" のままなので、
-// 下の vcsRevision() が debug.ReadBuildInfo から拾い直す。
+// version is filled in from -ldflags for release builds (see Makefile / CI).
+// When installed with go install it stays "dev", and vcsRevision() below picks
+// the commit back up from debug.ReadBuildInfo.
 var version = "dev"
 
-// vcsRevision はモジュール経由で入れられた場合のコミットを返す。
-// バグ報告を受けるときに「どのバイナリか」を特定できないと切り分けができない。
+// vcsRevision returns the commit when the binary was installed as a module.
+// Without knowing which binary a bug report came from, nothing can be narrowed
+// down.
 func vcsRevision() string {
 	info, ok := debug.ReadBuildInfo()
 	if !ok {
@@ -41,7 +42,7 @@ func vcsRevision() string {
 
 func cmdVersion([]string) error {
 	v := version
-	// ldflags で埋まっている場合はそこにコミットが含まれているので、重ねない。
+	// When ldflags filled it in, the commit is already there; do not repeat it.
 	if v == "dev" {
 		if rev := vcsRevision(); rev != "" {
 			v += " (" + rev + ")"
@@ -51,7 +52,8 @@ func cmdVersion([]string) error {
 	return nil
 }
 
-// isGlobalFlag は、フラグの形で来てもサブコマンドとして扱うものを判定する。
+// isGlobalFlag reports whether an argument that looks like a flag should be
+// treated as a subcommand.
 func isGlobalFlag(s string) bool {
 	switch s {
 	case "-h", "--help", "-v", "--version":

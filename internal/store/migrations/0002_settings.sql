@@ -1,11 +1,13 @@
--- 利用者が画面から切り替える設定。
+-- Settings the user toggles from the screen.
 --
--- config.toml(ポート・パス)とは別物である。あちらは起動時に読む運用の設定で、
--- 手で編集してサーバを再起動するもの。こちらは実行中に画面から変わる好みなので、
--- 他のデータと同じ DB に置き、バックアップとエクスポートの対象に自然に含める。
+-- These are not config.toml (ports and paths). That file is operational
+-- configuration, read at start-up, edited by hand and applied by restarting.
+-- These are preferences that change at run time from the UI, so they live in
+-- the same database as everything else and are naturally covered by backups
+-- and exports.
 --
--- **行が無い = 既定値**とする。既定を DB に書き込まないので、
--- 既定を変えたいときはコード側を直せばよく、移行用の UPDATE が要らない。
+-- **No row means the default.** Defaults are never written to the database, so
+-- changing one is a code change and needs no migration UPDATE.
 CREATE TABLE settings (
   key        TEXT NOT NULL PRIMARY KEY,
   value      TEXT NOT NULL,

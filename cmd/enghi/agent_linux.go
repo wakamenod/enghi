@@ -13,12 +13,13 @@ import (
 	"github.com/wakamenod/enghi/internal/config"
 )
 
-// systemd の user unit。macOS の launchd plist(agent_darwin.go)に対応する。
+// A systemd user unit, the counterpart of the launchd plist on macOS
+// (agent_darwin.go).
 //
-// ログは journald が受けるのでファイルには落とさない
-// (launchd 側が ~/Library/Logs に書くのは、launchd にその仕組みが無いため)。
+// Logs go to journald rather than to a file. (The launchd side writes to
+// ~/Library/Logs only because launchd has no equivalent.)
 const unitTemplate = `[Unit]
-Description=enghi — ローカル専用の Wiki + GTD
+Description=enghi - local-only wiki and GTD
 After=network.target
 
 [Service]
@@ -31,12 +32,12 @@ RestartSec=5
 WantedBy=default.target
 `
 
-// cmdInstallAgent は systemd の user unit を書き出す(DESIGN 8-11)。
-// 常駐させ、常にブラウザから開ける状態を保つため。
+// cmdInstallAgent writes out a systemd user unit (DESIGN 8-11), so that enghi
+// stays resident and is always there when the browser asks for it.
 func cmdInstallAgent(args []string) error {
 	fs := flag.NewFlagSet("install-agent", flag.ExitOnError)
-	label := fs.String("label", "enghi", "systemd の unit 名(.service は付けない)")
-	load := fs.Bool("load", false, "書き出した後に systemctl --user enable --now まで実行する")
+	label := fs.String("label", "enghi", "systemd unit name (without .service)")
+	load := fs.Bool("load", false, "run systemctl --user enable --now after writing the unit")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -58,18 +59,18 @@ func cmdInstallAgent(args []string) error {
 	if err := os.WriteFile(unitPath, []byte(fmt.Sprintf(unitTemplate, exe)), 0o600); err != nil {
 		return err
 	}
-	fmt.Printf("書き出した: %s\n", unitPath)
-	fmt.Printf("  実行ファイル: %s\n", exe)
-	fmt.Printf("  ログ: journalctl --user -u %s\n", *label)
-	fmt.Printf("  設定: %s\n", config.Path())
+	fmt.Printf("wrote: %s\n", unitPath)
+	fmt.Printf("  executable: %s\n", exe)
+	fmt.Printf("  log: journalctl --user -u %s\n", *label)
+	fmt.Printf("  config: %s\n", config.Path())
 
-	// ログアウト後も常駐させるには linger が要る。
-	// これが無いとセッション終了で落ちるので、常駐サーバとしては必ず案内する。
-	fmt.Printf("\nログアウト後も常駐させるには(初回のみ):\n  loginctl enable-linger $(whoami)\n")
+	// Staying resident after logout requires linger. Without it the service dies
+	// with the session, so a resident server must always mention this.
+	fmt.Printf("\nto keep it running after logout (once):\n  loginctl enable-linger $(whoami)\n")
 
 	if !*load {
-		fmt.Printf("\n有効にするには:\n  systemctl --user daemon-reload\n  systemctl --user enable --now %s\n", *label)
-		fmt.Printf("止めるには:\n  systemctl --user disable --now %s\n", *label)
+		fmt.Printf("\nto enable it:\n  systemctl --user daemon-reload\n  systemctl --user enable --now %s\n", *label)
+		fmt.Printf("to stop it:\n  systemctl --user disable --now %s\n", *label)
 		return nil
 	}
 
@@ -80,11 +81,12 @@ func cmdInstallAgent(args []string) error {
 	if err != nil {
 		return fmt.Errorf("systemctl enable --now: %w: %s", err, strings.TrimSpace(string(out)))
 	}
-	fmt.Println("systemd に登録した")
+	fmt.Println("registered with systemd")
 	return nil
 }
 
-// configHome は unit の置き場を決める。config パッケージと同じ XDG の規則に従う。
+// configHome decides where the unit goes, following the same XDG rules as the
+// config package.
 func configHome() string {
 	if v := os.Getenv("XDG_CONFIG_HOME"); v != "" {
 		return v

@@ -7,32 +7,34 @@ import (
 	"github.com/wakamenod/enghi/internal/wiki"
 )
 
-// Dashboard は / と GET /api/dashboard が返すもの(DESIGN 5)。
-// 上段が GTD、下段が Wiki。**GTD を使っていなければ上段は自然に空になる。**
+// Dashboard is what / and GET /api/dashboard return (DESIGN 5).
+// GTD on top, the wiki below. **Without GTD in use, the top half is simply
+// empty.**
 type Dashboard struct {
 	GTD  GTDSummary  `json:"gtd"`
 	Wiki WikiSummary `json:"wiki"`
 }
 
-// GTDSummary は上段(DESIGN 5)。**GTD を使っていなければ自然に空になる。**
+// GTDSummary is the top half (DESIGN 5). **Without GTD in use it is simply
+// empty.**
 type GTDSummary struct {
-	// 1. Inbox 件数(0 でないときだけ強調する)
+	// 1. Inbox count, emphasized only when it is not zero
 	InboxCount int `json:"inbox_count"`
-	// 2. 今日の Next Actions(deadline_on <= today または scheduled_on <= today)
+	// 2. Today's next actions (deadline_on <= today or scheduled_on <= today)
 	Today []*gtd.Task `json:"today"`
-	// 3. コンテキスト別の Next Action 件数
+	// 3. Next-action counts per context
 	Contexts []*gtd.Context `json:"contexts"`
-	// 4. **停滞プロジェクト(Next Action が無いもの)** — DESIGN 2.4
+	// 4. **Stalled projects, those without a next action** - DESIGN 2.4
 	StalledProjects []*gtd.Project `json:"stalled_projects"`
-	// 5. Waiting For のうち委譲から一定日数が経過したもの(既定 7 日)
+	// 5. Waiting-for items delegated more than a few days ago (7 by default)
 	WaitingOverdue []*gtd.Task `json:"waiting_overdue"`
-	// 6. 再検討日が到来した Someday プロジェクト
+	// 6. Someday projects whose review date has come
 	SomedayDueReview []*gtd.Project `json:"someday_due_review"`
 
-	Enabled bool `json:"enabled"` // GTD のデータが1件でもあるか
+	Enabled bool `json:"enabled"` // whether there is any GTD data at all
 }
 
-// WikiSummary は下段。
+// WikiSummary is the lower half.
 type WikiSummary struct {
 	TotalPages   int               `json:"total_pages"`
 	RecentUpdate []*wiki.Page      `json:"recently_updated"`
@@ -41,7 +43,7 @@ type WikiSummary struct {
 	Tags         []wiki.TagCount   `json:"tags"`
 }
 
-// dashboardData は必要な集計をまとめて取る。
+// dashboardData gathers every aggregate in one go.
 func (s *Server) dashboardData(ctx context.Context) (*Dashboard, error) {
 	d := &Dashboard{}
 
@@ -51,17 +53,19 @@ func (s *Server) dashboardData(ctx context.Context) (*Dashboard, error) {
 	}
 	d.Wiki.TotalPages = total
 
-	// 7. 最近更新した記事 20 件。
-	// **ダッシュボードの「最近の変更」はこれ1本で出す。**新規作成も updated_at が
-	// 動くのでここに入る。新規かどうかは version == 1 で見分ける(dashboard.html)。
+	// 7. The 20 most recently updated articles.
+	// **"Recent changes" on the dashboard comes from this one query.** Creating
+	// an article moves updated_at too, so new ones appear here as well; whether
+	// something is new is decided by version == 1 (dashboard.html).
 	if d.Wiki.RecentUpdate, err = s.pages.List(ctx, "updated", 20, 0); err != nil {
 		return nil, err
 	}
-	// 8. 最近作成した記事。画面では 7 に併合したが、API の利用者のために残す。
+	// 8. Recently created articles. The screen folds these into 7, but the API
+	// keeps them for its callers.
 	if d.Wiki.RecentCreate, err = s.pages.RecentlyCreated(ctx, 10); err != nil {
 		return nil, err
 	}
-	// 9. 未解決リンク — 書くべきものの示唆になる
+	// 9. Unresolved links - a hint at what is worth writing
 	if d.Wiki.Unresolved, err = s.pages.UnresolvedLinks(ctx, 15); err != nil {
 		return nil, err
 	}
@@ -69,7 +73,8 @@ func (s *Server) dashboardData(ctx context.Context) (*Dashboard, error) {
 		return nil, err
 	}
 
-	// 上段 — GTD。**空でも崩れないレイアウトにすること**(DESIGN 5)。
+	// The top half, GTD. **The layout must hold up when it is empty**
+	// (DESIGN 5).
 	var gtdRows int
 	if err := s.db.QueryRowContext(ctx,
 		`SELECT (SELECT count(*) FROM tasks) + (SELECT count(*) FROM projects) + (SELECT count(*) FROM areas)`).

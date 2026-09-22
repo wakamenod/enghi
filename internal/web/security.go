@@ -8,24 +8,25 @@ import (
 	filestore "github.com/wakamenod/enghi/internal/files"
 )
 
-// secure は DESIGN 4.4 の3層をすべて適用する。
-// **「127.0.0.1 に bind したから安全」は誤りである。**
-// 利用者が普段ブラウザで開いている任意の Web ページの JavaScript が
-// http://127.0.0.1:<port>/api/... を叩けるため、以下がすべて必要になる。
+// secure applies all three layers of DESIGN 4.4.
+// **"It binds to 127.0.0.1, so it is safe" is wrong.** JavaScript on any page
+// the user happens to have open can call http://127.0.0.1:<port>/api/..., which
+// is why every one of the following is needed.
 func (s *Server) secure(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// 1. Host ヘッダの検証。
-		//    **これが本丸であり、DNS rebinding に対する唯一有効な防御である。**
-		//    rebinding が成立するとブラウザから見て同一オリジンになるため Origin 検査では防げない。
+		// 1. Validate the Host header.
+		//    **This is the main defense, and the only effective one against DNS
+		//    rebinding.** Once rebinding succeeds the browser considers it the
+		//    same origin, so an Origin check cannot stop it.
 		if !s.allowedHost(r.Host) {
 			forbid(w, s.tr(r, "err.forbidden_host", r.Host))
 			return
 		}
 
-		// 2. Origin / Sec-Fetch-Site の検証。クロスオリジン呼び出しを弾く。
-		//    **Sec-Fetch-Site は curl や Emacs の url-retrieve では送られてこない。**
-		//    判定は「ヘッダが存在する場合に same-origin 以外なら 403」とすること。
-		//    「存在しなければ拒否」にすると Emacs 層が動かなくなる。
+		// 2. Validate Origin / Sec-Fetch-Site to reject cross-origin calls.
+		//    **Neither curl nor Emacs's url-retrieve sends Sec-Fetch-Site.**
+		//    The rule is "if the header is present and is not same-origin, 403".
+		//    "Reject when absent" would break the Emacs layer.
 		if site := r.Header.Get("Sec-Fetch-Site"); site != "" {
 			if site != "same-origin" && site != "none" {
 				forbid(w, s.tr(r, "err.forbidden_site", site))
@@ -39,11 +40,12 @@ func (s *Server) secure(next http.Handler) http.Handler {
 			}
 		}
 
-		// 3. Content-Type の強制。simple request として preflight 無しに通る経路を塞ぐ。
-		//    simple request になりうるのは GET / HEAD / POST だけなので、強制が本当に
-		//    効いているのは POST である。PUT / PATCH / DELETE はメソッド自体が
-		//    必ず preflight を起こすため、**本文の無い呼び出しにまで Content-Type を
-		//    要求すると、防御を足さずに Emacs 層と curl を壊すだけになる。**
+		// 3. Enforce Content-Type, closing the path where a simple request gets
+		//    through without a preflight. Only GET / HEAD / POST can be simple
+		//    requests, so in practice this bites on POST. PUT / PATCH / DELETE
+		//    always trigger a preflight by virtue of the method, so **demanding a
+		//    Content-Type even on a body-less call adds no protection and merely
+		//    breaks the Emacs layer and curl.**
 		if s.needsJSONContentType(r) {
 			ct := r.Header.Get("Content-Type")
 			if mediaType(ct) != "application/json" {
@@ -58,25 +60,24 @@ func (s *Server) secure(next http.Handler) http.Handler {
 	})
 }
 
-// formAllowed は「ブラウザの UI から来た form 送信」に限って
-// application/x-www-form-urlencoded を許す経路。
-// Sec-Fetch-Site: same-origin が付いていることを条件とするため、
-// 外部ページからの simple request では通らない。
-// needsJSONContentType は Content-Type を強制すべき呼び出しかを判定する。
+// formAllowed lets application/x-www-form-urlencoded through, but only for a
+// form submitted by the browser UI. It requires Sec-Fetch-Site: same-origin, so
+// a simple request from an external page never qualifies.
+// needsJSONContentType reports whether a call must carry a JSON Content-Type.
 func (s *Server) needsJSONContentType(r *http.Request) bool {
 	if !isWrite(r.Method) || s.formAllowed(r) {
 		return false
 	}
 	if r.Method == http.MethodPost {
-		// ファイルのアップロードは生のバイト列を受け取る。
-		// 許すのは files.MediaTypeAllowed に載っている種別だけで、
-		// これらは CORS の simple request にならないため preflight を避けられない。
+		// File uploads take raw bytes. Only the media types listed in
+		// files.MediaTypeAllowed are accepted, and none of them can be a CORS
+		// simple request, so a preflight is unavoidable for them.
 		if r.URL.Path == "/api/files" && filestore.MediaTypeAllowed(mediaType(r.Header.Get("Content-Type"))) {
 			return false
 		}
-		return true // simple request になりうるのは POST。常に強制する
+		return true // POST is the one that can be a simple request; always enforce
 	}
-	// PUT / PATCH / DELETE は本文を伴うときだけ検査する
+	// PUT / PATCH / DELETE are checked only when they carry a body
 	return r.ContentLength != 0 || r.Header.Get("Content-Type") != ""
 }
 
@@ -97,8 +98,9 @@ func (s *Server) allowedHost(host string) bool {
 	case "127.0.0.1", "localhost", "::1":
 		return true
 	}
-	// 設定で明示的に足された名前(前段にプロキシを置く運用)。
-	// **既定は空で、そのときは上のループバック3つだけが通る。**
+	// Names added explicitly in the configuration, for running behind a proxy.
+	// **It is empty by default, and then only the three loopback names above
+	// are accepted.**
 	for _, a := range s.cfg.NormalizedAllowedHosts() {
 		if h == a {
 			return true
