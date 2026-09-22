@@ -2,9 +2,9 @@
 
 *English · [日本語](README.ja.md)*
 
-A local-only personal wiki + GTD server for macOS and Linux. Runs as a background service, used from the browser; nothing leaves the machine. Instant full-text search (SQLite FTS5), `[[wikilinks]]` resolved by title, export to plain Markdown any time.
-
-The database schema is in [docs/schema.sql](docs/schema.sql).
+A local-only personal wiki + GTD server for macOS and Linux. Runs as a background
+service, used from the browser; nothing leaves the machine. Instant full-text search
+(SQLite FTS5), `[[wikilinks]]` resolved by title, export to plain Markdown any time.
 
 ## Installation
 
@@ -13,9 +13,12 @@ brew install wakamenod/tap/enghi
 brew services start enghi     # Registers with launchd on macOS, systemd on Linux
 ```
 
-Open http://127.0.0.1:7777/. See `/guide` for GTD introduction and usage (English and Japanese).
+Open http://127.0.0.1:7777/. See `/guide` for GTD introduction and usage (English and
+Japanese).
 
-Without Homebrew, unpack the tarball from [Releases](https://github.com/wakamenod/enghi/releases) and run `enghi install-agent -load` to set up the background service.
+Without Homebrew, unpack the tarball from
+[Releases](https://github.com/wakamenod/enghi/releases) and run `enghi install-agent
+-load` to set up the background service.
 
 ## Configuration
 
@@ -25,7 +28,7 @@ Without Homebrew, unpack the tarball from [Releases](https://github.com/wakameno
 port = 7777
 db_path    = "~/.local/share/enghi/enghi.db"
 export_dir = "~/.local/share/enghi/export"
-revision_compact_minutes = 10                            # Re-edit a page within this many minutes and it overwrites the last revision
+revision_compact_minutes = 10   # re-edits within this window overwrite the last revision
 
 files_db_path  = "~/.local/share/enghi/enghi-files.db"   # Tracks db_path if omitted
 backup_dir     = "~/.local/share/enghi/backup"
@@ -49,10 +52,12 @@ All commands accept `--config` to specify the configuration file path.
 
 ## Service Management and Recovery
 
-`install-agent` writes a launchd plist to `~/Library/LaunchAgents` on macOS, or a systemd user unit to `~/.config/systemd/user` on Linux.
-**On Linux, run `loginctl enable-linger` to keep the service running after logout.**
+`install-agent` writes a launchd plist to `~/Library/LaunchAgents` on macOS, or a
+systemd user unit to `~/.config/systemd/user` on Linux. **On Linux, run `loginctl
+enable-linger` to keep the service running after logout.**
 
-Backups use `VACUUM INTO`, capturing the database cleanly without missing WAL entries. To restore, stop the server and replace the file:
+Backups use `VACUUM INTO`, capturing the database cleanly without missing WAL entries.
+To restore, stop the server and replace the file:
 
 ```sh
 brew services stop enghi        # Or launchctl bootout / systemctl --user stop
@@ -73,7 +78,8 @@ iPhone ──https──▶ Caddy (LAN:443)  ──http──▶ enghi (127.0.0.
                    └ Password verification
 ```
 
-**Never bind to `0.0.0.0`.** enghi has no authentication; doing so gives read/write access to everyone on your Wi-Fi.
+**Never bind to `0.0.0.0`.** enghi has no authentication; doing so gives read/write
+access to everyone on your Wi-Fi.
 
 ### 1. Install Caddy and hash your password
 
@@ -109,25 +115,32 @@ brew services start caddy
 allowed_hosts = ["junnomacbook-pro.local"]
 ```
 
-Requests are accepted only when the incoming `Host` header matches. Wildcards are not allowed
-(`*.local` produces an error on startup). Defaults to loopback only if omitted.
+Requests are accepted only when the incoming `Host` header matches. Wildcards are not
+allowed (`*.local` produces an error on startup). Defaults to loopback only if omitted.
 
 Restart enghi after editing.
 
 ### 4. Trust the certificate on iPhone
 
-Because `tls internal` uses Caddy's self-generated root CA, Safari will warn on first access.
-Transfer the root certificate (find its path via `caddy trust` or in Caddy's data directory)
-to your iPhone, then enable "Full Trust" under **Settings → General → About → Certificate Trust Settings**.
+Because `tls internal` uses Caddy's self-generated root CA, Safari will warn on first
+access. Transfer the root certificate (find its path via `caddy trust` or in Caddy's
+data directory) to your iPhone, then enable "Full Trust" under **Settings → General →
+About → Certificate Trust Settings**.
 
-Ignoring the warning lets you browse pages, but `wss://` will be rejected, breaking live updates (such as focus sync from Emacs).
+Ignoring the warning lets you browse pages, but `wss://` will be rejected, breaking live
+updates (such as focus sync from Emacs).
 
 ### Notes
 
 - **Never omit `basic_auth`.** Without it, anyone on the same LAN has read/write access
-- `basic_auth` was previously named `basicauth`. Verify the syntax for your installed Caddy version
-- Basic auth uses the browser's native prompt, so password manager autofill (like 1Password) does not work. Paste a long random password once; the browser will remember it
-- **Not accessible outside your home network** (home LAN only). For remote access, use an external tunnel like Tailscale or Cloudflare Tunnel. On the enghi side, simply add that hostname to `allowed_hosts`
+- `basic_auth` was previously named `basicauth`. Verify the syntax for your installed
+  Caddy version
+- Basic auth uses the browser's native prompt, so password manager autofill (like
+  1Password) does not work. Paste a long random password once; the browser will remember
+  it
+- **Not accessible outside your home network** (home LAN only). For remote access, use
+  an external tunnel like Tailscale or Cloudflare Tunnel. On the enghi side, simply add
+  that hostname to `allowed_hosts`
 - The `.local` name tracks IP changes on your Mac. No static IP needed
 
 ## Recurring Task Syntax
@@ -143,7 +156,10 @@ Follows org-mode repeater syntax (stored directly in the `recurrence` column):
 | `monthly:25` / `monthly:last` | Monthly | Next matching date / end of month |
 | `yearly:04-01` | Yearly | Next matching date |
 
-Completing (or skipping) a task generates **only the next single instance**, so there is always at most one open instance per series. Generated instances always start in the `scheduled` state. Dates that do not exist (a 31st in a short month, Feb 29 in a non-leap year) clamp to the last day of that month.
+Completing (or skipping) a task generates **only the next single instance**, so there is
+always at most one open instance per series. Generated instances always start in the
+`scheduled` state. Dates that do not exist (a 31st in a short month, Feb 29 in a
+non-leap year) clamp to the last day of that month.
 
 ## Keyboard Shortcuts (Web UI)
 
@@ -152,14 +168,13 @@ Completing (or skipping) a task generates **only the next single instance**, so 
 
 ## Using from Emacs
 
-The client is a separate project: **[enghi.el](https://github.com/wakamenod/enghi.el)**.
-It only speaks the JSON API, so there is nothing to configure on the server.
+See **[enghi.el](https://github.com/wakamenod/enghi.el)**.
 
 ## Development
 
 **The `sqlite_fts5` build tag and `CGO_ENABLED=1` are required** (FTS5 and the trigram
-tokenizer); the build fails on purpose without them (`cmd/enghi/require_*.go`). cgo rules
-out cross-compiling, so release binaries are built on native runners.
+tokenizer); the build fails on purpose without them (`cmd/enghi/require_*.go`). cgo
+rules out cross-compiling, so release binaries are built on native runners.
 
 ```sh
 make build test vet     # browser tests need: npx playwright install chromium webkit
