@@ -4,8 +4,7 @@
 
 ローカル専用の個人向け Wiki + GTD。常駐サーバとして動き、ブラウザから使う。
 
-設計と判断の根拠は [docs/DESIGN.md](docs/DESIGN.md)、スキーマは [docs/schema.sql](docs/schema.sql)。
-**実装は DESIGN.md に従うこと。特に 3 節(検索)は実測に基づく確定仕様である。**
+スキーマは [docs/schema.sql](docs/schema.sql)。
 
 ## インストール
 
@@ -27,26 +26,13 @@ tarball を展開し、`enghi install-agent -load` で常駐させる。
 port = 7777
 db_path    = "~/.local/share/enghi/enghi.db"
 export_dir = "~/.local/share/enghi/export"
-revision_compact_minutes = 10
+revision_compact_minutes = 10                            # この分数以内の再編集は直前のリビジョンを上書きする
 
 files_db_path  = "~/.local/share/enghi/enghi-files.db"   # 省略すると db_path に追従する
 backup_dir     = "~/.local/share/enghi/backup"
 backup_keep    = 7       # 残す世代数
 backup_enabled = true
 ```
-
-### 画面からの設定(`/settings`)
-
-config.toml が「起動時に読む運用の設定」なのに対し、こちらは実行中に切り替える好み。
-保存先は DB で、**行が無い = 既定値**。
-
-| 項目 | 既定 | |
-|---|---|---|
-| Context | off | 行動を場所や道具で絞り込む(`@電話` `@自宅`)。Next Actions が長くなってきたら |
-| Area | off | 完了しない責任範囲(経理・健康)で Project と行動をまとめる |
-
-**on にすると画面に現れ、使い方ガイドの該当する節も現れる。** off に戻してもデータは消えない。
-エクスポートとバックアップの実行もこの画面にある。
 
 ## コマンド
 
@@ -176,46 +162,18 @@ org-mode のリピータ記法に準拠(`recurrence` 列にそのまま格納):
 
 ## Emacs から使う
 
-クライアントは別プロジェクト **[`../enghi.el`](../enghi.el)**。サーバ側の設定は要らない。
-依存している API は以下だけで、**JSON で独立に成立させてある**:
-
-```
-GET    /api/search?q=&kind=&limit=
-GET    /api/pages ; POST /api/pages
-GET    /api/pages/:slug ; PUT /api/pages/:slug ; DELETE /api/pages/:slug
-GET    /api/tasks ; POST /api/tasks ; PATCH /api/tasks/:id
-POST   /api/tasks/:id/complete ; POST /api/tasks/:id/file
-GET    /api/projects ; GET /api/projects/stalled ; GET /api/contexts
-POST   /api/focus              開いているブラウザタブを遷移させる
-GET    /api/status             接続確認
-```
+クライアントは別プロジェクトの **[enghi.el](https://github.com/wakamenod/enghi.el)**。
+JSON API を叩くだけなので、サーバ側の設定は要らない。
 
 ## 開発
 
 **build tag `sqlite_fts5` と `CGO_ENABLED=1` が必須**(FTS5 と trigram tokenizer)。
-どちらが欠けてもコンパイルエラーで止まる(`cmd/enghi/require_*.go`)。
-cgo なので **GOOS を跨いだビルドはできない**。配布物は各 OS の runner で作る。
+どちらが欠けてもコンパイルエラーで止まる(`cmd/enghi/require_*.go`)。cgo なので GOOS を
+跨いだビルドはできず、配布物は各 OS の runner で作る。
 
 ```sh
-make build test vet
+make build test vet     # ブラウザ検証には npx playwright install chromium webkit が要る
 ```
-
-テストは DESIGN.md が「壊れやすい」と名指ししている箇所を中心に書いてある
-(リネームの往復、検索のフレーズリテラル化と語境界、セキュリティ3層、
-定期タスクの日付計算、全画面が最後まで描画されること)。
-ブラウザを使う検証は Playwright: `npx playwright install chromium webkit`。
 
 `docs/guide/` に書き足すときは、**見出しに `{#id}` で明示的なアンカーを必ず書くこと**
 (自動生成 ID だと日英で食い違い、画面の「?」リンクが切れる)。
-
-## リリース
-
-タグを push すると各 OS の runner でビルドし、tarball と `SHA256SUMS` を付けて
-GitHub Release を作る(`.github/workflows/release.yml`)。
-
-```sh
-git tag v0.1.0 && git push origin v0.1.0
-```
-
-そのあと `packaging/homebrew/enghi.rb` の `url` と `sha256` を更新し、
-`wakamenod/homebrew-tap` の `Formula/enghi.rb` へ反映する。

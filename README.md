@@ -4,8 +4,7 @@
 
 A local-only personal wiki + GTD server for macOS and Linux. Runs as a background service, used from the browser; nothing leaves the machine. Instant full-text search (SQLite FTS5), `[[wikilinks]]` resolved by title, export to plain Markdown any time.
 
-Design rationale is in [docs/DESIGN.md](docs/DESIGN.md); schema is in [docs/schema.sql](docs/schema.sql).
-**All implementation must follow DESIGN.md. Section 3 (Search) in particular is a locked specification based on empirical benchmarks.**
+The database schema is in [docs/schema.sql](docs/schema.sql).
 
 ## Installation
 
@@ -26,26 +25,13 @@ Without Homebrew, unpack the tarball from [Releases](https://github.com/wakameno
 port = 7777
 db_path    = "~/.local/share/enghi/enghi.db"
 export_dir = "~/.local/share/enghi/export"
-revision_compact_minutes = 10
+revision_compact_minutes = 10                            # Re-edit a page within this many minutes and it overwrites the last revision
 
 files_db_path  = "~/.local/share/enghi/enghi-files.db"   # Tracks db_path if omitted
 backup_dir     = "~/.local/share/enghi/backup"
 backup_keep    = 7       # Generations to keep
 backup_enabled = true
 ```
-
-### In-App Settings (`/settings`)
-
-While `config.toml` holds operational settings read at startup, `/settings` controls runtime preferences.
-Stored in the database; **no row = default**.
-
-| Setting | Default | |
-|---|---|---|
-| Context | off | Filter actions by place or tool (`@phone`, `@home`). Turn on when Next Actions grows long |
-| Area | off | Group projects and actions by ongoing spheres of responsibility (accounting, health) |
-
-**Enabling a setting shows it in the UI and displays the corresponding section in the guide.** Disabling it leaves your data intact.
-Export and backup triggers are also on this screen.
 
 ## Commands
 
@@ -166,44 +152,18 @@ Completing (or skipping) a task generates **only the next single instance**, so 
 
 ## Using from Emacs
 
-Client is in a separate repository: **[`../enghi.el`](../enghi.el)**. No server-side configuration needed.
-It depends only on the following endpoints, **fully self-contained via JSON**:
-
-```
-GET    /api/search?q=&kind=&limit=
-GET    /api/pages ; POST /api/pages
-GET    /api/pages/:slug ; PUT /api/pages/:slug ; DELETE /api/pages/:slug
-GET    /api/tasks ; POST /api/tasks ; PATCH /api/tasks/:id
-POST   /api/tasks/:id/complete ; POST /api/tasks/:id/file
-GET    /api/projects ; GET /api/projects/stalled ; GET /api/contexts
-POST   /api/focus              Navigate open browser tabs
-GET    /api/status             Connection check
-```
+The client is a separate project: **[enghi.el](https://github.com/wakamenod/enghi.el)**.
+It only speaks the JSON API, so there is nothing to configure on the server.
 
 ## Development
 
-**Build tag `sqlite_fts5` and `CGO_ENABLED=1` are required** (FTS5 and trigram tokenizer).
-Missing either halts compilation with an error (`cmd/enghi/require_*.go`).
-Because of cgo, **cross-compiling across GOOS is not supported**. Release binaries are built on native OS runners.
+**The `sqlite_fts5` build tag and `CGO_ENABLED=1` are required** (FTS5 and the trigram
+tokenizer); the build fails on purpose without them (`cmd/enghi/require_*.go`). cgo rules
+out cross-compiling, so release binaries are built on native runners.
 
 ```sh
-make build test vet
+make build test vet     # browser tests need: npx playwright install chromium webkit
 ```
 
-Tests focus on areas DESIGN.md identifies as fragile:
-roundtrip renames, phrase literalization and word boundaries in search, the three security layers,
-recurring task date calculations, and full end-to-end rendering of all screens.
-Browser verification uses Playwright: `npx playwright install chromium webkit`.
-
-When adding to `docs/guide/`, **always include explicit `{#id}` anchors on headings**
-(auto-generated IDs diverge between English and Japanese, breaking in-app `?` help links).
-
-## Releases
-
-Pushing a tag triggers builds on native OS runners and publishes a GitHub Release with tarballs and `SHA256SUMS` (`.github/workflows/release.yml`).
-
-```sh
-git tag v0.1.0 && git push origin v0.1.0
-```
-
-Then update `url` and `sha256` in `packaging/homebrew/enghi.rb`, and commit the changes to `Formula/enghi.rb` in `wakamenod/homebrew-tap`.
+When adding to `docs/guide/`, **give every heading an explicit `{#id}` anchor** —
+auto-generated IDs diverge between English and Japanese and break the in-app `?` links.
