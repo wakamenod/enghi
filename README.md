@@ -1,30 +1,26 @@
 # enghi
 
-ローカル専用の個人向け Wiki + GTD。常駐サーバとして動き、ブラウザから使う。
+*English · [日本語](README.ja.md)*
 
-> **enghi** is a local-only personal wiki + GTD server for macOS and Linux.
-> It runs as a background service and you use it from your browser — nothing
-> leaves your machine. Instant full-text search (SQLite FTS5), `[[wikilinks]]`
-> resolved by title, and export to plain Markdown at any time.
+A local-only personal wiki + GTD server for macOS and Linux. Runs as a background service, used from the browser; nothing leaves the machine. Instant full-text search (SQLite FTS5), `[[wikilinks]]` resolved by title, export to plain Markdown any time.
 
-設計と判断の根拠は [docs/DESIGN.md](docs/DESIGN.md)、スキーマは [docs/schema.sql](docs/schema.sql)。
-**実装は DESIGN.md に従うこと。特に 3 節(検索)は実測に基づく確定仕様である。**
+Design rationale is in [docs/DESIGN.md](docs/DESIGN.md); schema is in [docs/schema.sql](docs/schema.sql).
+**All implementation must follow DESIGN.md. Section 3 (Search) in particular is a locked specification based on empirical benchmarks.**
 
-## インストール
+## Installation
 
 ```sh
 brew install wakamenod/tap/enghi
-brew services start enghi     # macOS は launchd、Linux は systemd に登録される
+brew services start enghi     # Registers with launchd on macOS, systemd on Linux
 ```
 
-http://127.0.0.1:7777/ を開く。使い方は `/guide`(GTD の入門と操作説明。日英)。
+Open http://127.0.0.1:7777/. See `/guide` for GTD introduction and usage (English and Japanese).
 
-brew を使わない場合は [Releases](https://github.com/wakamenod/enghi/releases) の
-tarball を展開し、`enghi install-agent -load` で常駐させる。
+Without Homebrew, unpack the tarball from [Releases](https://github.com/wakamenod/enghi/releases) and run `enghi install-agent -load` to set up the background service.
 
-## 設定
+## Configuration
 
-`~/.config/enghi/config.toml`。無ければ既定値で動く。
+`~/.config/enghi/config.toml`. Runs with defaults if omitted.
 
 ```toml
 port = 7777
@@ -32,87 +28,84 @@ db_path    = "~/.local/share/enghi/enghi.db"
 export_dir = "~/.local/share/enghi/export"
 revision_compact_minutes = 10
 
-files_db_path  = "~/.local/share/enghi/enghi-files.db"   # 省略すると db_path に追従する
+files_db_path  = "~/.local/share/enghi/enghi-files.db"   # Tracks db_path if omitted
 backup_dir     = "~/.local/share/enghi/backup"
-backup_keep    = 7       # 残す世代数
+backup_keep    = 7       # Generations to keep
 backup_enabled = true
 ```
 
-### 画面からの設定(`/settings`)
+### In-App Settings (`/settings`)
 
-config.toml が「起動時に読む運用の設定」なのに対し、こちらは実行中に切り替える好み。
-保存先は DB で、**行が無い = 既定値**。
+While `config.toml` holds operational settings read at startup, `/settings` controls runtime preferences.
+Stored in the database; **no row = default**.
 
-| 項目 | 既定 | |
+| Setting | Default | |
 |---|---|---|
-| Context | off | 行動を場所や道具で絞り込む(`@電話` `@自宅`)。Next Actions が長くなってきたら |
-| Area | off | 完了しない責任範囲(経理・健康)で Project と行動をまとめる |
+| Context | off | Filter actions by place or tool (`@phone`, `@home`). Turn on when Next Actions grows long |
+| Area | off | Group projects and actions by ongoing spheres of responsibility (accounting, health) |
 
-**on にすると画面に現れ、使い方ガイドの該当する節も現れる。** off に戻してもデータは消えない。
-エクスポートとバックアップの実行もこの画面にある。
+**Enabling a setting shows it in the UI and displays the corresponding section in the guide.** Disabling it leaves your data intact.
+Export and backup triggers are also on this screen.
 
-## コマンド
+## Commands
 
 ```
-enghi [serve]          常駐サーバを起動する
-enghi export [--dir D] Markdown に全件エクスポート(--dir は CLI のみ。API は設定値に固定)
-enghi doctor [--fix]   整合性検査。--fix で NFD の混入を直す
-enghi backup [--list]  DB のバックアップ(--dir で出力先)。常駐中は1日1回自動で取る
-enghi files [--prune]  画像などの一覧。--prune で未参照のものを消す
-enghi install-agent    常駐設定を書き出す。-load で登録まで行う
-enghi version          バージョンを表示する
+enghi [serve]          Start resident server
+enghi export [--dir D] Export everything to Markdown (--dir CLI only; API uses config value)
+enghi doctor [--fix]   Integrity check. --fix repairs stray NFD text
+enghi backup [--list]  Database backup (--dir sets destination). Runs daily while resident
+enghi files [--prune]  List images and files. --prune removes unreferenced files
+enghi install-agent    Write service config. -load registers and starts it
+enghi version          Print version
 ```
 
-いずれも `--config` で設定ファイルのパスを指定できる。
+All commands accept `--config` to specify the configuration file path.
 
-## 常駐と復元
+## Service Management and Recovery
 
-`install-agent` は macOS なら launchd の plist を `~/Library/LaunchAgents` に、
-Linux なら systemd の user unit を `~/.config/systemd/user` に書く。
-**Linux ではログアウト後も動かすために `loginctl enable-linger` が要る。**
+`install-agent` writes a launchd plist to `~/Library/LaunchAgents` on macOS, or a systemd user unit to `~/.config/systemd/user` on Linux.
+**On Linux, run `loginctl enable-linger` to keep the service running after logout.**
 
-バックアップは `VACUUM INTO` で取るので、WAL を取りこぼさない。戻すときは
-サーバを止めてファイルを置き換えるだけでよい:
+Backups use `VACUUM INTO`, capturing the database cleanly without missing WAL entries. To restore, stop the server and replace the file:
 
 ```sh
-brew services stop enghi        # または launchctl bootout / systemctl --user stop
+brew services stop enghi        # Or launchctl bootout / systemctl --user stop
 cp ~/.local/share/enghi/backup/enghi-2026-09-21.db ~/.local/share/enghi/enghi.db
 rm -f ~/.local/share/enghi/enghi.db-wal ~/.local/share/enghi/enghi.db-shm
 brew services start enghi
 ```
 
-## 自宅のスマホから安全に使う
+## Secure Mobile Access at Home
 
-enghi は `127.0.0.1` にしか bind せず、`Host` ヘッダがループバックでなければ 403 を返す。
-スマホから使うには、**前段に Caddy を置いて TLS とログインを担当させる**。
-enghi はループバックのまま変えない。
+enghi binds only to `127.0.0.1` and returns 403 unless the `Host` header is loopback.
+To access it from a phone, **place Caddy in front to handle TLS and authentication**.
+Leave enghi bound to loopback.
 
 ```
 iPhone ──https──▶ Caddy (LAN:443)  ──http──▶ enghi (127.0.0.1:7777)
-                   ├ TLS 終端
-                   └ パスワード確認
+                   ├ TLS termination
+                   └ Password verification
 ```
 
-**`0.0.0.0` に bind して済ませないこと。** enghi に認証は無いので、同じ Wi-Fi にいる
-全員が読み書きできる状態になる。
+**Never bind to `0.0.0.0`.** enghi has no authentication; doing so gives read/write access to everyone on your Wi-Fi.
 
-### 1. Caddy を入れ、パスワードのハッシュを作る
+### 1. Install Caddy and hash your password
 
 ```sh
 brew install caddy
-caddy hash-password        # 対話で入力する。平文は設定に書かない
+caddy hash-password        # Enter interactively; do not store plaintext in config
 ```
 
-### 2. Caddyfile を書く
+### 2. Write the Caddyfile
 
-`$(brew --prefix)/etc/Caddyfile`。名前は `scutil --get LocalHostName` の値 + `.local`
-(例: `junnomacbook-pro.local`)。
+`$(brew --prefix)/etc/Caddyfile`. Name matches `scutil --get LocalHostName` + `.local`
+(e.g. `junnomacbook-pro.local`).
 
 ```
 junnomacbook-pro.local {
     tls internal
     basic_auth {
-        jun    $2a$14$...(caddy hash-password の出力)...
+        jun    $2a$14$...(caddy hash-password output)...
     }
     reverse_proxy 127.0.0.1:7777
 }
@@ -122,7 +115,7 @@ junnomacbook-pro.local {
 brew services start caddy
 ```
 
-### 3. enghi にその名前を許可させる
+### 3. Allow the hostname in enghi
 
 `~/.config/enghi/config.toml`:
 
@@ -130,57 +123,51 @@ brew services start caddy
 allowed_hosts = ["junnomacbook-pro.local"]
 ```
 
-書いた名前が `Host` ヘッダとして届いたときだけ受け付ける。ワイルドカードは使えない
-(`*.local` は起動時にエラー)。省略すればループバックのみ。
+Requests are accepted only when the incoming `Host` header matches. Wildcards are not allowed
+(`*.local` produces an error on startup). Defaults to loopback only if omitted.
 
-書き換えたら enghi を再起動する。
+Restart enghi after editing.
 
-### 4. iPhone に証明書を信頼させる
+### 4. Trust the certificate on iPhone
 
-`tls internal` は Caddy が自作した認証局の証明書なので、そのままでは Safari が警告を出す。
-ルート証明書(場所は `caddy trust` の出力か Caddy のデータディレクトリで確認する)を
-iPhone に転送し、**設定 → 一般 → 情報 → 証明書信頼設定** で「完全に信頼」を有効にする。
+Because `tls internal` uses Caddy's self-generated root CA, Safari will warn on first access.
+Transfer the root certificate (find its path via `caddy trust` or in Caddy's data directory)
+to your iPhone, then enable "Full Trust" under **Settings → General → About → Certificate Trust Settings**.
 
-警告を毎回無視しても閲覧はできるが、`wss://` が拒否されて live 更新(Emacs からの
-focus 追従)が繋がらなくなることがある。
+Ignoring the warning lets you browse pages, but `wss://` will be rejected, breaking live updates (such as focus sync from Emacs).
 
-### 注意
+### Notes
 
-- **`basic_auth` を省かないこと。** 省くと同じ LAN の全員が読み書きできる
-- `basic_auth` は以前 `basicauth` という名前だった。入れた版の書式を確認すること
-- Basic 認証はブラウザのネイティブなダイアログなので、1Password などからの自動入力は
-  効かない。長いランダムなパスワードを初回に貼り付ければ、以後はブラウザが覚える
-- **外出先からは使えない**(家の LAN の中だけ)。外からも使うなら Tailscale や
-  Cloudflare Tunnel のような別の前段が要る。enghi 側は `allowed_hosts` に
-  その名前を足すだけでよい
-- Mac の IP が変わっても `.local` の名前は追従する。IP の固定は要らない
+- **Never omit `basic_auth`.** Without it, anyone on the same LAN has read/write access
+- `basic_auth` was previously named `basicauth`. Verify the syntax for your installed Caddy version
+- Basic auth uses the browser's native prompt, so password manager autofill (like 1Password) does not work. Paste a long random password once; the browser will remember it
+- **Not accessible outside your home network** (home LAN only). For remote access, use an external tunnel like Tailscale or Cloudflare Tunnel. On the enghi side, simply add that hostname to `allowed_hosts`
+- The `.local` name tracks IP changes on your Mac. No static IP needed
 
-## 定期タスクの記法
+## Recurring Task Syntax
 
-org-mode のリピータ記法に準拠(`recurrence` 列にそのまま格納):
+Follows org-mode repeater syntax (stored directly in the `recurrence` column):
 
-| 記法 | 意味 | 基準 |
+| Syntax | Meaning | Basis |
 |---|---|---|
-| `+1d` `+2w` `+1m` `+1y` | 固定間隔 | 前回の**予定日** + 間隔。1回分だけ進める |
-| `++1w` | 固定間隔、未来まで送る | 今日より後になるまで繰り返し加算する |
-| `.+3d` | 完了日基準 | **完了した日** + 間隔 |
-| `weekly:mon,thu` | 毎週の指定曜日 | 次に来る該当曜日 |
-| `monthly:25` / `monthly:last` | 毎月 | 次の該当日 / 月末 |
-| `yearly:04-01` | 毎年 | 次の該当日 |
+| `+1d` `+2w` `+1m` `+1y` | Fixed interval | Previous **scheduled date** + interval. Advances by one step |
+| `++1w` | Fixed interval, catch up to future | Adds interval repeatedly until after today |
+| `.+3d` | Completion-based | **Completion date** + interval |
+| `weekly:mon,thu` | Specific days each week | Next matching weekday |
+| `monthly:25` / `monthly:last` | Monthly | Next matching date / end of month |
+| `yearly:04-01` | Yearly | Next matching date |
 
-完了(または skip)を契機に**次の1件だけ**を生成するので、同じ系列で開いている
-インスタンスは常に高々1件。生成される次インスタンスは必ず `scheduled`。
-存在しない日付(31日の無い月、閏日)はその月の最終日に丸める。
+Completing (or skipping) a task generates **only the next single instance**, so there is always at most one open instance per series. Generated instances always start in the `scheduled` state. Dates that do not exist (a 31st in a short month, Feb 29 in a non-leap year) clamp to the last day of that month.
 
-## キーボード操作(ブラウザ側)
+## Keyboard Shortcuts (Web UI)
 
-`/` 検索 · `g d`/`g w`/`g i`/`g n`/`g p` 移動 · `c` クイックキャプチャ ·
-`e` 編集 · `j`/`k` リスト移動 · `Enter` 開く · `Esc` 解除
+`/` Search · `g d`/`g w`/`g i`/`g n`/`g p` Navigation · `c` Quick capture ·
+`e` Edit · `j`/`k` List navigation · `Enter` Open · `Esc` Dismiss
 
-## Emacs から使う
+## Using from Emacs
 
-クライアントは別プロジェクト **[`../enghi.el`](../enghi.el)**。サーバ側の設定は要らない。
-依存している API は以下だけで、**JSON で独立に成立させてある**:
+Client is in a separate repository: **[`../enghi.el`](../enghi.el)**. No server-side configuration needed.
+It depends only on the following endpoints, **fully self-contained via JSON**:
 
 ```
 GET    /api/search?q=&kind=&limit=
@@ -189,36 +176,34 @@ GET    /api/pages/:slug ; PUT /api/pages/:slug ; DELETE /api/pages/:slug
 GET    /api/tasks ; POST /api/tasks ; PATCH /api/tasks/:id
 POST   /api/tasks/:id/complete ; POST /api/tasks/:id/file
 GET    /api/projects ; GET /api/projects/stalled ; GET /api/contexts
-POST   /api/focus              開いているブラウザタブを遷移させる
-GET    /api/status             接続確認
+POST   /api/focus              Navigate open browser tabs
+GET    /api/status             Connection check
 ```
 
-## 開発
+## Development
 
-**build tag `sqlite_fts5` と `CGO_ENABLED=1` が必須**(FTS5 と trigram tokenizer)。
-どちらも欠けるとコンパイルエラーで止まる(`cmd/enghi/require_*.go`)。
-cgo なので **GOOS を跨いだビルドはできない**。配布物は各 OS の runner で作る。
+**Build tag `sqlite_fts5` and `CGO_ENABLED=1` are required** (FTS5 and trigram tokenizer).
+Missing either halts compilation with an error (`cmd/enghi/require_*.go`).
+Because of cgo, **cross-compiling across GOOS is not supported**. Release binaries are built on native OS runners.
 
 ```sh
 make build test vet
 ```
 
-テストは DESIGN.md が「壊れやすい」と名指ししている箇所を中心に書いてある
-(リネームの往復、検索のフレーズリテラル化と語境界、セキュリティ3層、
-定期タスクの日付計算、全画面が最後まで描画されること)。
-ブラウザを使う検証は Playwright: `npx playwright install chromium webkit`。
+Tests focus on areas DESIGN.md identifies as fragile:
+roundtrip renames, phrase literalization and word boundaries in search, the three security layers,
+recurring task date calculations, and full end-to-end rendering of all screens.
+Browser verification uses Playwright: `npx playwright install chromium webkit`.
 
-`docs/guide/` に書き足すときは、**見出しに `{#id}` で明示的なアンカーを必ず書くこと**
-(自動生成 ID だと日英で食い違い、画面の「?」リンクが切れる)。
+When adding to `docs/guide/`, **always include explicit `{#id}` anchors on headings**
+(auto-generated IDs diverge between English and Japanese, breaking in-app `?` help links).
 
-## リリース
+## Releases
 
-タグを push すると各 OS の runner でビルドし、tarball と `SHA256SUMS` を付けて
-GitHub Release を作る(`.github/workflows/release.yml`)。
+Pushing a tag triggers builds on native OS runners and publishes a GitHub Release with tarballs and `SHA256SUMS` (`.github/workflows/release.yml`).
 
 ```sh
 git tag v0.1.0 && git push origin v0.1.0
 ```
 
-そのあと `packaging/homebrew/enghi.rb` の `url` と `sha256` を更新し、
-`wakamenod/homebrew-tap` の `Formula/enghi.rb` へ反映する。
+Then update `url` and `sha256` in `packaging/homebrew/enghi.rb`, and commit the changes to `Formula/enghi.rb` in `wakamenod/homebrew-tap`.
