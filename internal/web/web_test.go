@@ -455,3 +455,72 @@ func TestStaticAssetsAreFingerprinted(t *testing.T) {
 		t.Fatalf("フォント → %d", w.Code)
 	}
 }
+
+// allowed_hosts を設定すると、その名前の Host / Origin だけが追加で通る。
+// **ワイルドカードは無い。設定しなければ従来どおりループバックのみ**(DESIGN 4.4)。
+func TestAllowedHosts(t *testing.T) {
+	dir := t.TempDir()
+	db, err := store.Open(filepath.Join(dir, "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	blobs, err := filestore.Open(filepath.Join(dir, "files.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { blobs.Close() })
+
+	cfg := config.Default()
+	cfg.ExportDir, cfg.BackupDir = filepath.Join(dir, "e"), filepath.Join(dir, "b")
+	cfg.AllowedHosts = []string{"Macbook.local"} // 大小は区別しない
+	srv, err := web.New(cfg, db, blobs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := srv.Handler()
+
+	get := func(host string) int {
+		r := httptest.NewRequest("GET", "/wiki", nil)
+		r.Host = host
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return w.Code
+	}
+	if c := get("macbook.local"); c != http.StatusOK {
+		t.Errorf("許可した名前が通らない: %d", c)
+	}
+	if c := get("MACBOOK.local:443"); c != http.StatusOK {
+		t.Errorf("大小とポートを無視すること: %d", c)
+	}
+	if c := get("127.0.0.1:7777"); c != http.StatusOK {
+		t.Errorf("ループバックは従来どおり通ること: %d", c)
+	}
+	// 設定していない名前は今までどおり弾く
+	for _, bad := range []string{"evil.com", "macbook.local.evil.com", "x.macbook.local"} {
+		if c := get(bad); c != http.StatusForbidden {
+			t.Errorf("%s が通ってしまった: %d", bad, c)
+		}
+	}
+	// Origin も同じ基準で判定される(allowedOrigin が allowedHost を呼ぶ)
+	r := httptest.NewRequest("GET", "/wiki", nil)
+	r.Host = "macbook.local"
+	r.Header.Set("Origin", "https://macbook.local")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Errorf("同じ名前の Origin が弾かれた: %d", w.Code)
+	}
+}
+
+// 設定しなければ、これまでと何も変わらない。
+func TestAllowedHostsEmptyByDefault(t *testing.T) {
+	h := newServer(t)
+	r := httptest.NewRequest("GET", "/wiki", nil)
+	r.Host = "macbook.local"
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("既定でループバック以外が通ってしまった: %d", w.Code)
+	}
+}

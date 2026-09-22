@@ -70,3 +70,42 @@ func TestRejectsNonLoopbackHost(t *testing.T) {
 		t.Fatal("0.0.0.0 が通ってしまった")
 	}
 }
+
+// allowed_hosts は「名前を1つずつ」だけ受け付ける。
+// Host 検証は DNS rebinding に対する唯一有効な防御なので(DESIGN 4.4)、
+// ワイルドカードで緩められる口を作らない。
+func TestAllowedHostsRejectsWildcard(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	if err := os.WriteFile(path, []byte(`allowed_hosts = ["*.local"]`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := config.Load(path); err == nil {
+		t.Fatal("ワイルドカードが通ってしまった")
+	}
+}
+
+// 書かれた名前は、大小とポートを無視して比較できる形になること。
+func TestAllowedHostsNormalized(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	if err := os.WriteFile(path, []byte(`allowed_hosts = ["MacBook.local:443", " enghi.example.com "]`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := strings.Join(c.NormalizedAllowedHosts(), ",")
+	if got != "macbook.local,enghi.example.com" {
+		t.Fatalf("NormalizedAllowedHosts = %q", got)
+	}
+}
+
+// 既定では空。設定しない限り挙動は変わらない。
+func TestAllowedHostsEmptyByDefault(t *testing.T) {
+	c := config.Default()
+	if len(c.NormalizedAllowedHosts()) != 0 {
+		t.Fatalf("既定で許可リストが空でない: %v", c.AllowedHosts)
+	}
+}

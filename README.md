@@ -68,6 +68,91 @@ rm -f ~/.local/share/enghi/enghi.db-wal ~/.local/share/enghi/enghi.db-shm
 brew services start enghi
 ```
 
+## 自宅のスマホから安全に使う
+
+enghi は `127.0.0.1` にしか bind せず、`Host` ヘッダがループバックでなければ 403 を返す。
+**スマホからは、そのままでは繋がらない。** これは手抜きではなく、ブラウザで開いている
+任意のページの JavaScript が `http://127.0.0.1:7777/api/...` を叩けるため
+(DNS rebinding。DESIGN 4.4)。
+
+**`0.0.0.0` に bind して済ませないこと。** enghi に認証は無く、同じ Wi-Fi にいる全員が
+読み書きできる状態になる。来客に Wi-Fi のパスワードを教えた時点でそうなる。
+
+代わりに、**前段に Caddy を置いて TLS とログインを担当させる**。enghi は
+ループバックのまま変えない。
+
+```
+iPhone ──https──▶ Caddy (LAN:443)  ──http──▶ enghi (127.0.0.1:7777)
+                   ├ TLS 終端
+                   └ パスワード確認
+```
+
+### 1. Caddy を入れ、パスワードのハッシュを作る
+
+```sh
+brew install caddy
+caddy hash-password        # 対話で入力する。平文は設定に書かない
+```
+
+### 2. Caddyfile を書く
+
+`$(brew --prefix)/etc/Caddyfile`。**名前は `scutil --get LocalHostName` の値 + `.local`**
+(例: `junnomacbook-pro.local`)。
+
+```
+junnomacbook-pro.local {
+    tls internal
+    basic_auth {
+        jun    $2a$14$...(caddy hash-password の出力)...
+    }
+    reverse_proxy 127.0.0.1:7777
+}
+```
+
+```sh
+brew services start caddy
+```
+
+**`basic_auth` は以前 `basicauth` という名前だった。** 入れた版の書式を確認すること。
+
+### 3. enghi に、その名前を許可させる
+
+`~/.config/enghi/config.toml`:
+
+```toml
+allowed_hosts = ["junnomacbook-pro.local"]
+```
+
+書いた名前が `Host` ヘッダとして届いたときだけ受け付ける。**ワイルドカードは受け付けない**
+(`*.local` は起動時にエラー)。**何も書かなければ従来どおりループバックのみ**で、
+挙動は一切変わらない。
+
+書き換えたら enghi を再起動する。
+
+### 4. iPhone に証明書を信頼させる
+
+`tls internal` は Caddy が自作した認証局の証明書なので、そのままでは Safari が警告を出す。
+`macbook.local` のような名前に公的な証明書は発行されないため、これは避けられない。
+
+Caddy のルート証明書(`caddy trust` が Mac に入れるもの。実体の場所は環境で変わるので
+`caddy trust` の出力や Caddy のデータディレクトリで確認する)を iPhone に転送し、
+**設定 → 一般 → 情報 → 証明書信頼設定** で「完全に信頼」を有効にする。
+
+警告を毎回「無視して進む」でも閲覧はできるが、**`wss://` が拒否されて live 更新
+(Emacs からの focus 追従)だけが黙って繋がらなくなる可能性がある**。
+`app.js` は指数バックオフで再接続を試み続けるのでエラーも出ない。証明書は入れた方がよい。
+
+### 注意
+
+- **`basic_auth` を省かないこと。** 省くと同じ LAN の全員が読み書きできる。
+  DESIGN 4.4 は「他マシンから到達できるようにしたら本物の認証が必須」と定めている
+- Basic 認証は**ブラウザのネイティブなダイアログ**なので、1Password 等からの自動入力は
+  効かない。長いランダムなパスワードを初回に貼り付ければ、以後はブラウザが覚える
+- **外出先からは使えない**(家の LAN の中だけ)。外からも使うなら Tailscale や
+  Cloudflare Tunnel のような別の前段が要る。いずれの場合も enghi 側は
+  `allowed_hosts` にその名前を足すだけでよい
+- Mac の IP が変わっても `.local` の名前は追従する。IP を固定する必要は無い
+
 ## 定期タスクの記法
 
 org-mode のリピータ記法に準拠(`recurrence` 列にそのまま格納):

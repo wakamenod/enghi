@@ -69,12 +69,24 @@ func (h *Hub) Count() int {
 	return len(h.clients)
 }
 
+// originPatterns は WebSocket で許す Origin。
+// **ここは secure ミドルウェアとは別の判定なので、allowed_hosts を足し忘れると
+// 「画面は開けるのに live 更新だけ黙って繋がらない」状態になる。**
+// app.js は指数バックオフで再接続を試み続けるため、エラーも出ない。
+func (s *Server) originPatterns() []string {
+	out := []string{"127.0.0.1:*", "localhost:*", "[::1]:*"}
+	for _, h := range s.cfg.NormalizedAllowedHosts() {
+		out = append(out, h, h+":*")
+	}
+	return out
+}
+
 // handleEvents は WebSocket のエンドポイント。
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	// Origin の検証は secure ミドルウェアが済ませているが、
 	// ライブラリ側の既定(Host と Origin の一致を要求)もそのまま効かせる。
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		OriginPatterns: []string{"127.0.0.1:*", "localhost:*", "[::1]:*"},
+		OriginPatterns: s.originPatterns(),
 	})
 	if err != nil {
 		return // Accept が既にレスポンスを書いている

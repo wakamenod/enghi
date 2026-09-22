@@ -12,9 +12,21 @@ import (
 
 // Config は ~/.config/enghi/config.toml の内容。
 type Config struct {
-	Port   int    `toml:"port"`
-	Host   string `toml:"host"` // 127.0.0.1 固定。0.0.0.0 は拒否する(DESIGN 4.4)
-	DBPath string `toml:"db_path"`
+	Port int    `toml:"port"`
+	Host string `toml:"host"` // 127.0.0.1 固定。0.0.0.0 は拒否する(DESIGN 4.4)
+	// AllowedHosts: Host ヘッダで追加で許す名前。前段にリバースプロキシを置いて
+	// 他の端末から使うときだけ設定する。**空なら従来どおりループバックのみ**。
+	//
+	// bind は 127.0.0.1 のまま変えない。プロキシが受けて loopback へ渡すので、
+	// ここで増えるのは「どの名前で呼ばれたリクエストを受け付けるか」だけである。
+	//
+	// **ワイルドカードは受け付けない。** Host 検証は DNS rebinding に対する
+	// 唯一有効な防御なので(DESIGN 4.4)、緩めるのは書いた名前1つずつに限る。
+	//
+	// **これを設定した時点で「他マシンから到達できる」状態になるため、
+	// 前段での本物の認証が必須になる**(DESIGN 4.4)。enghi は認証を持たない。
+	AllowedHosts []string `toml:"allowed_hosts"`
+	DBPath       string   `toml:"db_path"`
 	// FilesDBPath: 画像などのバイナリ。**本体とは別ファイルにする**(バックアップを軽く保つため)
 	FilesDBPath string `toml:"files_db_path"`
 	ExportDir   string `toml:"export_dir"`
@@ -121,9 +133,36 @@ func Load(path string) (Config, error) {
 func (c Config) validate() error {
 	switch c.Host {
 	case "127.0.0.1", "localhost", "::1":
-		return nil
+	default:
+		return fmt.Errorf("host %q は許可されない。enghi はループバックにのみ bind する(DESIGN 4.4)", c.Host)
 	}
-	return fmt.Errorf("host %q は許可されない。enghi はループバックにのみ bind する(DESIGN 4.4)", c.Host)
+	for _, h := range c.AllowedHosts {
+		// 手で書く設定なので前後の空白は許す。中の空白は名前ではないので弾く。
+		h = strings.TrimSpace(h)
+		if h == "" {
+			return fmt.Errorf("allowed_hosts に空の項目がある")
+		}
+		if strings.ContainsAny(h, "*?/ ") {
+			return fmt.Errorf("allowed_hosts %q: ワイルドカードや区切りは使えない。名前を1つずつ書くこと(DESIGN 4.4)", h)
+		}
+	}
+	return nil
+}
+
+// NormalizedAllowedHosts は allowed_hosts を比較しやすい形にする。
+// ホスト名は大小を区別しないので小文字に揃え、ポートが書かれていれば落とす。
+func (c Config) NormalizedAllowedHosts() []string {
+	out := make([]string, 0, len(c.AllowedHosts))
+	for _, h := range c.AllowedHosts {
+		h = strings.ToLower(strings.TrimSpace(h))
+		if i := strings.LastIndex(h, ":"); i >= 0 && !strings.Contains(h[i:], "]") {
+			h = h[:i]
+		}
+		if h = strings.Trim(h, "[]"); h != "" {
+			out = append(out, h)
+		}
+	}
+	return out
 }
 
 func expand(p string) string {

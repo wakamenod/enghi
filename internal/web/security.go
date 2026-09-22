@@ -88,7 +88,7 @@ func (s *Server) formAllowed(r *http.Request) bool {
 }
 
 func (s *Server) allowedHost(host string) bool {
-	h := host
+	h := strings.ToLower(host)
 	if i := strings.LastIndex(h, ":"); i >= 0 && !strings.Contains(h[i:], "]") {
 		h = h[:i]
 	}
@@ -96,6 +96,13 @@ func (s *Server) allowedHost(host string) bool {
 	switch h {
 	case "127.0.0.1", "localhost", "::1":
 		return true
+	}
+	// 設定で明示的に足された名前(前段にプロキシを置く運用)。
+	// **既定は空で、そのときは上のループバック3つだけが通る。**
+	for _, a := range s.cfg.NormalizedAllowedHosts() {
+		if h == a {
+			return true
+		}
 	}
 	return false
 }
