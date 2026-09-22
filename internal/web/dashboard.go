@@ -28,8 +28,6 @@ type GTDSummary struct {
 	StalledProjects []*gtd.Project `json:"stalled_projects"`
 	// 5. Waiting-for items delegated more than a few days ago (7 by default)
 	WaitingOverdue []*gtd.Task `json:"waiting_overdue"`
-	// 6. Someday projects whose review date has come
-	SomedayDueReview []*gtd.Project `json:"someday_due_review"`
 
 	Enabled bool `json:"enabled"` // whether there is any GTD data at all
 }
@@ -99,9 +97,6 @@ func (s *Server) dashboardData(ctx context.Context) (*Dashboard, error) {
 		return nil, err
 	}
 	if d.GTD.WaitingOverdue, err = s.gtd.WaitingOverdue(ctx, 7); err != nil {
-		return nil, err
-	}
-	if d.GTD.SomedayDueReview, err = s.gtd.SomedayDueReview(ctx); err != nil {
 		return nil, err
 	}
 	return d, nil

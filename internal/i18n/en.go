@@ -51,7 +51,6 @@ func init() {
 		"dash.waiting_long":    "Waiting longest",
 		"dash.stalled":         "Stalled projects",
 		"dash.stalled_note":    "Active projects with no Next Action.",
-		"dash.someday_due":     "Someday/Maybe due for review",
 		"dash.articles":        "Articles",
 		"dash.recent_changes":  "Recent changes",
 		"dash.new":             "New",

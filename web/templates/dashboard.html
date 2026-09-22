@@ -62,18 +62,6 @@
           <div class="meta">{{t "dash.stalled_note"}}</div>
           {{else}}<div class="empty">{{t "common.empty"}}</div>{{end}}
         </div>
-
-        {{if $d.GTD.SomedayDueReview}}
-        <div class="col-block">
-          <div class="subhead">{{t "dash.someday_due"}}</div>
-          <ul class="rows">
-            {{range $d.GTD.SomedayDueReview}}
-            <li><a href="/gtd/project/{{.ID}}">{{.Title}}</a>
-                <span class="when">{{.ReviewOn}}</span></li>
-            {{end}}
-          </ul>
-        </div>
-        {{end}}
       </div>
     </div>
   {{else}}

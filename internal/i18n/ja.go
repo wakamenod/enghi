@@ -51,7 +51,6 @@ func init() {
 		"dash.waiting_long":    "長く待っている項目",
 		"dash.stalled":         "停滞している Project",
 		"dash.stalled_note":    "Next Action が1つも無い active な Project。",
-		"dash.someday_due":     "再検討期日を迎えた Someday",
 		"dash.articles":        "記事",
 		"dash.recent_changes":  "最近の変更",
 		"dash.new":             "新規",
