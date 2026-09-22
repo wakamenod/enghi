@@ -5,10 +5,9 @@
 A local-only personal wiki + GTD server for macOS and Linux. It runs as a background
 service and you use it from the browser. Nothing leaves the machine.
 
-<p align="center">
-  <img src="docs/images/dashboard-en-light.png" width="49%" alt="Dashboard, light theme">
-  <img src="docs/images/dashboard-en-dark.png" width="49%" alt="Dashboard, dark theme">
-</p>
+![Dashboard, light theme](docs/images/dashboard-en-light.png)
+
+![Dashboard, dark theme](docs/images/dashboard-en-dark.png)
 
 ## Features
 

@@ -5,10 +5,9 @@
 macOS と Linux で動く、ローカル専用の個人向け Wiki + GTD サーバ。常駐サービスとして
 動作し、ブラウザから使う。データは一切マシン外に出ない。
 
-<p align="center">
-  <img src="docs/images/dashboard-ja-light.png" width="49%" alt="ダッシュボード (ライト)">
-  <img src="docs/images/dashboard-ja-dark.png" width="49%" alt="ダッシュボード (ダーク)">
-</p>
+![ダッシュボード (ライト)](docs/images/dashboard-ja-light.png)
+
+![ダッシュボード (ダーク)](docs/images/dashboard-ja-dark.png)
 
 ## 特徴
 
