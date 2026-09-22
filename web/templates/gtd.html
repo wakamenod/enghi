@@ -18,11 +18,12 @@
       <li><a href="/gtd/scheduled">{{t "gtd.scheduled"}}</a><span class="when">{{$d.SchedCount}}</span></li>
       <li><a href="/gtd/someday">{{t "gtd.someday"}}</a><span class="when">{{$d.SomedayCnt}}</span></li>
       <li><a href="/gtd/projects">{{t "gtd.projects"}}</a><span class="when">{{len $d.Projects}}</span></li>
-      <li><a href="/gtd/areas">{{t "gtd.areas"}}</a><span class="when">{{len $d.Areas}}</span></li>
+      {{if $.Set.Areas}}<li><a href="/gtd/areas">{{t "gtd.areas"}}</a><span class="when">{{len $d.Areas}}</span></li>{{end}}
       <li><a href="/gtd/review">{{t "gtd.review"}}</a></li>
     </ul>
   </section>
 
+  {{if .Set.Contexts}}
   <section class="panel card">
     <h2>{{t "gtd.contexts"}}</h2>
     {{if $d.Contexts}}
@@ -38,6 +39,7 @@
       <button type="submit">{{t "common.add"}}</button>
     </form>
   </section>
+  {{end}}
 </div>
 
 {{if $d.Stalled}}
@@ -47,7 +49,7 @@
   <ul class="rows">
     {{range $d.Stalled}}
     <li><a href="/gtd/project/{{.ID}}">{{.Title}}</a>
-        {{if .AreaName}}<span class="tag">{{.AreaName}}</span>{{end}}
+        {{if and $.Set.Areas .AreaName}}<span class="tag">{{.AreaName}}</span>{{end}}
         <span class="when">{{t "gtd.unprocessed" .OpenTasks}}</span></li>
     {{end}}
   </ul>

@@ -8,6 +8,7 @@ import (
 
 	"github.com/wakamenod/enghi/internal/export"
 	"github.com/wakamenod/enghi/internal/search"
+	"github.com/wakamenod/enghi/internal/settings"
 	"github.com/wakamenod/enghi/internal/store"
 	"github.com/wakamenod/enghi/internal/wiki"
 )
@@ -22,9 +23,12 @@ type viewData struct {
 	Data  any
 
 	// 以下は render がまとめて埋める(各ハンドラに書かせると必ずどこかで漏れる)
-	LangCode string      // 現在の言語
-	Path     string      // 言語を切り替えた後に戻る先
-	Strings  template.JS // JS 側で使う文言(JSON)
+	LangCode string            // 現在の言語
+	Path     string            // 言語を切り替えた後に戻る先
+	Strings  template.JS       // JS 側で使う文言(JSON)
+	Set      settings.Settings // 画面の出し分けに使う設定
+	Side     bool              // 左にタグの列を出すか(記事系の画面だけ)
+	SideTags []wiki.TagCount   // その中身
 }
 
 func (s *Server) viewDashboard(w http.ResponseWriter, r *http.Request) {
@@ -331,7 +335,7 @@ func (s *Server) uiExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = res
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	redirectBack(w, r, "/settings")
 }
 
 func (s *Server) uiPreview(w http.ResponseWriter, r *http.Request) {

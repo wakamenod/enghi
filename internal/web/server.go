@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"log"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -16,6 +18,7 @@ import (
 	"github.com/wakamenod/enghi/internal/gtd"
 	"github.com/wakamenod/enghi/internal/i18n"
 	"github.com/wakamenod/enghi/internal/search"
+	"github.com/wakamenod/enghi/internal/settings"
 	"github.com/wakamenod/enghi/internal/store"
 	"github.com/wakamenod/enghi/internal/wiki"
 )
@@ -28,6 +31,7 @@ type Server struct {
 	gtd    *gtd.Service
 	files  *filestore.Store
 	search *search.Service
+	set    *settings.Service
 	hub    *Hub
 	// tmpl は言語ごとに1組。**テンプレートの関数は解析時に束縛されるので、
 	// リクエストごとに差し替えられない。**言語の数だけ作っておく。
@@ -53,6 +57,7 @@ func New(cfg config.Config, db *store.DB, files *filestore.Store) (*Server, erro
 		gtd:    gtd.New(db),
 		files:  files,
 		search: search.New(db),
+		set:    settings.New(db),
 		hub:    NewHub(),
 		tmpl:   tmpl,
 		mux:    http.NewServeMux(),
@@ -64,6 +69,7 @@ func New(cfg config.Config, db *store.DB, files *filestore.Store) (*Server, erro
 func parseTemplates(lang i18n.Lang) (*template.Template, error) {
 	funcs := template.FuncMap{
 		"shortTime": shortTime,
+		"base":      filepath.Base,
 		"join":      strings.Join,
 		"add":       func(a, b int) int { return a + b },
 		"snippet":   search.SnippetHTML,
@@ -113,6 +119,7 @@ func (s *Server) routes() {
 	m.HandleFunc("GET /gtd/area/{id}", s.viewArea)
 	m.HandleFunc("GET /gtd/review", s.viewReview)
 	m.HandleFunc("GET /gtd/clarify/{id}", s.viewClarify)
+	m.HandleFunc("GET /settings", s.viewSettings)
 	m.HandleFunc("GET /guide", s.viewGuideIndex)
 	m.HandleFunc("GET /guide/{topic}", s.viewGuide)
 
@@ -138,6 +145,8 @@ func (s *Server) routes() {
 	m.HandleFunc("POST /ui/contexts", s.uiCreateContext)
 	m.HandleFunc("POST /ui/review/{id}/check", s.uiReviewCheck)
 	m.HandleFunc("POST /ui/review/{id}/complete", s.uiReviewComplete)
+	m.HandleFunc("POST /ui/settings", s.uiUpdateSettings)
+	m.HandleFunc("POST /ui/backup", s.uiBackup)
 	m.HandleFunc("GET /ui/lang", s.handleSetLang)
 	m.HandleFunc("GET /ui/search", s.uiSearchFragment) // 打鍵ごとのインクリメンタル検索
 	m.HandleFunc("POST /ui/preview", s.uiPreview)      // 編集画面のプレビュー
@@ -158,6 +167,7 @@ func (s *Server) routes() {
 	m.HandleFunc("POST /api/focus", s.handleFocus)
 	m.HandleFunc("GET /api/events", s.handleEvents)
 	m.HandleFunc("GET /api/status", s.handleStatus)
+	m.HandleFunc("GET /api/settings", s.apiSettings)
 	m.HandleFunc("POST /api/export", s.apiExport)
 	m.HandleFunc("POST /api/backup", s.apiBackup)
 	m.HandleFunc("GET /api/backups", s.apiBackups)
@@ -234,6 +244,19 @@ func (s *Server) writeConflict(w http.ResponseWriter, r *http.Request, err error
 // langOf はこのリクエストで使う言語。
 func (s *Server) langOf(r *http.Request) i18n.Lang { return i18n.FromRequest(r) }
 
+// sideNav は左にタグの列を出す画面。
+var sideNav = map[string]bool{"dashboard": true, "wiki": true, "tags": true, "search": true}
+
+// settings はこのリクエストで使う設定。
+// **読めなくても画面は出す。**設定が引けないことと、画面が出ないことは別の問題である。
+func (s *Server) settings(r *http.Request) settings.Settings {
+	set, err := s.set.Load(ctxOf(r))
+	if err != nil {
+		log.Printf("settings: %v", err)
+	}
+	return set
+}
+
 // tr はハンドラから文言を引く。
 func (s *Server) tr(r *http.Request, key string, args ...any) string {
 	return i18n.T(s.langOf(r), key, args...)
@@ -247,6 +270,12 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, dat
 		vd.LangCode = string(lang)
 		vd.Path = r.URL.RequestURI()
 		vd.Strings = template.JS(jsStrings(lang))
+		vd.Set = s.settings(r)
+		// 左のタグ列は記事系の画面にだけ出す。GTD とガイドには出さない
+		// (ガイドは自前の目次を左に持っている)。
+		if vd.Side = sideNav[vd.Nav]; vd.Side {
+			vd.SideTags, _ = s.pages.Tags(ctxOf(r))
+		}
 		data = vd
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

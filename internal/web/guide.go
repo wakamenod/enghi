@@ -9,6 +9,7 @@ import (
 
 	enghi "github.com/wakamenod/enghi"
 	"github.com/wakamenod/enghi/internal/i18n"
+	"github.com/wakamenod/enghi/internal/settings"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
@@ -31,10 +32,13 @@ var guideTopics = []string{"gtd", "enghi"}
 // WithHeadingAttribute で `## 見出し {#id}` を有効にする。
 // **見出し ID を自動生成に任せない。**日本語見出しから作られる ID は
 // 英語版とずれるため、画面から張ったアンカーが言語を切り替えた途端に切れる。
+// WithUnsafe は図(inline SVG)のために要る。**ガイド本文は利用者の入力ではなく、
+// ビルド時にバイナリへ埋め込む自分の文書である。**記事本文のレンダラ(wiki.Renderer)
+// には付けないこと。
 var guideMD = goldmark.New(
 	goldmark.WithExtensions(extension.GFM),
 	goldmark.WithParserOptions(parser.WithAutoHeadingID(), parser.WithHeadingAttribute()),
-	goldmark.WithRendererOptions(html.WithHardWraps()),
+	goldmark.WithRendererOptions(html.WithHardWraps(), html.WithUnsafe()),
 )
 
 type guideSection struct {
@@ -58,7 +62,48 @@ type guideData struct {
 var (
 	guideH1Re = regexp.MustCompile(`(?m)^# +(.+?)\s*$`)
 	guideH2Re = regexp.MustCompile(`(?m)^## +(.+?)\s*\{#([A-Za-z0-9_-]+)\}\s*$`)
+	// 機能タグ。設定で off の機能の節は本文ごと落とす。
+	// **見出しの行内には書かない。** 見出しの末尾は `{#id}` の位置であり、
+	// そこに注釈を足すと goldmark が ID を拾えなくなる。直前の行に置く:
+	//
+	//	<!--feature:contexts-->
+	//	### Contexts {#context}
+	guideFeatRe = regexp.MustCompile(`(?m)^<!--\s*feature:([a-z]+)\s*-->\n(#{1,6}) `)
+	// 節の切れ目(見出し行)。落とす範囲を決めるのに使う。
+	guideHeadRe = regexp.MustCompile(`(?m)^(#{1,6}) `)
 )
+
+// guideFilter は、設定で off になっている機能の節を本文から取り除く。
+//
+// **出し分けを画面だけでやると、ガイドだけが「無い機能」を説明し続ける。**
+// 節は、機能タグの次の見出しから、次に来る同位以上の見出しの手前までとする。
+func guideFilter(src string, set settings.Settings) string {
+	on := map[string]bool{"contexts": set.Contexts, "areas": set.Areas}
+	heads := guideHeadRe.FindAllStringSubmatchIndex(src, -1)
+	var out strings.Builder
+	prev := 0
+	for _, m := range guideFeatRe.FindAllStringSubmatchIndex(src, -1) {
+		if on[src[m[2]:m[3]]] {
+			continue
+		}
+		level := len(src[m[4]:m[5]])
+		end := len(src)
+		for _, h := range heads {
+			if h[0] > m[4] && len(src[h[2]:h[3]]) <= level {
+				end = h[0]
+				break
+			}
+		}
+		if m[0] > prev {
+			out.WriteString(src[prev:m[0]])
+		}
+		if end > prev {
+			prev = end
+		}
+	}
+	out.WriteString(src[prev:])
+	return out.String()
+}
 
 // guideSource は指定言語のガイド本文を返す。
 // その言語の訳が無ければ既定の言語にフォールバックする(文言と同じ方針)。
@@ -98,14 +143,14 @@ func guideOutline(slug, src string) guideTopic {
 }
 
 // guideOutlines は全 topic の目次を作る(サイドバー用)。
-func (s *Server) guideOutlines(lang i18n.Lang, current string) []guideTopic {
+func (s *Server) guideOutlines(lang i18n.Lang, current string, set settings.Settings) []guideTopic {
 	out := make([]guideTopic, 0, len(guideTopics))
 	for _, slug := range guideTopics {
 		src, ok := guideSource(lang, slug)
 		if !ok {
 			continue
 		}
-		t := guideOutline(slug, src)
+		t := guideOutline(slug, guideFilter(src, set))
 		t.Current = slug == current
 		out = append(out, t)
 	}
@@ -115,9 +160,10 @@ func (s *Server) guideOutlines(lang i18n.Lang, current string) []guideTopic {
 // viewGuideIndex は /guide。全 topic の目次だけを出す。
 func (s *Server) viewGuideIndex(w http.ResponseWriter, r *http.Request) {
 	lang := s.langOf(r)
+	set := s.settings(r)
 	s.render(w, r, "guide.html", viewData{
 		Title: s.tr(r, "guide.title"), Nav: "guide",
-		Data: guideData{Topics: s.guideOutlines(lang, "")},
+		Data: guideData{Topics: s.guideOutlines(lang, "", set)},
 	})
 }
 
@@ -130,6 +176,8 @@ func (s *Server) viewGuide(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, s.tr(r, "err.not_found"), http.StatusNotFound)
 		return
 	}
+	set := s.settings(r)
+	src = guideFilter(src, set)
 	var buf bytes.Buffer
 	if err := guideMD.Convert([]byte(src), &buf); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -139,7 +187,7 @@ func (s *Server) viewGuide(w http.ResponseWriter, r *http.Request) {
 	cur.Current = true
 	s.render(w, r, "guide.html", viewData{
 		Title: cur.Title, Nav: "guide",
-		Data: guideData{Topics: s.guideOutlines(lang, topic), Topic: &cur,
+		Data: guideData{Topics: s.guideOutlines(lang, topic, set), Topic: &cur,
 			// 埋め込んだ自分の文書なので、goldmark の出力をそのまま信頼してよい。
 			HTML: template.HTML(buf.String())},
 	})

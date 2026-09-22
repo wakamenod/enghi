@@ -552,7 +552,32 @@ SELECT p.id, p.slug, p.title, p.updated_at,
 /gtd/review                Weekly Review
 /guide                     使い方ガイド(目次)
 /guide/:topic              使い方ガイド(gtd = GTD 入門 / enghi = 操作)
+/settings                  設定
 ```
+
+**ヘッダーのナビは GTD / ガイド / 設定 の3つだけとする。** 記事とタグは
+記事系の画面(ダッシュボード・記事・タグ・検索)の左列に常に出し、ヘッダーからは外す。
+
+### 4.1.1 Context と Area は opt-in(設定で on にしたときだけ現れる)
+
+**既定は off。** Context(場所や道具での絞り込み)と Area(責任範囲)は GTD の中では
+任意の道具であり、絞り込む必要が無いうちは選択肢が増えるだけになる。
+
+- 設定は `settings` テーブル(key/value)に置く。**行が無い = 既定値**とし、既定値は
+  DB に書かない(既定を変えるときにコードだけ直せば済む)。
+- off のとき: `/gtd/areas` と `/gtd/area/:id` は 404、Clarify の選択欄・GTD トップの枠・
+  ダッシュボードの件数・Weekly Review の一覧から消える。**データは消さない。**
+- **使い方ガイドも同じ設定で出し分ける。** off の機能の節は本文ごと落とす
+  (節の直前に `<!--feature:contexts-->` を書く)。画面から消えた機能を
+  ガイドだけが説明し続ける状態を作らない。
+- API(`/api/*`)は出し分けの対象外。設定は画面の都合であり、Emacs 層の都合ではない。
+
+### 4.1.2 GTD の用語は訳さない
+
+Inbox / Next Action / Waiting For / Scheduled / Someday/Maybe / Project / Outcome /
+Context / Area of Responsibility / Weekly Review / Capture / Clarify / Organize /
+Reflect / Engage / Reference は、**画面でもガイドでも英語のまま使う。**
+GTD の本と画面で呼び方が違うと、本で読んだ内容を画面の上で見失う。
 
 **ガイドの本文は `docs/guide/<lang>/<topic>.md` に置き、バイナリに埋め込む。**
 Wiki ページとして DB に投入しない(利用者が編集・削除でき、版を上げるたびに衝突するため)。

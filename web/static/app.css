@@ -567,6 +567,9 @@ button.danger:hover { border-color: var(--warn); }
 /* ---- 使い方ガイド ----
    左に目次、右に本文。本文は記事と同じ .prose を使う */
 .guide { display: grid; grid-template-columns: 200px 1fr; gap: 0 var(--sp-7); }
+/* **グリッドの子は既定で min-width:auto**。中身より縮まないので、横に長い図や表を
+   置くと列のほうが広がって、ページ全体に横スクロールが出る。 */
+.guide > * { min-width: 0; }
 .guide-toc {
   position: sticky; top: 64px; align-self: start;
   padding-top: var(--sp-6); font-size: var(--fs-2); line-height: 1.7;
@@ -594,3 +597,57 @@ a.help {
 }
 a.help:hover { color: var(--fg); background: var(--bg-hover); }
 label a.help { background: none; padding: 0; margin-left: var(--sp-2); text-decoration: underline; border-radius: 0; }
+
+/* ---- ガイドの図(inline SVG) ----
+   色はすべて変数に寄せる。light-dark() が両テーマを持っているので、
+   図の側でテーマ分岐を書く必要はない。
+   文字サイズは viewBox の座標系に対する値であり、画面上では拡大縮小される。 */
+/* 図は縮めすぎると文字が読めなくなるので、狭い画面では図の中で横に
+   動かせるようにする(表と同じ扱い。ページ全体を横に流さない)。 */
+.dg-wrap { overflow-x: auto; min-width: 0; margin: var(--sp-5) 0; }
+svg.dg { display: block; width: 100%; min-width: 600px; height: auto; font-family: var(--sans); }
+svg.dg rect.box { fill: var(--bg-raised); stroke: var(--border); }
+svg.dg rect.q   { fill: var(--bg-sunken); stroke: var(--border-strong); }
+svg.dg rect.end { fill: var(--accent); stroke: var(--accent); }
+svg.dg path     { fill: none; stroke: var(--border-strong); stroke-width: 1.2; }
+svg.dg path.head { fill: var(--border-strong); stroke: none; }
+svg.dg text { fill: var(--fg); font-size: 14px; }
+svg.dg text.small { fill: var(--fg-muted); font-size: 12px; }
+svg.dg text.mono  { font-family: var(--mono); font-size: 13px; }
+svg.dg text.lab   { fill: var(--fg-faint); font-size: 11.5px; font-family: var(--mono); }
+svg.dg text.end-t { fill: var(--accent-fg); }
+
+/* ---- 記事系の画面の左列 ----
+   ヘッダーから「記事」「タグ」を外した代わりに、タグをここに常に並べる。
+   ガイドの目次(.guide-toc)と同じ幅・同じ位置に置き、画面が変わっても
+   左の列が動かないようにする。 */
+.wrap.with-side { display: grid; grid-template-columns: 200px 1fr; gap: 0 var(--sp-7); }
+.wrap.with-side > * { min-width: 0; }
+.side {
+  position: sticky; top: 64px; align-self: start;
+  padding-top: var(--sp-6); font-size: var(--fs-2); line-height: 1.7;
+}
+.side .side-head {
+  display: block; color: var(--fg); font-size: var(--fs-3); font-weight: 500; text-decoration: none;
+}
+.side .side-head.on { border-bottom: 2px solid var(--accent); }
+.side ul { list-style: none; margin: var(--sp-2) 0 0; padding: 0; border-left: 1px solid var(--border); }
+.side li { display: flex; gap: var(--sp-2); padding: 1px 0 1px var(--sp-3); }
+.side a { color: var(--fg-muted); text-decoration: none; }
+.side a:hover { color: var(--fg); }
+.side .when { margin-left: auto; color: var(--fg-faint); font-family: var(--mono); }
+@media (max-width: 720px) {
+  .wrap.with-side { grid-template-columns: 1fr; }
+  .side { position: static; padding-top: var(--sp-5); }
+}
+
+/* 設定のチェックボックス。ラベル全体を押せるようにする */
+label.check {
+  display: flex; gap: var(--sp-3); align-items: baseline;
+  margin: var(--sp-4) 0 0; font-size: var(--fs-4); color: var(--fg); cursor: pointer;
+}
+label.check input { margin: 0; }
+label.check strong { font-weight: 600; }
+/* 節見出しがリンクのとき(ダッシュボードの「記事」→ 一覧)は、見出しの見た目のまま */
+section.panel > h2 a { color: inherit; text-decoration: none; }
+section.panel > h2 a:hover { text-decoration: underline; text-underline-offset: 3px; }

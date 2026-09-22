@@ -1,0 +1,47 @@
+{{template "head" .}}
+{{$d := .Data}}
+<h1>{{t "settings.title"}}</h1>
+
+<section class="panel">
+  <h2>{{t "settings.features"}}</h2>
+  <div class="meta">{{t "settings.features_note"}}</div>
+  <form method="post" action="/ui/settings">
+    <label class="check">
+      <input type="checkbox" name="gtd.contexts" value="1" {{if $d.Set.Contexts}}checked{{end}}>
+      <span><strong>{{t "gtd.contexts"}}</strong> — {{t "settings.contexts_note"}}</span>
+    </label>
+    <label class="check">
+      <input type="checkbox" name="gtd.areas" value="1" {{if $d.Set.Areas}}checked{{end}}>
+      <span><strong>{{t "gtd.areas"}}</strong> — {{t "settings.areas_note"}}</span>
+    </label>
+    <div class="meta" style="margin-top:12px">{{t "settings.keeps_data"}}</div>
+    <div class="actions"><button type="submit" class="primary">{{t "common.save"}}</button></div>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>{{t "settings.export"}}</h2>
+  <div class="meta">{{t "settings.export_note"}}</div>
+  <div class="meta"><code>{{$d.Export}}</code></div>
+  <form method="post" action="/ui/export" class="actions">
+    <input type="hidden" name="return_to" value="/settings">
+    <button type="submit">{{t "dash.export"}}</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>{{t "settings.backup"}}</h2>
+  <div class="meta">{{t "settings.backup_note"}}</div>
+  <div class="meta"><code>{{$d.Dir}}</code></div>
+  {{if $d.Backups}}
+  <ul class="rows">
+    {{range $d.Backups}}
+    <li><code>{{base .Path}}</code><span class="when">{{.CreatedAt}}</span></li>
+    {{end}}
+  </ul>
+  {{else}}<div class="empty">{{t "settings.backup_none"}}</div>{{end}}
+  <form method="post" action="/ui/backup" class="actions">
+    <button type="submit">{{t "settings.backup_now"}}</button>
+  </form>
+</section>
+{{template "foot" .}}

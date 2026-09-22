@@ -14,7 +14,7 @@
   <li>
     <a href="/gtd/project/{{.ID}}">{{.Title}}</a>
     {{if index $d.Stalled .ID}}<span class="tag warn">{{t "project.stalled_badge"}}</span>{{end}}
-    {{if .AreaName}}<span class="tag">{{.AreaName}}</span>{{end}}
+    {{if and $.Set.Areas .AreaName}}<span class="tag">{{.AreaName}}</span>{{end}}
     {{if ne .Status "active"}}<span class="tag">{{.Status}}</span>{{end}}
     {{if .ReviewOn}}<span class="tag">{{t "project.review_on" .ReviewOn}}</span>{{end}}
     <span class="when">{{.NextCount}} / {{.OpenTasks}}</span>
@@ -31,11 +31,13 @@
     <input type="text" id="title" name="title" placeholder="{{t "project.title_example"}}" required>
     <label for="outcome">{{t "project.outcome_label"}}</label>
     <input type="text" id="outcome" name="outcome" placeholder="{{t "project.outcome_example"}}">
+    {{if .Set.Areas}}
     <label for="area_id">{{t "project.area"}}</label>
     <select id="area_id" name="area_id">
       <option value="">—</option>
       {{range $d.Areas}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
     </select>
+    {{end}}
     <div class="actions"><button type="submit" class="primary">{{t "common.create"}}</button></div>
   </form>
 </section>

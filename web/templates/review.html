@@ -30,7 +30,7 @@
   <ul class="rows">
     {{range $d.Stalled}}
     <li><a href="/gtd/project/{{.ID}}">{{.Title}}</a>
-        {{if .AreaName}}<span class="tag">{{.AreaName}}</span>{{end}}
+        {{if and $.Set.Areas .AreaName}}<span class="tag">{{.AreaName}}</span>{{end}}
         {{if not .Outcome}}<span class="tag warn">{{t "review.outcome_missing"}}</span>{{end}}
         <span class="when">{{t "gtd.unprocessed" .OpenTasks}}</span></li>
     {{end}}
@@ -73,9 +73,9 @@
 
 <section class="panel" id="review_next_actions">
   <h2>{{t "gtd.next"}} <span class="count">{{len $d.NextActions}}</span></h2>
-  <div class="meta">
+  {{if .Set.Contexts}}<div class="meta">
     {{range $d.Contexts}}<a class="tag" href="/gtd/next?context={{.Name}}">{{.Name}} {{.Count}}</a> {{end}}
-  </div>
+  </div>{{end}}
   {{if $d.NextActions}}
   <ul class="rows">{{range $d.NextActions}}{{template "task_row" .}}{{end}}</ul>
   {{else}}<div class="empty">{{t "common.empty"}}</div>{{end}}

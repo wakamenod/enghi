@@ -286,6 +286,23 @@ func init() {
 		"empty.scheduled": "No scheduled items. Add a date during clarify to keep items hidden until then.",
 		"empty.someday":   "Empty. Park ideas you aren't ready to act on yet, and review them during your Weekly Review.",
 
+		// ---- settings
+		"nav.settings":               "Settings",
+		"settings.title":             "Settings",
+		"settings.features":          "Features",
+		"settings.features_note":     "Off by default. Turn on only what you need — it then appears both in the app and in the guide.",
+		"settings.contexts_note":     "Filter actions by place or tool (@phone, @home). Worth it once Next Actions gets long.",
+		"settings.areas_note":        "Group projects and actions under standards you maintain (Finances, Health).",
+		"settings.keeps_data":        "Turning a feature off keeps its data. It only disappears from the screens.",
+		"settings.export":            "Export",
+		"settings.export_note":       "Writes every article and task out as Markdown.",
+		"settings.backup":            "Backup",
+		"settings.backup_note":       "Copies of the database. Older ones beyond the limit are removed automatically.",
+		"settings.backup_none":       "None yet",
+		"settings.backup_now":        "Back up now",
+		"settings.feature_off_title": "This feature is turned off",
+		"settings.feature_off_body":  "Turn it on in Settings and this screen — along with its section of the guide — comes back.",
+
 		// ---- errors and notices
 		"err.not_found":         "Not found",
 		"err.page_not_found":    "Page not found",

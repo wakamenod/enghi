@@ -78,7 +78,7 @@ func (s *Server) viewNextActions(w http.ResponseWriter, r *http.Request) {
 	contexts, _ := s.gtd.Contexts(ctx)
 	var cur *gtd.Context
 	var ctxID *int64
-	if name := r.URL.Query().Get("context"); name != "" {
+	if name := r.URL.Query().Get("context"); name != "" && s.settings(r).Contexts {
 		if c, err := s.gtd.ContextByName(ctx, name); err == nil {
 			cur, ctxID = c, &c.ID
 		} else if id, err := strconv.ParseInt(name, 10, 64); err == nil {
@@ -205,6 +205,10 @@ type areasData struct {
 }
 
 func (s *Server) viewAreas(w http.ResponseWriter, r *http.Request) {
+	if !s.settings(r).Areas {
+		s.featureOff(w, r)
+		return
+	}
 	areas, err := s.gtd.Areas(ctxOf(r))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -222,6 +226,10 @@ type areaData struct {
 }
 
 func (s *Server) viewArea(w http.ResponseWriter, r *http.Request) {
+	if !s.settings(r).Areas {
+		s.featureOff(w, r)
+		return
+	}
 	ctx := ctxOf(r)
 	id, err := pathID(r)
 	if err != nil {
@@ -511,6 +519,10 @@ func (s *Server) uiPatchProject(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) uiCreateArea(w http.ResponseWriter, r *http.Request) {
+	if !s.settings(r).Areas {
+		s.featureOff(w, r)
+		return
+	}
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -549,6 +561,10 @@ func (s *Server) uiPatchArea(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) uiCreateContext(w http.ResponseWriter, r *http.Request) {
+	if !s.settings(r).Contexts {
+		s.featureOff(w, r)
+		return
+	}
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

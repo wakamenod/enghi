@@ -210,3 +210,64 @@ func TestGuideUnknownTopicIs404(t *testing.T) {
 		}
 	}
 }
+
+// 図(inline SVG)が落ちていないこと。
+// **goldmark は既定で生の HTML を落とす。** WithUnsafe を外すと、図だけが
+// 静かに消えて本文は通る(テンプレートも型検査も何も言わない)。
+// 図の数が言語間で違うのも同じ理由で見つかりにくい。
+func TestGuideDiagramsSurviveRendering(t *testing.T) {
+	h := newServer(t)
+	for _, lang := range []string{"ja", "en"} {
+		r := req("GET", "/guide/gtd", "")
+		r.Header.Set("Accept-Language", lang)
+		body := do(h, r).Body.String()
+		if n := strings.Count(body, `<svg class="dg"`); n == 0 {
+			t.Errorf("/guide/gtd (%s): 図が描画されていない(WithUnsafe が外れている)", lang)
+		}
+	}
+
+	counts := map[string]map[string]int{} // topic -> lang -> 図の数
+	for name, src := range guideFiles(t) {
+		lang, topic, _ := strings.Cut(name, "/")
+		topic = strings.TrimSuffix(topic, ".md")
+		if counts[topic] == nil {
+			counts[topic] = map[string]int{}
+		}
+		counts[topic][lang] = strings.Count(src, `<svg class="dg"`)
+	}
+	for topic, langs := range counts {
+		var want = -1
+		for _, n := range langs {
+			if want < 0 || n < want {
+				want = n
+			}
+		}
+		for lang, n := range langs {
+			if n != want {
+				t.Errorf("%s: 図の数が言語で違う (%s=%d, 他=%d)", topic, lang, n, want)
+			}
+		}
+	}
+}
+
+// 強調が壊れていないこと。
+//
+// **日本語の直前・直後に空白が無いと `**` が閉じられず、本文にそのまま出る。**
+// (CommonMark の規則: 閉じる側の区切りが左右どちらにも接していると閉じられない)
+// 文言を直すたびに起こりうるので、描画結果で見張る。
+func TestGuideHasNoRawMarkdown(t *testing.T) {
+	h := newServer(t)
+	enableFeatures(t, h)
+	for _, lang := range []string{"ja", "en"} {
+		for _, topic := range []string{"gtd", "enghi"} {
+			r := req("GET", "/guide/"+topic, "")
+			r.Header.Set("Accept-Language", lang)
+			body := do(h, r).Body.String()
+			for _, bad := range []string{"**", "](/guide"} {
+				if strings.Contains(body, bad) {
+					t.Errorf("/guide/%s (%s): %q が描画結果に出ている", topic, lang, bad)
+				}
+			}
+		}
+	}
+}

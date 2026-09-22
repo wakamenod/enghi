@@ -18,7 +18,7 @@ Everything you capture lands here first. Nothing here has been decided yet.
 
 Click an item to open the **clarify screen**. Process items one by one from the top.
 
-Emptying the Inbox is the goal, but you don't need to do it every day. Just make sure to clear it once a week during your Weekly Review.
+**Emptying the Inbox is a daily habit.** Spend a few minutes a day working from the top. You won't clear it out completely every day, and that's fine — but **it must be empty once a week, during the Weekly Review.** That is your backstop.
 
 ## The Clarify Screen — Action or Reference {#clarify-screen}
 
@@ -40,6 +40,8 @@ Enter a title and body, then click "Create Article". The item **becomes a wiki a
 ### Choosing a State {#states}
 
 These are the available states on the clarify screen. **This distinction is the core of enghi**, so return to this table whenever you are unsure.
+
+<div class="dg-wrap"><svg class="dg" viewBox="0 0 830 370" role="img" aria-label="Where items go when they leave the Inbox"><defs><marker id="a3en" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="head" d="M 0 0 L 8 4 L 0 8 z"/></marker></defs><rect class="box" x="20" y="158" width="150" height="44" rx="6"/><text class="mono" x="95.0" y="176.0" text-anchor="middle">inbox</text><text class="small" x="95.0" y="193.0" text-anchor="middle">Unprocessed item</text><rect class="box" x="250" y="20" width="250" height="44" rx="6"/><text class="mono" x="375.0" y="38.0" text-anchor="middle">next</text><text class="small" x="375.0" y="55.0" text-anchor="middle">can be done right now</text><path d="M 170 180 L 210 180 L 210 42 L 248 42" marker-end="url(#a3en)"/><rect class="box" x="250" y="76" width="250" height="44" rx="6"/><text class="mono" x="375.0" y="94.0" text-anchor="middle">later</text><text class="small" x="375.0" y="111.0" text-anchor="middle">a follow-on; make it next when its turn comes</text><path d="M 170 180 L 210 180 L 210 98 L 248 98" marker-end="url(#a3en)"/><rect class="box" x="250" y="132" width="250" height="44" rx="6"/><text class="mono" x="375.0" y="150.0" text-anchor="middle">waiting</text><text class="small" x="375.0" y="167.0" text-anchor="middle">waiting on someone else</text><path d="M 170 180 L 210 180 L 210 154 L 248 154" marker-end="url(#a3en)"/><rect class="box" x="250" y="188" width="250" height="44" rx="6"/><text class="mono" x="375.0" y="206.0" text-anchor="middle">scheduled</text><text class="small" x="375.0" y="223.0" text-anchor="middle">joins next when the date arrives</text><path d="M 170 180 L 210 180 L 210 210 L 248 210" marker-end="url(#a3en)"/><rect class="box" x="250" y="244" width="250" height="44" rx="6"/><text class="mono" x="375.0" y="262.0" text-anchor="middle">someday</text><text class="small" x="375.0" y="279.0" text-anchor="middle">not committed to</text><path d="M 170 180 L 210 180 L 210 266 L 248 266" marker-end="url(#a3en)"/><rect class="box" x="250" y="300" width="250" height="44" rx="6"/><text class="mono" x="375.0" y="318.0" text-anchor="middle">filed</text><text class="small" x="375.0" y="335.0" text-anchor="middle">reference, not an action</text><path d="M 170 180 L 210 180 L 210 322 L 248 322" marker-end="url(#a3en)"/><path d="M 500 42 L 545 42"/><path d="M 500 98 L 545 98"/><path d="M 500 154 L 545 154"/><path d="M 500 210 L 545 210"/><path d="M 500 266 L 545 266"/><path d="M 545 42 L 545 266"/><path d="M 545 154 L 608 154" marker-end="url(#a3en)"/><rect class="end" x="610" y="132" width="200" height="44" rx="6"/><text class="mono end-t" x="710.0" y="158.5" text-anchor="middle">done / dropped</text><path d="M 500 322 L 608 322" marker-end="url(#a3en)"/><rect class="box" x="610" y="300" width="200" height="44" rx="6"/><text class="small" x="710.0" y="326.5" text-anchor="middle">becomes a wiki article</text></svg></div>
 
 | State | Meaning | Where It Appears |
 |---|---|---|
@@ -103,6 +105,7 @@ You can assign a **review date** to projects moved to Someday. When that date ar
 
 This is what makes Someday truly usable: knowing when an idea will resurface lets you safely shelve it.
 
+<!--feature:areas-->
 ## Areas — Areas of Responsibility {#areas}
 
 Areas are ongoing standards you maintain rather than finish (e.g., "Finances", "Health", "Hiring").
@@ -111,6 +114,7 @@ Linking projects and single actions to an Area shows you **everything currently 
 
 You can also attach a single wiki article to an Area for reference notes.
 
+<!--feature:contexts-->
 ## Contexts {#contexts}
 
 Add contexts on the right side of the GTD screen. Starting with a few basics like `@phone`, `@home`, `@errands`, and `@email` is plenty.

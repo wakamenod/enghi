@@ -4,7 +4,7 @@
 <h1>{{$p.Title}}</h1>
 <div class="meta">
   {{$p.Status}}
-  {{if $p.AreaName}} · <a href="/gtd/area/{{$p.AreaID}}">{{$p.AreaName}}</a>{{end}}
+  {{if and .Set.Areas $p.AreaName}} · <a href="/gtd/area/{{$p.AreaID}}">{{$p.AreaName}}</a>{{end}}
   {{if $p.ReviewOn}} · {{t "project.review_on" $p.ReviewOn}}{{end}}
 </div>
 
@@ -67,11 +67,13 @@
     </select>
     <label for="review_on">{{t "project.review_label"}}</label>
     <input type="text" id="review_on" name="review_on" value="{{$p.ReviewOn}}" placeholder="YYYY-MM-DD">
+    {{if .Set.Areas}}
     <label for="area_id">{{t "project.area"}}</label>
     <select id="area_id" name="area_id">
       <option value="">—</option>
       {{range $d.Areas}}<option value="{{.ID}}" {{if eqID $.Data.Project.AreaID .ID}}selected{{end}}>{{.Name}}</option>{{end}}
     </select>
+    {{end}}
     <label for="note_page">{{t "project.support_label"}}</label>
     <input type="text" id="note_page" name="note_page" value="{{$p.NotePageSlug}}">
     <div class="actions"><button type="submit" class="primary">{{t "common.save"}}</button></div>

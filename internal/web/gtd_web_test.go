@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"regexp"
 	"strings"
 	"testing"
@@ -14,6 +15,7 @@ import (
 // head を書き出した後に body の途中で止まるため 200 のまま壊れた HTML が返る。
 func TestAllScreensRenderCompletely(t *testing.T) {
 	h := newServer(t)
+	enableFeatures(t, h)
 
 	// 各画面に中身がある状態を作る(空のときだけ通る、という取りこぼしを避ける)
 	mustJSON(t, h, "POST", "/api/pages", `{"title":"参考資料","body":"本文"}`)
@@ -38,7 +40,7 @@ func TestAllScreensRenderCompletely(t *testing.T) {
 		"/gtd/waiting", "/gtd/scheduled", "/gtd/someday",
 		"/gtd/projects", "/gtd/projects?status=active", "/gtd/project/1",
 		"/gtd/areas", "/gtd/area/1", "/gtd/review", "/gtd/clarify/5",
-		"/guide", "/guide/gtd", "/guide/enghi",
+		"/guide", "/guide/gtd", "/guide/enghi", "/settings",
 	}
 	for _, path := range screens {
 		w := do(h, req("GET", path, ""))
@@ -181,6 +183,7 @@ func mustJSON(t *testing.T, h http.Handler, method, path, body string) {
 // 英語でも全画面が最後まで描画され、日本語が残っていないこと。
 func TestEnglishScreensHaveNoJapanese(t *testing.T) {
 	h := newServer(t)
+	enableFeatures(t, h)
 	mustJSON(t, h, "POST", "/api/pages", `{"title":"Article","body":"body"}`)
 	mustJSON(t, h, "POST", "/api/contexts", `{"name":"@phone"}`)
 	mustJSON(t, h, "POST", "/api/areas", `{"name":"Finances"}`)
@@ -280,5 +283,19 @@ func TestErrorMessagesAreLocalized(t *testing.T) {
 	msg, _ := res["message"].(string)
 	if regexp.MustCompile(`[ぁ-んァ-ヶ一-龠]`).MatchString(msg) {
 		t.Errorf("英語のはずが日本語: %q", msg)
+	}
+}
+
+// enableFeatures は Context と Area を on にする。
+// **既定は off なので、これを呼ばない画面テストは 404 を見ることになる。**
+func enableFeatures(t *testing.T, h http.Handler) {
+	t.Helper()
+	form := strings.NewReader("gtd.contexts=1&gtd.areas=1")
+	r := httptest.NewRequest("POST", "/ui/settings", form)
+	r.Host = "127.0.0.1:7777"
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r.Header.Set("Sec-Fetch-Site", "same-origin")
+	if got := do(h, r).Code; got != http.StatusSeeOther {
+		t.Fatalf("POST /ui/settings → %d", got)
 	}
 }

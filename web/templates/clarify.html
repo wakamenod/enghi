@@ -25,16 +25,20 @@
         <option value="">—</option>
         {{range $d.Projects}}<option value="{{.ID}}" {{if eqID $.Data.Task.ProjectID .ID}}selected{{end}}>{{.Title}}</option>{{end}}
       </select>
+      {{if .Set.Contexts}}
       <label for="context_id">{{t "clarify.context"}}</label>
       <select id="context_id" name="context_id">
         <option value="">—</option>
         {{range $d.Contexts}}<option value="{{.ID}}" {{if eqID $.Data.Task.ContextID .ID}}selected{{end}}>{{.Name}}</option>{{end}}
       </select>
+      {{end}}
+      {{if .Set.Areas}}
       <label for="area_id">{{t "clarify.area"}}</label>
       <select id="area_id" name="area_id">
         <option value="">—</option>
         {{range $d.Areas}}<option value="{{.ID}}" {{if eqID $.Data.Task.AreaID .ID}}selected{{end}}>{{.Name}}</option>{{end}}
       </select>
+      {{end}}
       <label for="scheduled_on">{{t "clarify.scheduled"}}</label>
       <input type="text" id="scheduled_on" name="scheduled_on" value="{{$t.ScheduledOn}}" placeholder="YYYY-MM-DD">
       <label for="deadline_on">{{t "clarify.deadline"}}</label>
