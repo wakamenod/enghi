@@ -2,9 +2,19 @@
 
 *English · [日本語](README.ja.md)*
 
-A local-only personal wiki + GTD server for macOS and Linux. Runs as a background
-service, used from the browser; nothing leaves the machine. Instant full-text search
-(SQLite FTS5), `[[wikilinks]]` resolved by title, export to plain Markdown any time.
+A local-only personal wiki + GTD server for macOS and Linux. It runs as a background
+service and you use it from the browser. Nothing leaves the machine.
+
+## Features
+
+- **Instant full-text search** over pages and tasks, built on SQLite FTS5 with a
+  trigram tokenizer, so Japanese matches as well as English
+- **`[[wikilinks]]` resolved by title.** Renaming a page keeps the old title as an
+  alias, so links to it stay alive
+- **GTD on top of the wiki:** inbox, next actions, projects, and recurring tasks in
+  org-mode repeater syntax
+- **Markdown export** of everything, any time. Nothing is locked inside the database
+- **Local only.** Binds to loopback, no account, no cloud
 
 ## Installation
 
