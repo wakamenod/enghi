@@ -9,8 +9,10 @@ permissions:
 
 jobs:
   build:
-    # cgo prevents cross-compilation (enforced by require_cgo.go), so build
-    # natively on a runner matching the target OS and architecture.
+    # cgo rules out building across operating systems, so each OS gets its own
+    # runner. Architecture is different: on macOS, clang can target x86_64 from
+    # Apple Silicon, so one runner covers both Macs. That matters because the
+    # Intel macos-13 runner has been retired and never leaves the queue.
     #
     # To add linux/arm64, add an entry with runs-on: ubuntu-24.04-arm
     # (arm64 runners are free for public repositories).
@@ -18,16 +20,30 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runs-on: macos-latest   # Apple Silicon
+          - runs-on: macos-latest
             goos: darwin
             goarch: arm64
-          - runs-on: macos-13       # Intel
+            cgo_flags: "-O2 -g"
+            arch_check: arm64
+            native: true
+          - runs-on: macos-latest
             goos: darwin
             goarch: amd64
+            cgo_flags: "-O2 -g -arch x86_64"
+            arch_check: x86_64
+            native: false
           - runs-on: ubuntu-latest
             goos: linux
             goarch: amd64
+            cgo_flags: "-O2 -g"
+            arch_check: x86-64
+            native: true
     runs-on: ${{ matrix.runs-on }}
+    env:
+      GOOS: ${{ matrix.goos }}
+      GOARCH: ${{ matrix.goarch }}
+      CGO_CFLAGS: ${{ matrix.cgo_flags }}
+      CGO_LDFLAGS: ${{ matrix.cgo_flags }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -43,10 +59,14 @@ jobs:
 
       - name: inspect the binary
         run: |
-          ./bin/enghi version
-          # Verify the architecture to catch runner mismatches
-          test "$(go env GOARCH)" = "${{ matrix.goarch }}"
-          test "$(go env GOOS)" = "${{ matrix.goos }}"
+          # Inspect the binary itself. Asking the toolchain would only echo the
+          # environment set above, which proves nothing about what was produced.
+          file bin/enghi
+          file bin/enghi | grep -q '${{ matrix.arch_check }}'
+
+      - name: run it
+        if: ${{ matrix.native }}
+        run: ./bin/enghi version
 
       - name: package
         run: |
