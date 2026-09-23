@@ -7,7 +7,7 @@ on:
 
 jobs:
   test:
-    # cgo なのでクロスコンパイルができない。各 OS の runner で実際に回す。
+    # cgo prevents cross-compilation, so run natively on a runner per OS.
     strategy:
       fail-fast: false
       matrix:
@@ -23,13 +23,13 @@ jobs:
       - run: make vet
       - run: make test
 
-      # ビルドガードが効いていることを毎回確かめる。
-      # ここが壊れると、FTS5 の無いバイナリや cgo 無しのスタブが配布物に混ざる。
+      # Verify that the build guards still trigger. If they stop working,
+      # a binary without FTS5 or a cgo-less stub could silently slip into a release.
       - name: build guards reject bad builds
         run: |
           if go build -o /dev/null ./cmd/enghi 2>/dev/null; then
-            echo "タグ無しビルドが通ってしまった (require_fts5.go が効いていない)"; exit 1
+            echo "a build without the tag succeeded (require_fts5.go is not working)"; exit 1
           fi
           if CGO_ENABLED=0 go build -tags sqlite_fts5 -o /dev/null ./cmd/enghi 2>/dev/null; then
-            echo "CGO_ENABLED=0 のビルドが通ってしまった (require_cgo.go が効いていない)"; exit 1
+            echo "a CGO_ENABLED=0 build succeeded (require_cgo.go is not working)"; exit 1
           fi

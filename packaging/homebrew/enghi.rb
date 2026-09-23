@@ -1,32 +1,32 @@
-# enghi の Homebrew formula。
+# Homebrew formula for enghi.
 #
-# 置き場はこのリポジトリではなく、別リポジトリ `wakamenod/homebrew-tap` の
-# `Formula/enghi.rb`。ここにあるのは正本で、tap へはコピーして使う。
+# This file is the source of truth, but Homebrew does not read it directly. Copy it to
+# `Formula/enghi.rb` in the separate `wakamenod/homebrew-tap` repository.
 #
-# **ビルド済みバイナリではなくソースからビルドする。** 理由:
-#   - build tag sqlite_fts5 の付け忘れが構造的に起きない(formula が必ず付ける)
-#   - ダウンロードした実行ファイルではないので、Gatekeeper の quarantine を踏まない
-#   - macOS / Linux を 1 つの formula で賄える
+# **Builds from source rather than shipping prebuilt binaries** because:
+#   - the formula always passes the sqlite_fts5 build tag, so it cannot be forgotten
+#   - no downloaded binaries, so Gatekeeper never quarantines them
+#   - a single formula covers both macOS and Linux
 class Enghi < Formula
   desc "Local-only personal wiki and GTD server"
   homepage "https://github.com/wakamenod/enghi"
   url "https://github.com/wakamenod/enghi/archive/refs/tags/v0.1.0.tar.gz"
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000" # リリース後に埋める
+  sha256 "0000000000000000000000000000000000000000000000000000000000000000" # fill in after release
   license "MIT"
   head "https://github.com/wakamenod/enghi.git", branch: "main"
 
   depends_on "go" => :build
 
   def install
-    # SQLite の FTS5 と trigram tokenizer が要る(DESIGN 1)。
-    # cgo 経由で同梱の C をビルドするため CGO_ENABLED=1 が必須。
+    # Search requires SQLite FTS5 and the trigram tokenizer, which are compile-time
+    # options in the bundled C source, so cgo must be enabled.
     ENV["CGO_ENABLED"] = "1"
     system "go", "build", *std_go_args(ldflags: "-X main.version=#{version}"),
            "-tags", "sqlite_fts5", "./cmd/enghi"
   end
 
-  # brew services が macOS では launchd、Linux では systemd に振り分ける。
-  # enghi install-agent は brew を使わない人向けの裏口として残してある。
+  # brew services registers this with launchd on macOS and systemd on Linux.
+  # `enghi install-agent` remains the fallback for non-Homebrew users.
   service do
     run [opt_bin/"enghi", "serve"]
     keep_alive true
@@ -36,19 +36,19 @@ class Enghi < Formula
 
   def caveats
     <<~EOS
-      常駐させるには:
+      To run enghi in the background:
         brew services start enghi
 
-      起動したら http://127.0.0.1:7777/ を開く。
-      設定は ~/.config/enghi/config.toml (無ければ既定値で動く)。
+      Then open http://127.0.0.1:7777/ and visit /guide to get started.
+      Configuration lives in ~/.config/enghi/config.toml (defaults apply if absent).
     EOS
   end
 
   test do
     assert_match "enghi", shell_output("#{bin}/enghi version")
 
-    # FTS5 の無いバイナリを掴んでいないことを確かめる。
-    # doctor は DB を作って整合性を検査するので、tokenizer が無ければここで落ちる。
+    # Verify the build includes FTS5: doctor creates the database and runs
+    # integrity checks, so a missing tokenizer fails here.
     ENV["XDG_DATA_HOME"] = testpath/"data"
     ENV["XDG_CONFIG_HOME"] = testpath/"cfg"
     system bin/"enghi", "doctor"

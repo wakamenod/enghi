@@ -1,10 +1,9 @@
-# FTS5 と trigram tokenizer が必要なので、**build tag は必須**(DESIGN 1)。
-# 付け忘れた場合は起動時の検証(store.verifyFTS)が明示的なエラーで落とす。
+# Search requires FTS5 and the trigram tokenizer, so the build tag is mandatory.
+# Omitting it fails the build in cmd/enghi/require_fts5.go, as does
+# CGO_ENABLED=0 in require_cgo.go.
 TAGS := sqlite_fts5
 BIN  := bin/enghi
 
-# タグの無いビルドは cmd/enghi/require_fts5.go がコンパイルエラーで止める。
-# CGO_ENABLED=0 も同様(require_cgo.go)。
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -X main.version=$(VERSION)
 

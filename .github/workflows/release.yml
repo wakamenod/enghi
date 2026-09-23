@@ -9,11 +9,11 @@ permissions:
 
 jobs:
   build:
-    # cgo なので GOOS を跨いだビルドができない(require_cgo.go が止める)。
-    # 目的の OS/ARCH と同じ runner でネイティブにビルドする。
+    # cgo prevents cross-compilation (enforced by require_cgo.go), so build
+    # natively on a runner matching the target OS and architecture.
     #
-    # linux/arm64 を足すなら runs-on を ubuntu-24.04-arm にしたジョブを
-    # 増やす(public リポジトリなら無料の arm64 runner が使える)。
+    # To add linux/arm64, add an entry with runs-on: ubuntu-24.04-arm
+    # (arm64 runners are free for public repositories).
     strategy:
       fail-fast: false
       matrix:
@@ -31,7 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # git describe にタグが要る
+          fetch-depth: 0   # git describe requires tags
 
       - uses: actions/setup-go@v5
         with:
@@ -41,10 +41,10 @@ jobs:
       - name: build
         run: make build
 
-      - name: 出来上がったバイナリを検査する
+      - name: inspect the binary
         run: |
           ./bin/enghi version
-          # 目的のアーキテクチャになっているか(runner の取り違えを検出する)
+          # Verify the architecture to catch runner mismatches
           test "$(go env GOARCH)" = "${{ matrix.goarch }}"
           test "$(go env GOOS)" = "${{ matrix.goos }}"
 
@@ -69,7 +69,7 @@ jobs:
           path: dist
           merge-multiple: true
 
-      # Homebrew の formula が sha256 を要求するので必ず出す。
+      # The Homebrew formula needs SHA-256 checksums, so always publish them.
       - name: checksums
         run: cd dist && sha256sum *.tar.gz | tee SHA256SUMS
 
