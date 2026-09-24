@@ -17,7 +17,7 @@
 <link rel="stylesheet" href="{{asset "/static/app.css"}}">
 <script src="{{asset "/static/htmx.min.js"}}" defer></script>
 </head>
-<body data-strings='{{.Strings}}'>
+<body data-strings='{{.Strings}}'{{if .Set.Contexts}} data-contexts="on"{{end}}>
 {{/* Icons are defined once here and referenced with <use>. A <use href> into an
      external SVG file does not work in Chrome or Safari, so they live inline.
      They are decorative, hence aria-hidden: the meaning always belongs to the

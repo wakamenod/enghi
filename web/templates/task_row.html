@@ -1,15 +1,18 @@
 {{define "task_row"}}
-<li data-task-id="{{.ID}}">
+<li data-task-id="{{.ID}}" data-state="{{.State}}" data-title="{{.Title}}"
+    data-project-id="{{with .ProjectID}}{{.}}{{end}}" data-project-title="{{.ProjectTitle}}" data-context-id="{{with .ContextID}}{{.}}{{end}}"
+    data-waiting-for="{{.WaitingFor}}" data-scheduled-on="{{.ScheduledOn}}">
   <form method="post" action="/ui/tasks/{{.ID}}/complete" class="inline-form">
     <button type="submit" class="check" title="{{t "gtd.complete"}}">✓</button>
   </form>
-  <a href="/gtd/clarify/{{.ID}}">{{.Title}}</a>
+  <a class="task-title" href="/gtd/clarify/{{.ID}}">{{.Title}}</a>
   {{if .Recurrence}}<span class="tag" title="{{t "gtd.recurring" .Recurrence}}">↻ {{.Recurrence}}</span>{{end}}
   {{if .ProjectTitle}}<a class="tag" href="/gtd/project/{{.ProjectID}}">{{.ProjectTitle}}</a>{{end}}
   {{if .ContextName}}<a class="tag" href="/gtd/next?context={{.ContextName}}">{{.ContextName}}</a>{{end}}
   {{if .DeadlineOn}}<span class="tag warn">{{t "gtd.deadline" .DeadlineOn}}</span>{{end}}
   {{if and .ScheduledOn (ne .State "next")}}<span class="tag">{{t "gtd.scheduled_on" .ScheduledOn}}</span>{{end}}
   {{if eq .State "waiting"}}<span class="tag">{{.WaitingFor}} — {{t "gtd.days_elapsed" .WaitingDays}}</span>{{end}}
+  <a class="row-detail" href="/gtd/clarify/{{.ID}}">{{t "move.details"}}</a>
   <span class="when">{{.State}}</span>
 </li>
 {{end}}

@@ -303,3 +303,73 @@ func enableFeatures(t *testing.T, h http.Handler) {
 		t.Fatalf("POST /ui/settings → %d", got)
 	}
 }
+
+// Task rows carry what the move modal needs to prefill its second step, and a
+// Details link to Clarify beside the title.
+func TestTaskRowsCarryMoveData(t *testing.T) {
+	h := newServer(t)
+	mustJSON(t, h, "POST", "/api/projects", `{"title":"オフィス移転","outcome":"移転完了"}`)
+	mustJSON(t, h, "POST", "/api/tasks", `{"title":"返事待ち"}`)
+	mustJSON(t, h, "PATCH", "/api/tasks/1",
+		`{"state":"waiting","waiting_for":"田中さん","project_id":1}`)
+
+	body := do(h, req("GET", "/gtd/waiting", "")).Body.String()
+	for _, want := range []string{
+		`data-task-id="1"`, `data-state="waiting"`, `data-title="返事待ち"`,
+		`data-project-id="1"`, `data-project-title="オフィス移転"`, `data-context-id=""`,
+		`data-waiting-for="田中さん"`, `data-scheduled-on=""`,
+		`<a class="task-title" href="/gtd/clarify/1">`,
+		`<a class="row-detail" href="/gtd/clarify/1">`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the waiting row lacks %s", want)
+		}
+	}
+}
+
+// The move modal submits ordinary form posts to POST /ui/tasks/{id}.
+func TestMoveTaskByFormPost(t *testing.T) {
+	h := newServer(t)
+	mustJSON(t, h, "POST", "/api/tasks", `{"title":"動かすもの"}`)
+
+	form := func(body string) int {
+		r := httptest.NewRequest("POST", "/ui/tasks/1", strings.NewReader(body+"&return_to=/gtd/inbox"))
+		r.Host = "127.0.0.1:7777"
+		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		r.Header.Set("Sec-Fetch-Site", "same-origin")
+		return do(h, r).Code
+	}
+	state := func() map[string]any {
+		var got struct {
+			Task map[string]any `json:"task"`
+		}
+		w := do(h, req("GET", "/api/tasks/1", ""))
+		if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+			t.Fatalf("GET /api/tasks/1: %v", err)
+		}
+		return got.Task
+	}
+
+	if got := form("state=waiting&waiting_for=X"); got != http.StatusSeeOther {
+		t.Fatalf("state=waiting → %d", got)
+	}
+	if got := state(); got["state"] != "waiting" || got["waiting_for"] != "X" {
+		t.Errorf("after waiting: %v", got)
+	}
+
+	// The date is required; the task must stay as it was
+	if got := form("state=scheduled"); got != http.StatusBadRequest {
+		t.Errorf("state=scheduled without a date → %d, want 400", got)
+	}
+	if got := state(); got["state"] != "waiting" {
+		t.Errorf("a rejected move changed the state to %v", got["state"])
+	}
+
+	// Drop keeps the row (state=dropped), unlike /delete
+	if got := form("state=dropped"); got != http.StatusSeeOther {
+		t.Fatalf("state=dropped → %d", got)
+	}
+	if got := state(); got["state"] != "dropped" {
+		t.Errorf("after drop: %v", got["state"])
+	}
+}

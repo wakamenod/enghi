@@ -537,6 +537,32 @@ button.danger:hover { border-color: var(--warn); }
 .modal input { font-size: var(--fs-5); }
 .modal-hint { font-size: var(--fs-1); color: var(--fg-faint); margin-top: var(--sp-2); font-family: var(--mono); }
 
+/* ---- moving a task (click a title, or Enter on a task row) ---- */
+
+.modal:focus { outline: none; }
+.move-choices { list-style: none; margin: 0; padding: 0; }
+.move-choices li {
+  display: flex; align-items: baseline; gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3); border-radius: var(--r-md); cursor: pointer;
+}
+.move-choices li:hover, .move-choices li.cur { background: var(--bg-hover); }
+.move-choices .kbd { min-width: 1.6em; text-align: center; }
+.move-form { display: flex; flex-direction: column; gap: var(--sp-3); }
+.move-field { display: flex; flex-direction: column; gap: var(--sp-1); margin: 0; }
+.modal .move-field input, .move-field select { font-size: var(--fs-4); }
+.move-field input[type=date] {
+  font-family: var(--sans); color: var(--fg); color-scheme: light dark;
+  background: var(--bg-raised); border: 1px solid var(--border);
+  border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3); width: 100%;
+}
+.move-confirm { margin: 0; color: var(--fg); }
+.move-actions { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-2); }
+
+/* Clarify is one click away, but the row leads with the title */
+ul.rows .row-detail { font-size: var(--fs-2); color: var(--fg-faint); margin-left: auto; }
+ul.rows .row-detail:hover { color: var(--fg-muted); }
+ul.rows .row-detail + .when { margin-left: 0; }
+
 /* ---- theme switch ---- */
 
 .theme-toggle {

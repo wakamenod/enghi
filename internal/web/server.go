@@ -308,7 +308,13 @@ func jsStrings(lang i18n.Lang) string {
 		"capture.title", "capture.hint", "capture.added", "capture.failed",
 		"capture.uploading", "capture.upload_failed",
 		"wikilink.alias", "wikilink.create", "wikilink.hint",
-		"keys.ask_waiting", "keys.ask_scheduled", "keys.ask_title", "keys.confirm_drop",
+		"keys.ask_title",
+		"move.title", "move.back", "move.submit", "move.details",
+		"move.choice.next", "move.choice.later", "move.choice.waiting", "move.choice.scheduled",
+		"move.choice.someday", "move.choice.done", "move.choice.dropped", "move.choice.filed",
+		"move.project", "move.project_required", "move.context", "move.none",
+		"move.waiting_for", "move.scheduled_on", "move.file_title", "move.file_tags",
+		"move.confirm_drop", "move.hint",
 	}
 	m := make(map[string]string, len(keys))
 	for _, k := range keys {

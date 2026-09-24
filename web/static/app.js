@@ -14,7 +14,7 @@ var S = (function () {
 
 function t(key, arg) {
   var s = S[key] || key;
-  return arg === undefined ? s : s.replace(/%[sd]/, arg);
+  return arg === undefined ? s : s.replace(/%[sd]/, function () { return arg; });
 }
 
 // ---------------------------------------------------------------- focus channel
@@ -206,44 +206,41 @@ function t(key, arg) {
     form.submit();
   }
 
-  var STATES = { n: 'next', l: 'later', m: 'someday' };
+  var STATES = { n: 'next', m: 'someday' };
   var PATHS = { d: 'complete', S: 'skip', f: 'file' };
+  // These need a value or a confirmation first, so they open the second step
+  // of the move modal instead of posting at once.
+  var ASKS = { l: 'later', w: 'waiting', s: 'scheduled', x: 'dropped' };
 
-  function cursorTask() {
+  function taskOf(li) {
+    if (!li || !li.getAttribute('data-task-id')) return null;
+    var d = li.dataset;
+    var link = li.querySelector('a.task-title');
+    return {
+      id: d.taskId, state: d.state || '',
+      title: d.title || (link ? link.textContent.trim() : ''),
+      projectId: d.projectId || '', projectTitle: d.projectTitle || '',
+      contextId: d.contextId || '',
+      waitingFor: d.waitingFor || '', scheduledOn: d.scheduledOn || '',
+    };
+  }
+
+  function cursorRow() {
     var list = rows();
     var i = cursorIndex(list);
-    if (i < 0) return null;
-    var id = list[i].getAttribute('data-task-id');
-    if (!id) return null;                       // a non-task row, such as in an article list
-    var link = list[i].querySelector('a[href]');
-    return { id: id, title: link ? link.textContent.trim() : '' };
+    return i < 0 ? null : list[i];
   }
 
   function taskKey(key) {
-    var task = cursorTask();
+    var task = taskOf(cursorRow());     // null on a non-task row, such as in an article list
     if (!task) return false;
     var base = '/ui/tasks/' + task.id;
 
     if (STATES[key]) { post(base, { state: STATES[key] }); return true; }
-
-    if (key === 'w') {
-      var who = window.prompt(t('keys.ask_waiting'));
-      if (who) post(base, { state: 'waiting', waiting_for: who });
-      return true;
-    }
-    if (key === 's') {
-      var on = window.prompt(t('keys.ask_scheduled'));
-      if (on) post(base, { state: 'scheduled', scheduled_on: on });
-      return true;
-    }
+    if (ASKS[key]) { openMove(task, ASKS[key]); return true; }
     if (key === 't') {
       var title = window.prompt(t('keys.ask_title'), task.title);
       if (title) post(base, { title: title });
-      return true;
-    }
-    if (key === 'x') {
-      // Dropping is the one that cannot be undone, so confirm it
-      if (window.confirm(t('keys.confirm_drop', task.title))) post(base + '/delete');
       return true;
     }
     if (PATHS[key]) { post(base + '/' + PATHS[key]); return true; }
@@ -251,17 +248,223 @@ function t(key, arg) {
   }
 
   function openCursor() {
-    var list = rows();
-    var i = cursorIndex(list);
-    if (i < 0) return false;
-    var a = list[i].querySelector('a[href]');
+    var li = cursorRow();
+    if (!li) return false;
+    var task = taskOf(li);
+    if (task) { openMove(task); return true; }
+    var a = li.querySelector('a[href]');
     if (!a) return false;
     window.location.assign(a.getAttribute('href'));
     return true;
   }
 
+  // ---- the move modal
+  //
+  // Clicking a task's title asks where it goes next, then shows only the fields
+  // that state needs. Everything is submitted through post(), so it takes the
+  // same route as the screens and lands back on this page.
+  // The title's href still points at Clarify, for no-JS and modifier-clicks.
+  var CHOICES = [
+    { key: 'n', state: 'next' }, { key: 'l', state: 'later' },
+    { key: 'w', state: 'waiting' }, { key: 's', state: 'scheduled' },
+    { key: 'm', state: 'someday' }, { key: 'd', state: 'done' },
+    { key: 'x', state: 'dropped' }, { key: 'f', state: 'filed' },
+  ];
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+
+  function getList(url, field) {
+    return fetch(url, { headers: { Accept: 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : {}; })
+      .then(function (j) { return j[field] || []; })
+      .catch(function () { return []; });
+  }
+
+  function modalOpen() { return !!document.getElementById('move-modal'); }
+
+  function openMove(task, direct) {
+    if (modalOpen()) return;
+    var base = '/ui/tasks/' + task.id;
+    var contextsOn = document.body.getAttribute('data-contexts') === 'on';
+    var projects = getList('/api/projects?status=active', 'projects');
+    var contexts = contextsOn ? getList('/api/contexts', 'contexts') : null;
+
+    var overlay = el('div', 'modal-overlay');
+    overlay.id = 'move-modal';
+    var box = el('div', 'modal move-modal');
+    box.tabIndex = -1;
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    var choices = CHOICES.filter(function (c) { return c.state !== task.state; });
+    var step = 1, cur = 0;
+
+    function close() { overlay.remove(); }
+
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+
+    // Keys never reach the page's own shortcuts while the modal is open
+    overlay.addEventListener('keydown', function (e) {
+      e.stopPropagation();
+      if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+      if (step !== 1 || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === 'j' || e.key === 'ArrowDown') { e.preventDefault(); showStep1(cur + 1); return; }
+      if (e.key === 'k' || e.key === 'ArrowUp') { e.preventDefault(); showStep1(cur - 1); return; }
+      if (e.key === 'Enter') { e.preventDefault(); choose(choices[cur]); return; }
+      for (var i = 0; i < choices.length; i++) {
+        if (choices[i].key === e.key) { e.preventDefault(); choose(choices[i]); return; }
+      }
+    });
+
+    function showStep1(at) {
+      step = 1;
+      cur = Math.max(0, Math.min(choices.length - 1, at || 0));
+      box.innerHTML = '';
+      box.appendChild(el('div', 'modal-label', t('move.title', task.title)));
+      var ul = el('ul', 'move-choices');
+      choices.forEach(function (c, i) {
+        var li = el('li', i === cur ? 'cur' : '');
+        li.appendChild(el('span', 'kbd', c.key));
+        li.appendChild(el('span', '', t('move.choice.' + c.state)));
+        li.addEventListener('click', function () { choose(c); });
+        ul.appendChild(li);
+      });
+      box.appendChild(ul);
+      box.appendChild(el('div', 'modal-hint', t('move.hint')));
+      box.focus();
+    }
+
+    function choose(c) {
+      if (c.state === 'someday') { post(base, { state: 'someday' }); return; }
+      if (c.state === 'done') { post(base + '/complete'); return; }
+      showStep2(c);
+    }
+
+    function field(form, labelKey, input) {
+      var label = el('label', 'move-field');
+      label.appendChild(el('span', '', t(labelKey)));
+      label.appendChild(input);
+      form.appendChild(label);
+      return input;
+    }
+
+    function input(type, name, value, required) {
+      var i = el('input');
+      i.type = type; i.name = name; i.value = value || '';
+      i.required = !!required;
+      return i;
+    }
+
+    // A select filled once its list arrives. The current value is kept even
+    // when the list does not have it (say, a project that is on hold), so
+    // submitting never clears it by surprise.
+    function select(name, list, labelOf, current, currentLabel, required) {
+      var s = el('select');
+      s.name = name; s.required = !!required;
+      s.appendChild(new Option(t('move.none'), ''));
+      list.then(function (items) {
+        var seen = false;
+        items.forEach(function (it) {
+          if (String(it.id) === current) seen = true;
+          s.appendChild(new Option(labelOf(it), String(it.id)));
+        });
+        if (current && !seen) s.appendChild(new Option(currentLabel || '#' + current, current));
+        s.value = current;
+      });
+      return s;
+    }
+
+    function showStep2(c) {
+      step = 2;
+      box.innerHTML = '';
+      box.appendChild(el('div', 'modal-label',
+        t('move.title', task.title) + ' ' + t('move.choice.' + c.state)));
+      var form = el('form', 'move-form');
+      var path = base;
+      var fixed = { state: c.state };
+      var title = function (p) { return p.title; };
+
+      if (c.state === 'next') {
+        field(form, 'move.project', select('project_id', projects, title,
+          task.projectId, task.projectTitle, false));
+        if (contexts) {
+          field(form, 'move.context', select('context_id', contexts,
+            function (x) { return x.name; }, task.contextId, '', false));
+        }
+      } else if (c.state === 'later') {
+        field(form, 'move.project_required', select('project_id', projects, title,
+          task.projectId, task.projectTitle, true));
+      } else if (c.state === 'waiting') {
+        field(form, 'move.waiting_for', input('text', 'waiting_for', task.waitingFor, true));
+      } else if (c.state === 'scheduled') {
+        field(form, 'move.scheduled_on', input('date', 'scheduled_on', task.scheduledOn, true));
+      } else if (c.state === 'dropped') {
+        form.appendChild(el('p', 'move-confirm', t('move.confirm_drop', task.title)));
+      } else if (c.state === 'filed') {
+        path = base + '/file';
+        fixed = {};
+        field(form, 'move.file_title', input('text', 'title', task.title, true));
+        field(form, 'move.file_tags', input('text', 'tags', '', false));
+      }
+
+      var actions = el('div', 'move-actions');
+      var back = el('button', '', t('move.back'));
+      back.type = 'button';
+      back.addEventListener('click', function () { showStep1(0); });
+      var submit = el('button', c.state === 'dropped' ? 'danger' : 'primary',
+        c.state === 'dropped' ? t('move.choice.dropped') : t('move.submit'));
+      submit.type = 'submit';
+      actions.appendChild(back);
+      actions.appendChild(submit);
+      form.appendChild(actions);
+
+      // The browser checks the required fields before this runs
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var fields = {};
+        Object.keys(fixed).forEach(function (k) { fields[k] = fixed[k]; });
+        Array.prototype.forEach.call(form.elements, function (f) {
+          if (f.name) fields[f.name] = f.value;
+        });
+        post(path, fields);
+      });
+      // Enter on a select submits too, as it does in a text box
+      form.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && e.target.tagName === 'SELECT') {
+          e.preventDefault();
+          form.requestSubmit();
+        }
+      });
+
+      box.appendChild(form);
+      var first = form.querySelector('input, select') || submit;
+      first.focus();
+    }
+
+    var preset = direct && CHOICES.filter(function (c) { return c.state === direct; })[0];
+    if (preset) showStep2(preset); else showStep1(0);
+  }
+
+  // A plain click on a task's title opens the modal; a modifier-click or a
+  // middle click still opens Clarify.
+  document.addEventListener('click', function (e) {
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    var a = e.target.closest && e.target.closest('a.task-title');
+    if (!a) return;
+    var task = taskOf(a.closest('li'));
+    if (!task) return;
+    e.preventDefault();
+    openMove(task);
+  });
+
   document.addEventListener('keydown', function (ev) {
     if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+    if (modalOpen()) return;
 
     if (inField(document.activeElement)) {
       if (ev.key === 'Escape') { document.activeElement.blur(); }
