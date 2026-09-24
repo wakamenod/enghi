@@ -351,13 +351,17 @@ func (s *Server) handleSetLang(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, dest, http.StatusSeeOther)
 }
 
+// shortTime renders a stored timestamp in local time.
+// **Timestamps are stored in UTC** (datetime('now')), so showing them as they
+// are puts everything 9 hours early in Japan, and on the previous day before
+// 09:00.
 func shortTime(s string) string {
 	t, err := time.Parse("2006-01-02 15:04:05", s)
 	if err != nil {
 		return s
 	}
-	now := time.Now().UTC()
-	if t.Year() == now.Year() {
+	t = t.In(time.Local)
+	if t.Year() == time.Now().Year() {
 		return t.Format("01/02 15:04")
 	}
 	return t.Format("2006/01/02")
