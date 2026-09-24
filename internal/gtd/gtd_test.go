@@ -3,6 +3,8 @@ package gtd_test
 import (
 	"context"
 	"errors"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -317,6 +319,43 @@ func TestWaitingGetsDelegatedAt(t *testing.T) {
 	got := patch(t, s, tk.ID, gtd.TaskPatch{State: str(gtd.StateWaiting), WaitingFor: str("田中さん")})
 	if got.DelegatedAt == "" {
 		t.Fatal("delegated_at was not filled in")
+	}
+	if today := gtd.FormatDate(gtd.Today()); got.DelegatedAt != today {
+		t.Errorf("delegated_at = %s, want today (%s) on the local calendar", got.DelegatedAt, today)
+	}
+}
+
+// A deadline of today shows up in Today.
+func TestTodayIncludesDeadlineOfToday(t *testing.T) {
+	s, _, _ := newSvc(t)
+	tk := capture(t, s, "今日が締め切り")
+	patch(t, s, tk.ID, gtd.TaskPatch{State: str(gtd.StateNext),
+		DeadlineOn: str(gtd.FormatDate(gtd.Today()))})
+
+	got, err := s.Today(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].ID != tk.ID {
+		t.Fatalf("today's deadline is missing from Today (%d tasks)", len(got))
+	}
+}
+
+// "Today" is the local calendar day, in SQL as in Go. The tests above are run
+// again in two zones: at any moment one of UTC+14 and UTC-12 is on a different
+// date from UTC, so a query that uses the UTC date fails whatever the time.
+func TestDatesFollowLocalCalendar(t *testing.T) {
+	if os.Getenv("ENGHI_TZ_CHILD") != "" {
+		t.Skip("already running in a child")
+	}
+	const tests = `^(TestScheduledTaskAppearsInNextActionsWhenDue|TestWaitingGetsDelegatedAt|` +
+		`TestTodayIncludesDeadlineOfToday|TestSomedayDueReview)$`
+	for _, tz := range []string{"Etc/GMT-14", "Etc/GMT+12"} {
+		cmd := exec.Command(os.Args[0], "-test.run="+tests, "-test.count=1")
+		cmd.Env = append(os.Environ(), "TZ="+tz, "ENGHI_TZ_CHILD=1")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Errorf("TZ=%s: %v\n%s", tz, err, out)
+		}
 	}
 }
 

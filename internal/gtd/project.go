@@ -85,7 +85,7 @@ func (s *Service) StalledProjects(ctx context.Context) ([]*Project, error) {
 // **Without this, someday is effectively a bin** (DESIGN 2.2).
 func (s *Service) SomedayDueReview(ctx context.Context) ([]*Project, error) {
 	return s.projects(ctx,
-		`WHERE p.status = 'someday' AND p.review_on IS NOT NULL AND p.review_on <= date('now')
+		`WHERE p.status = 'someday' AND p.review_on IS NOT NULL AND p.review_on <= `+sqlToday+`
 		 ORDER BY p.review_on`)
 }
 

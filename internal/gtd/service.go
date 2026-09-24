@@ -17,6 +17,12 @@ func New(db *store.DB) *Service { return &Service{db: db} }
 
 // ---------------------------------------------------------------- task reads
 
+// sqlToday is today's date on the local calendar, the same day Today() gives.
+// **Never compare dates with a bare date('now').** That is the UTC date, so in
+// a zone ahead of UTC a task scheduled for today stays hidden until UTC catches
+// up (until 09:00 in Japan).
+const sqlToday = `date('now','localtime')`
+
 const taskCols = `t.id, t.title, t.note, t.state, t.project_id, t.context_id, t.area_id,
 	COALESCE(t.scheduled_on,''), COALESCE(t.deadline_on,''), COALESCE(t.waiting_for,''),
 	COALESCE(t.delegated_at,''), COALESCE(t.energy,''), t.time_estimate, t.priority,
@@ -24,7 +30,7 @@ const taskCols = `t.id, t.title, t.note, t.state, t.project_id, t.context_id, t.
 	t.sort_order, t.version, COALESCE(t.completed_at,''), t.created_at, t.updated_at,
 	COALESCE(p.title,''), COALESCE(c.name,''), COALESCE(a.name,''),
 	CASE WHEN t.state = 'waiting' AND t.delegated_at IS NOT NULL
-	     THEN CAST(julianday('now') - julianday(t.delegated_at) AS INTEGER) ELSE 0 END`
+	     THEN CAST(julianday(` + sqlToday + `) - julianday(t.delegated_at) AS INTEGER) ELSE 0 END`
 
 const taskFrom = `FROM tasks t
 	LEFT JOIN projects p ON p.id = t.project_id
@@ -81,7 +87,7 @@ func (s *Service) Inbox(ctx context.Context) ([]*Task, error) {
 // scheduled_on <= today.** That is expressed as a query condition; **there is no
 // batch job that rewrites state** (DESIGN 2.6), so a day when the server was
 // down cannot make tasks disappear.
-const nextActionsWhere = `(t.state = 'next' OR (t.state = 'scheduled' AND t.scheduled_on <= date('now')))`
+const nextActionsWhere = `(t.state = 'next' OR (t.state = 'scheduled' AND t.scheduled_on <= ` + sqlToday + `))`
 
 // NextActions lists next actions, optionally filtered by context.
 func (s *Service) NextActions(ctx context.Context, contextID *int64) ([]*Task, error) {
@@ -194,8 +200,8 @@ func (s *Service) UpcomingBetween(ctx context.Context, from, to string) ([]*Task
 func (s *Service) Today(ctx context.Context) ([]*Task, error) {
 	return s.tasks(ctx,
 		`WHERE t.state NOT IN ('done','dropped','filed','someday')
-		   AND ((t.deadline_on  IS NOT NULL AND t.deadline_on  <= date('now'))
-		     OR (t.scheduled_on IS NOT NULL AND t.scheduled_on <= date('now')))
+		   AND ((t.deadline_on  IS NOT NULL AND t.deadline_on  <= `+sqlToday+`)
+		     OR (t.scheduled_on IS NOT NULL AND t.scheduled_on <= `+sqlToday+`))
 		 ORDER BY COALESCE(t.deadline_on, t.scheduled_on), t.priority DESC`)
 }
 
@@ -207,6 +213,6 @@ func (s *Service) WaitingOverdue(ctx context.Context, days int) ([]*Task, error)
 	}
 	return s.tasks(ctx,
 		fmt.Sprintf(`WHERE t.state = 'waiting' AND t.delegated_at IS NOT NULL
-		   AND julianday('now') - julianday(t.delegated_at) >= %d
+		   AND julianday(`+sqlToday+`) - julianday(t.delegated_at) >= %d
 		 ORDER BY t.delegated_at`, days))
 }

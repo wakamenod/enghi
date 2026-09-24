@@ -82,7 +82,7 @@ func (b *setBuilder) Set(col string, v any) {
 }
 
 // Raw appends an expression with no value, such as col = NULL or
-// col = date('now').
+// col = datetime('now').
 func (b *setBuilder) Raw(expr string) { b.parts = append(b.parts, expr) }
 
 // Date is a date column where an empty string means NULL.
@@ -140,7 +140,7 @@ func (s *Service) Patch(ctx context.Context, id int64, p TaskPatch) (*Task, erro
 				// Without a delegation date, use today; the days-elapsed warning
 				// needs it
 				if cur.DelegatedAt == "" && p.DelegatedAt == nil {
-					b.Raw("delegated_at = date('now')")
+					b.Raw("delegated_at = " + sqlToday)
 				}
 			}
 		}
