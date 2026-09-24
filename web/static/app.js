@@ -608,11 +608,40 @@ function openCapture() {
       if (!r.ok) throw new Error('capture failed');
       label.textContent = t("capture.added");
       input.value = '';
-      setTimeout(close, 400);
+      setTimeout(function () { close(); refreshInbox(); }, 400);
     }).catch(function () {
       label.textContent = t("capture.failed");
     });
   });
+}
+
+// Screens that show the inbox count or list go stale after a modal capture, so
+// they are reloaded - unless that would throw away something being typed.
+var INBOX_PATHS = ['/', '/gtd', '/gtd/inbox', '/gtd/review'];
+
+function refreshInbox() {
+  var here = window.location.pathname;
+  if (INBOX_PATHS.indexOf(here) < 0) return;
+  if (document.querySelector('textarea, .modal-overlay')) return;
+  var fields = document.querySelectorAll('input:not([type=hidden]), select');
+  for (var i = 0; i < fields.length; i++) {
+    var f = fields[i];
+    if (f.type === 'checkbox' || f.type === 'radio') {
+      if (f.checked !== f.defaultChecked) return;
+    } else if (f.tagName === 'SELECT') {
+      for (var j = 0; j < f.options.length; j++) {
+        if (f.options[j].selected !== f.options[j].defaultSelected) return;
+      }
+    } else if (f.value !== f.defaultValue) {
+      return;
+    }
+  }
+  // Same marker as the wiki reload, so the scroll position carries over.
+  try {
+    sessionStorage.setItem('enghi:scroll:' + here,
+                           JSON.stringify({ y: window.scrollY, t: Date.now() }));
+  } catch (e) { /* give up in private mode and the like */ }
+  window.location.reload();
 }
 
 // ---------------------------------------------------------------- pasting images
