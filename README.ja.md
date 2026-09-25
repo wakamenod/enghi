@@ -188,8 +188,8 @@ org-mode のリピータ記法に準拠 (`recurrence` カラムにそのまま�
 
 `enghi install-skill` は [Claude Code](https://claude.com/claude-code) の Skill を
 `~/.claude/skills/enghi` に書き出す (接続先は設定のポートになる)。以後 Claude Code に
-「Inbox に入れといて」「wiki にまとめて」「前に書いた○○のメモを見て」「週次レビュー
-手伝って」と頼めば enghi を操作する。Inbox への追加はすぐ行い、ページや GTD の変更は
+「Inbox に入れといて」「wiki にまとめて」「前に書いた○○のメモを見て」「今日やること
+決めよう」「週次レビュー手伝って」と頼めば enghi を操作する。Inbox への追加はすぐ行い、ページや GTD の変更は
 書き込む前に内容を見せる。
 
 設定画面の「Claude Code」パネルからもボタン1つで同じことができ、入っている Skill が

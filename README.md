@@ -188,7 +188,7 @@ non-leap year) clamp to the last day of that month.
 `enghi install-skill` writes a [Claude Code](https://claude.com/claude-code) skill to
 `~/.claude/skills/enghi`, pointed at the configured port. Claude Code then works with
 enghi when you ask in plain words: "put this in my inbox", "write this up in the wiki",
-"find my notes on X", "help me with the weekly review". It captures right away, but
+"find my notes on X", "what should I do today?", "help me with the weekly review". It captures right away, but
 shows pages and GTD changes to you before writing them.
 
 The Claude Code panel on the Settings screen does the same with one button, and shows

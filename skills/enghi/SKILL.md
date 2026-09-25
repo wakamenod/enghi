@@ -1,6 +1,6 @@
 ---
 name: enghi
-description: Use the user's local enghi wiki and GTD system. Use when the user wants to capture something for later ("add to my inbox", "remind me to", "後でやる", "Inbox に入れて"), save notes or a design decision as a wiki page ("write this up in the wiki", "wiki にまとめて", "メモしておいて"), look up something they wrote before ("my notes on X", "前に書いた○○のメモ"), or get help with GTD: clarifying the inbox, the weekly review ("週次レビュー"), stalled projects, next actions, waiting-for items.
+description: Use the user's local enghi wiki and GTD system. Use when the user wants to capture something for later ("add to my inbox", "remind me to", "後でやる", "Inbox に入れて"), save notes or a design decision as a wiki page ("write this up in the wiki", "wiki にまとめて", "メモしておいて"), look up something they wrote before ("my notes on X", "前に書いた○○のメモ"), or get help with GTD: planning the day ("what should I do today", "今日やること", "朝の確認"), clarifying the inbox, the weekly review ("週次レビュー"), stalled projects, next actions, waiting-for items.
 ---
 
 # enghi
@@ -124,8 +124,9 @@ Reading:
 
 | | |
 |---|---|
+| `GET /api/dashboard` | Today at a glance: `gtd.today`, `gtd.inbox_count`, `gtd.waiting_overdue`, `gtd.stalled_projects` |
 | `GET /api/review` | Everything the weekly review needs, in one call (see below) |
-| `GET /api/tasks?state=inbox` | Tasks by state; `state=next_actions` gives the Next Actions view |
+| `GET /api/tasks?state=inbox` | Tasks by state, as `{"tasks": [...]}`; `state=next_actions` gives the Next Actions view |
 | `GET /api/tasks/<id>` | One task and the pages it links to |
 | `GET /api/projects?status=active` | Projects (`active`, `someday`, `done`, `dropped`) |
 | `GET /api/projects/stalled` | Active projects with no next action |
@@ -159,6 +160,33 @@ where it goes and why:
 - Otherwise → `next`, rewritten as a concrete action if it is vague.
 
 Let the user accept, change or skip each proposal before moving on.
+
+### The daily check
+
+For "what should I do today", a morning check-in and the like. It takes a few minutes,
+not an hour; keep it short and do not turn it into a weekly review.
+
+```sh
+curl -s http://127.0.0.1:7777/api/dashboard | jq '.gtd | {inbox_count, today, waiting_overdue}'
+curl -s 'http://127.0.0.1:7777/api/tasks?state=next_actions' |
+  jq '[.tasks[] | {id, title, context_name, project_title, deadline_on, energy, time_estimate}]'
+```
+
+1. **Today** — `today` holds what is due or scheduled for today or earlier. Lead with
+   these, overdue deadlines first. Scheduled tasks show up in Next Actions by themselves
+   once their day comes; they need no state change.
+2. **Inbox** — if `inbox_count` is not zero, offer to clarify it (as below). If the user
+   has no time now, just say how many are waiting and move on.
+3. **Waiting for** — mention items in `waiting_overdue` (waiting a week or more) and offer
+   to capture a follow-up.
+4. **Pick for today** — ask how much time they have and where they are, then suggest a
+   few next actions that fit: deadlines in the next few days first, then by context,
+   `energy` and `time_estimate`. Group the list by `context_name`.
+
+enghi has no "today" list, so the picks stay in the conversation; do not change tasks to
+record them. Completing, moving or rewriting tasks follows the usual rule: propose, then
+write after the user agrees. Leave stalled projects for the weekly review unless the user
+asks.
 
 ### The weekly review
 

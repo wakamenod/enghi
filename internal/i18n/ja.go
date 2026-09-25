@@ -343,7 +343,7 @@ func init() {
 		"settings.backup_none":         "まだありません",
 		"settings.backup_now":          "今すぐバックアップ",
 		"settings.skill":               "Claude Code",
-		"settings.skill_note":          "Claude Code から enghi を使えるようにします。Inbox への追加、Wiki の作成と検索、Weekly Review の手伝いを頼めます。",
+		"settings.skill_note":          "Claude Code から enghi を使えるようにします。Inbox への追加、Wiki の作成と検索、毎日の確認や Weekly Review の手伝いを頼めます。",
 		"settings.skill_not_installed": "未インストール",
 		"settings.skill_up_to_date":    "インストール済み（最新）",
 		"settings.skill_outdated":      "インストール済みですが、このバージョンと異なります（または別のポートを指しています）",

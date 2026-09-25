@@ -342,7 +342,7 @@ func init() {
 		"settings.backup_none":         "None yet",
 		"settings.backup_now":          "Back up now",
 		"settings.skill":               "Claude Code",
-		"settings.skill_note":          "Lets Claude Code use enghi: add to the inbox, write and search the wiki, and help with the weekly review.",
+		"settings.skill_note":          "Lets Claude Code use enghi: add to the inbox, write and search the wiki, and help with the daily check and the weekly review.",
 		"settings.skill_not_installed": "Not installed",
 		"settings.skill_up_to_date":    "Installed and up to date",
 		"settings.skill_outdated":      "Installed, but differs from this version (or points at another port)",
