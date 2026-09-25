@@ -2,8 +2,13 @@ package web_test
 
 import (
 	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/wakamenod/enghi/internal/config"
 )
 
 // Contexts and areas are off by default.
@@ -72,5 +77,65 @@ func TestFeaturesCanBeEnabled(t *testing.T) {
 	}
 	if !strings.Contains(do(h, req("GET", "/gtd", "")).Body.String(), "/gtd/areas") {
 		t.Error("the GTD screen does not show areas when turned on")
+	}
+}
+
+func installSkill(h http.Handler, host string) *httptest.ResponseRecorder {
+	r := httptest.NewRequest("POST", "/ui/install-skill", nil)
+	r.Host = host
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r.Header.Set("Sec-Fetch-Site", "same-origin")
+	return do(h, r)
+}
+
+// The settings screen installs the Claude Code skill, pointed at this server's
+// port, and then reports it as up to date.
+func TestInstallSkillFromSettings(t *testing.T) {
+	h, cfg := newServerWith(t, func(c *config.Config) { c.Port = 8123 })
+
+	body := do(h, req("GET", "/settings", "")).Body.String()
+	if !strings.Contains(body, `action="/ui/install-skill"`) {
+		t.Fatal("the settings screen has no install button")
+	}
+	if got := installSkill(h, "127.0.0.1:8123").Code; got != http.StatusSeeOther {
+		t.Fatalf("POST /ui/install-skill → %d, want 303", got)
+	}
+	b, err := os.ReadFile(filepath.Join(cfg.SkillsDir, "enghi", "SKILL.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), "http://127.0.0.1:8123/api/") {
+		t.Error("SKILL.md does not point at the server's port")
+	}
+	body = do(h, req("GET", "/settings", "")).Body.String()
+	if strings.Contains(body, `action="/ui/install-skill"`) {
+		t.Error("the install button is still offered for an up-to-date skill")
+	}
+}
+
+// Behind a proxy (a name from allowed_hosts) the action is refused and the
+// button is not shown: it writes into the home directory of the machine enghi
+// runs on.
+func TestInstallSkillIsLocalOnly(t *testing.T) {
+	h, cfg := newServerWith(t, func(c *config.Config) { c.AllowedHosts = []string{"macbook.local"} })
+
+	r := req("GET", "/settings", "")
+	r.Host = "macbook.local"
+	if body := do(h, r).Body.String(); strings.Contains(body, `action="/ui/install-skill"`) {
+		t.Error("the install button is shown to a request through allowed_hosts")
+	}
+	if got := installSkill(h, "macbook.local").Code; got != http.StatusForbidden {
+		t.Errorf("POST via allowed_hosts → %d, want 403", got)
+	}
+	// A proxy that rewrites Host to the upstream address still gives itself away
+	r = httptest.NewRequest("POST", "/ui/install-skill", nil)
+	r.Host = "127.0.0.1:7777"
+	r.Header.Set("Sec-Fetch-Site", "same-origin")
+	r.Header.Set("X-Forwarded-For", "192.168.1.20")
+	if got := do(h, r).Code; got != http.StatusForbidden {
+		t.Errorf("POST with X-Forwarded-For → %d, want 403", got)
+	}
+	if _, err := os.Stat(filepath.Join(cfg.SkillsDir, "enghi")); !os.IsNotExist(err) {
+		t.Errorf("something was written: %v", err)
 	}
 }

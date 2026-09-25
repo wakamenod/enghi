@@ -8,6 +8,7 @@
 //	enghi doctor          consistency checks (DESIGN 2.5)
 //	enghi backup          back up the database (also taken daily while resident)
 //	enghi install-agent   write the service definition (launchd / systemd)
+//	enghi install-skill   write the Claude Code skill
 //	enghi version         print the version
 package main
 
@@ -58,6 +59,8 @@ func main() {
 		err = cmdFiles(args)
 	case "install-agent":
 		err = cmdInstallAgent(args)
+	case "install-skill":
+		err = cmdInstallSkill(args)
 	case "version", "-v", "--version":
 		err = cmdVersion(args)
 	case "help", "-h", "--help":
@@ -81,6 +84,7 @@ func usage() {
   enghi backup [--dir D] back up the database
   enghi files [--prune]  list stored images; --prune removes unreferenced ones
   enghi install-agent    write the service definition (launchd / systemd)
+  enghi install-skill    write the Claude Code skill to ~/.claude/skills/enghi
   enghi version          print the version
 
 config: `+config.Path()+`

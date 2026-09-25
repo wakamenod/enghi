@@ -109,3 +109,22 @@ func TestAllowedHostsEmptyByDefault(t *testing.T) {
 		t.Fatalf("the allow list is not empty by default: %v", c.AllowedHosts)
 	}
 }
+
+// Paths under the home directory are shown with ~; others are left alone.
+func TestAbbrev(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip(err)
+	}
+	for in, want := range map[string]string{
+		filepath.Join(home, ".claude", "skills", "enghi"): "~/.claude/skills/enghi",
+		home:                        "~",
+		home + "-other/x":           home + "-other/x",
+		"/opt/enghi/skills":         "/opt/enghi/skills",
+		filepath.Dir(home) + "/bob": filepath.Dir(home) + "/bob",
+	} {
+		if got := config.Abbrev(in); got != want {
+			t.Errorf("Abbrev(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

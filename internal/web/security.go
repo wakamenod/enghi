@@ -88,14 +88,40 @@ func (s *Server) formAllowed(r *http.Request) bool {
 	return r.Header.Get("Sec-Fetch-Site") == "same-origin"
 }
 
-func (s *Server) allowedHost(host string) bool {
+// hostName lower-cases a Host header value and drops its port and brackets.
+func hostName(host string) string {
 	h := strings.ToLower(host)
 	if i := strings.LastIndex(h, ":"); i >= 0 && !strings.Contains(h[i:], "]") {
 		h = h[:i]
 	}
-	h = strings.Trim(h, "[]")
+	return strings.Trim(h, "[]")
+}
+
+func isLoopbackName(h string) bool {
 	switch h {
 	case "127.0.0.1", "localhost", "::1":
+		return true
+	}
+	return false
+}
+
+// fromThisMachine reports whether the request came in under a loopback name
+// rather than one of allowed_hosts. Actions that write outside enghi's own
+// data (install-skill writes into the home directory) are limited to it.
+// **A proxy may rewrite Host to the upstream address**, so a request carrying
+// forwarding headers does not count either.
+func fromThisMachine(r *http.Request) bool {
+	for _, k := range []string{"Forwarded", "X-Forwarded-For", "X-Forwarded-Host"} {
+		if r.Header.Get(k) != "" {
+			return false
+		}
+	}
+	return isLoopbackName(hostName(r.Host))
+}
+
+func (s *Server) allowedHost(host string) bool {
+	h := hostName(host)
+	if isLoopbackName(h) {
 		return true
 	}
 	// Names added explicitly in the configuration, for running behind a proxy.

@@ -22,7 +22,7 @@
 <section class="panel">
   <h2>{{t "settings.export"}}</h2>
   <div class="meta">{{t "settings.export_note"}}</div>
-  <div class="meta"><code>{{$d.Export}}</code></div>
+  <div class="meta"><code>{{tilde $d.Export}}</code></div>
   <form method="post" action="/ui/export" class="actions">
     <input type="hidden" name="return_to" value="/settings">
     <button type="submit">{{t "dash.export"}}</button>
@@ -32,7 +32,7 @@
 <section class="panel">
   <h2>{{t "settings.backup"}}</h2>
   <div class="meta">{{t "settings.backup_note"}}</div>
-  <div class="meta"><code>{{$d.Dir}}</code></div>
+  <div class="meta"><code>{{tilde $d.Dir}}</code></div>
   {{if $d.Backups}}
   <ul class="rows">
     {{range $d.Backups}}
@@ -43,5 +43,27 @@
   <form method="post" action="/ui/backup" class="actions">
     <button type="submit">{{t "settings.backup_now"}}</button>
   </form>
+</section>
+
+<section class="panel">
+  <h2>{{t "settings.skill"}}</h2>
+  <div class="meta">{{t "settings.skill_note"}}</div>
+  <div class="meta"><code>{{tilde $d.SkillPath}}</code></div>
+  <div class="meta">
+    {{if eq $d.Skill.State "linked"}}{{t "settings.skill_linked" (tilde $d.Skill.Target)}}
+    {{else if eq $d.Skill.State "up_to_date"}}{{t "settings.skill_up_to_date"}}
+    {{else if eq $d.Skill.State "outdated"}}{{t "settings.skill_outdated"}}
+    {{else}}{{t "settings.skill_not_installed"}}{{end}}
+  </div>
+  {{if not $d.Local}}
+  <div class="meta">{{t "settings.skill_local_only"}}</div>
+  {{else if ne $d.Skill.State "linked"}}
+  {{if ne $d.Skill.State "up_to_date"}}
+  <form method="post" action="/ui/install-skill" class="actions">
+    <button type="submit">{{if eq $d.Skill.State "outdated"}}{{t "settings.skill_update"}}{{else}}{{t "settings.skill_install"}}{{end}}</button>
+  </form>
+  {{end}}
+  <div class="meta">{{t "settings.skill_next_session"}}</div>
+  {{end}}
 </section>
 {{template "foot" .}}

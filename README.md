@@ -48,6 +48,8 @@ files_db_path  = "~/.local/share/enghi/enghi-files.db"   # Tracks db_path if omi
 backup_dir     = "~/.local/share/enghi/backup"
 backup_keep    = 7       # Generations to keep
 backup_enabled = true
+
+skills_dir     = "~/.claude/skills"   # Where install-skill writes the Claude Code skill
 ```
 
 ## Commands
@@ -59,6 +61,7 @@ enghi doctor [--fix]   Integrity check. --fix repairs stray NFD text
 enghi backup [--list]  Database backup (--dir sets destination). Runs daily while resident
 enghi files [--prune]  List images and files. --prune removes unreferenced files
 enghi install-agent    Write service config. -load registers and starts it
+enghi install-skill    Write the Claude Code skill to ~/.claude/skills/enghi
 enghi version          Print version
 ```
 
@@ -179,6 +182,22 @@ non-leap year) clamp to the last day of that month.
 
 `/` Search · `g d`/`g w`/`g i`/`g n`/`g p` Navigation · `c` Quick capture ·
 `e` Edit · `j`/`k` List navigation · `Enter` Open · `Esc` Dismiss
+
+## Using from Claude Code
+
+`enghi install-skill` writes a [Claude Code](https://claude.com/claude-code) skill to
+`~/.claude/skills/enghi`, pointed at the configured port. Claude Code then works with
+enghi when you ask in plain words: "put this in my inbox", "write this up in the wiki",
+"find my notes on X", "help me with the weekly review". It captures right away, but
+shows pages and GTD changes to you before writing them.
+
+The Claude Code panel on the Settings screen does the same with one button, and shows
+whether the installed skill matches the running server. It is only offered on the
+machine enghi runs on, not through `allowed_hosts`.
+
+Run it again after upgrading enghi to update the skill. To try edits to
+`skills/enghi/SKILL.md` without reinstalling, symlink the directory instead:
+`ln -s "$PWD/skills/enghi" ~/.claude/skills/enghi`.
 
 ## Using from Emacs
 

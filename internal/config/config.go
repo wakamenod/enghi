@@ -43,6 +43,10 @@ type Config struct {
 	BackupDir     string `toml:"backup_dir"`
 	BackupKeep    int    `toml:"backup_keep"`    // how many generations to keep
 	BackupEnabled *bool  `toml:"backup_enabled"` // enabled by default
+
+	// SkillsDir: where install-skill writes the Claude Code skill (as
+	// <SkillsDir>/enghi).
+	SkillsDir string `toml:"skills_dir"`
 }
 
 // BackupOn reports whether backups are enabled (unset means enabled).
@@ -103,6 +107,10 @@ func withDefaults(c Config) Config {
 	if c.BackupDir == "" {
 		c.BackupDir = filepath.Join(dataHome(), "enghi", "backup")
 	}
+	if c.SkillsDir == "" {
+		home, _ := os.UserHomeDir()
+		c.SkillsDir = filepath.Join(home, ".claude", "skills")
+	}
 	if c.RevisionCompactMinutes == 0 {
 		c.RevisionCompactMinutes = 10
 	}
@@ -112,6 +120,7 @@ func withDefaults(c Config) Config {
 	c.FilesDBPath = expand(c.FilesDBPath)
 	c.ExportDir = expand(c.ExportDir)
 	c.BackupDir = expand(c.BackupDir)
+	c.SkillsDir = expand(c.SkillsDir)
 	return c
 }
 
@@ -172,6 +181,22 @@ func (c Config) NormalizedAllowedHosts() []string {
 		}
 	}
 	return out
+}
+
+// Abbrev is the reverse of the ~ expansion, for showing a path: one under the
+// home directory is written as ~/...
+func Abbrev(p string) string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return p
+	}
+	if rel, err := filepath.Rel(home, p); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		if rel == "." {
+			return "~"
+		}
+		return "~" + string(filepath.Separator) + rel
+	}
+	return p
 }
 
 func expand(p string) string {

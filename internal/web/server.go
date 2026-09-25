@@ -71,6 +71,7 @@ func parseTemplates(lang i18n.Lang) (*template.Template, error) {
 	funcs := template.FuncMap{
 		"shortTime": shortTime,
 		"base":      filepath.Base,
+		"tilde":     config.Abbrev, // a path under the home directory as ~/...
 		"join":      strings.Join,
 		"add":       func(a, b int) int { return a + b },
 		"snippet":   search.SnippetHTML,
@@ -150,6 +151,7 @@ func (s *Server) routes() {
 	m.HandleFunc("POST /ui/review/{id}/complete", s.uiReviewComplete)
 	m.HandleFunc("POST /ui/settings", s.uiUpdateSettings)
 	m.HandleFunc("POST /ui/backup", s.uiBackup)
+	m.HandleFunc("POST /ui/install-skill", s.uiInstallSkill)
 	m.HandleFunc("GET /ui/lang", s.handleSetLang)
 	m.HandleFunc("GET /ui/search", s.uiSearchFragment) // incremental search, per keystroke
 	m.HandleFunc("POST /ui/preview", s.uiPreview)      // preview on the edit screen

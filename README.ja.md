@@ -47,6 +47,8 @@ files_db_path  = "~/.local/share/enghi/enghi-files.db"   # 省略時は db_path 
 backup_dir     = "~/.local/share/enghi/backup"
 backup_keep    = 7       # 保持する世代数
 backup_enabled = true
+
+skills_dir     = "~/.claude/skills"   # install-skill が Claude Code の Skill を書き出す先
 ```
 
 ## コマンド
@@ -58,6 +60,7 @@ enghi doctor [--fix]   整合性チェック。--fix で混入した NFD テキ�
 enghi backup [--list]  DB バックアップ (--dir で出力先を指定)。常駐中は毎日実行する
 enghi files [--prune]  画像やファイルの一覧。--prune で参照のないファイルを削除する
 enghi install-agent    サービス設定を書き出す。-load で登録して起動する
+enghi install-skill    Claude Code の Skill を ~/.claude/skills/enghi に書き出す
 enghi version          バージョンを表示する
 ```
 
@@ -180,6 +183,22 @@ org-mode のリピータ記法に準拠 (`recurrence` カラムにそのまま�
 
 `/` 検索 · `g d`/`g w`/`g i`/`g n`/`g p` 移動 · `c` クイックキャプチャ ·
 `e` 編集 · `j`/`k` リスト移動 · `Enter` 開く · `Esc` 閉じる
+
+## Claude Code から使う
+
+`enghi install-skill` は [Claude Code](https://claude.com/claude-code) の Skill を
+`~/.claude/skills/enghi` に書き出す (接続先は設定のポートになる)。以後 Claude Code に
+「Inbox に入れといて」「wiki にまとめて」「前に書いた○○のメモを見て」「週次レビュー
+手伝って」と頼めば enghi を操作する。Inbox への追加はすぐ行い、ページや GTD の変更は
+書き込む前に内容を見せる。
+
+設定画面の「Claude Code」パネルからもボタン1つで同じことができ、入っている Skill が
+動いているサーバーと一致しているかも表示される。これは enghi が動いているマシンから
+開いたときだけで、`allowed_hosts` 経由では使えない。
+
+enghi を更新したら再実行して Skill も更新する。`skills/enghi/SKILL.md` の編集を
+再インストールなしで試すなら、代わりにシンボリックリンクを張る:
+`ln -s "$PWD/skills/enghi" ~/.claude/skills/enghi`。
 
 ## Emacs から使う
 

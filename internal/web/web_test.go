@@ -23,6 +23,14 @@ import (
 
 func newServer(t *testing.T) http.Handler {
 	t.Helper()
+	h, _ := newServerWith(t, nil)
+	return h
+}
+
+// newServerWith is newServer with a chance to adjust the configuration first.
+// It returns the configuration used.
+func newServerWith(t *testing.T, edit func(*config.Config)) (http.Handler, config.Config) {
+	t.Helper()
 	dir := t.TempDir()
 	db, err := store.Open(filepath.Join(dir, "test.db"))
 	if err != nil {
@@ -33,6 +41,10 @@ func newServer(t *testing.T) http.Handler {
 	cfg := config.Default()
 	cfg.ExportDir = filepath.Join(dir, "export")
 	cfg.BackupDir = filepath.Join(dir, "backup")
+	cfg.SkillsDir = filepath.Join(dir, "skills") // never the real ~/.claude
+	if edit != nil {
+		edit(&cfg)
+	}
 	blobs, err := filestore.Open(filepath.Join(dir, "files.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -42,7 +54,7 @@ func newServer(t *testing.T) http.Handler {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return srv.Handler()
+	return srv.Handler(), cfg
 }
 
 // req sets the correct local headers by default.

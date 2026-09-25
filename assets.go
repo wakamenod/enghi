@@ -22,3 +22,10 @@ var StaticFS embed.FS
 //
 //go:embed docs/guide
 var GuideFS embed.FS
+
+// SkillFS holds the Claude Code skill (skills/enghi/SKILL.md) that
+// `enghi install-skill` writes out. Shipping it in the binary keeps the
+// instructions in step with the API this binary serves.
+//
+//go:embed skills/enghi
+var SkillFS embed.FS
