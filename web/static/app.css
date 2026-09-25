@@ -506,6 +506,9 @@ button.danger:hover { border-color: var(--warn); }
 .actions { display: flex; gap: var(--sp-2); align-items: center; margin-top: var(--sp-5); flex-wrap: wrap; }
 .actions input[type=text] { flex: 1; min-width: 200px; }
 .actions .spacer { flex: 1; }
+/* A list right under a form (the Inbox capture line) has no margin of its own,
+   so a highlighted first row would touch the input */
+.actions + ul.rows, .actions + .empty { margin-top: var(--sp-4); }
 
 .notice {
   border: 1px solid color-mix(in oklab, var(--warn) 45%, transparent);
