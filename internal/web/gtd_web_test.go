@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/wakamenod/enghi/internal/gtd"
 )
 
 // Every screen must render to the end.
@@ -330,6 +332,7 @@ func TestTaskRowsCarryMoveData(t *testing.T) {
 		`data-task-id="1"`, `data-state="waiting"`, `data-title="返事待ち"`,
 		`data-project-id="1"`, `data-project-title="オフィス移転"`, `data-context-id=""`,
 		`data-waiting-for="田中さん"`, `data-scheduled-on=""`, `data-recurrence=""`,
+		`data-delegated-at="` + gtd.FormatDate(gtd.Today()) + `"`, `data-version="2"`,
 		`<a class="task-title" href="/gtd/clarify/1">`,
 		`<a class="row-detail" href="/gtd/clarify/1">`,
 	} {
@@ -383,6 +386,57 @@ func TestMoveTaskByFormPost(t *testing.T) {
 	}
 	if got := state(); got["state"] != "dropped" {
 		t.Errorf("after drop: %v", got["state"])
+	}
+}
+
+// Undo posts the previous state with the version it saw after the move. An
+// edit made elsewhere in between makes it a conflict that changes nothing.
+func TestUndoByFormPostChecksVersion(t *testing.T) {
+	h := newServer(t)
+	mustJSON(t, h, "POST", "/api/tasks", `{"title":"うっかり動かした"}`)
+
+	form := func(body string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest("POST", "/ui/tasks/1", strings.NewReader(body+"&return_to=/gtd/inbox"))
+		r.Host = "127.0.0.1:7777"
+		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		r.Header.Set("Sec-Fetch-Site", "same-origin")
+		return do(h, r)
+	}
+	task := func() map[string]any {
+		var got struct {
+			Task map[string]any `json:"task"`
+		}
+		w := do(h, req("GET", "/api/tasks/1", ""))
+		if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+			t.Fatalf("GET /api/tasks/1: %v", err)
+		}
+		return got.Task
+	}
+
+	// version 1 → the move makes it 2
+	if w := form("state=someday"); w.Code != http.StatusSeeOther {
+		t.Fatalf("move → %d", w.Code)
+	}
+	// Edited elsewhere: version 3
+	mustJSON(t, h, "PATCH", "/api/tasks/1", `{"title":"Emacs で直した"}`)
+
+	w := form("state=inbox&scheduled_on=&waiting_for=&project_id=&context_id=&recurrence=&recurrence_ends_on=&delegated_at=&version=2")
+	if w.Code != http.StatusConflict {
+		t.Fatalf("stale undo → %d, want 409", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "別の場所で更新") {
+		t.Errorf("the conflict message is not the localized one: %q", w.Body.String())
+	}
+	if got := task(); got["state"] != "someday" || got["title"] != "Emacs で直した" {
+		t.Errorf("a rejected undo changed the task: %v", got)
+	}
+
+	// With the current version it goes through
+	if w := form("state=inbox&version=3"); w.Code != http.StatusSeeOther {
+		t.Fatalf("undo → %d", w.Code)
+	}
+	if got := task(); got["state"] != "inbox" {
+		t.Errorf("after undo: %v", got["state"])
 	}
 }
 

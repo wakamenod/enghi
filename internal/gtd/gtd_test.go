@@ -325,6 +325,59 @@ func TestWaitingGetsDelegatedAt(t *testing.T) {
 	}
 }
 
+// Leaving done or dropped clears completed_at, so a task put back by Undo
+// does not stay in the review's completed list.
+func TestLeavingDoneClearsCompletedAt(t *testing.T) {
+	s, _, _ := newSvc(t)
+	ctx := context.Background()
+	for _, via := range []string{"complete", gtd.StateDone, gtd.StateDropped} {
+		tk := capture(t, s, "戻す "+via)
+		patch(t, s, tk.ID, gtd.TaskPatch{State: str(gtd.StateNext)})
+		if via == "complete" {
+			if _, err := s.Complete(ctx, tk.ID, false); err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			patch(t, s, tk.ID, gtd.TaskPatch{State: str(via)})
+		}
+		if got, _ := s.Task(ctx, tk.ID); got.CompletedAt == "" {
+			t.Fatalf("%s: completed_at was not set", via)
+		}
+		got := patch(t, s, tk.ID, gtd.TaskPatch{State: str(gtd.StateNext)})
+		if got.CompletedAt != "" {
+			t.Errorf("%s: completed_at = %q after moving back to next", via, got.CompletedAt)
+		}
+	}
+}
+
+// Leaving waiting clears the delegation date. Coming back takes the date
+// given (Undo carries the old one), or today.
+func TestWaitingDateOnLeaveAndReturn(t *testing.T) {
+	s, _, _ := newSvc(t)
+	tk := capture(t, s, "返事待ち")
+	patch(t, s, tk.ID, gtd.TaskPatch{State: str(gtd.StateWaiting), WaitingFor: str("田中さん"),
+		DelegatedAt: str("2026-01-05")})
+
+	got := patch(t, s, tk.ID, gtd.TaskPatch{State: str(gtd.StateNext)})
+	if got.DelegatedAt != "" {
+		t.Errorf("delegated_at = %q after leaving waiting", got.DelegatedAt)
+	}
+	if got.WaitingFor != "田中さん" {
+		t.Errorf("waiting_for = %q, want it kept", got.WaitingFor)
+	}
+
+	got = patch(t, s, tk.ID, gtd.TaskPatch{State: str(gtd.StateWaiting), DelegatedAt: str("2026-01-05")})
+	if got.DelegatedAt != "2026-01-05" {
+		t.Errorf("delegated_at = %q, want the date carried back", got.DelegatedAt)
+	}
+
+	patch(t, s, tk.ID, gtd.TaskPatch{State: str(gtd.StateNext)})
+	got = patch(t, s, tk.ID, gtd.TaskPatch{State: str(gtd.StateWaiting)})
+	if today := gtd.FormatDate(gtd.Today()); got.DelegatedAt != today {
+		t.Errorf("delegated_at = %q, want today (%s)", got.DelegatedAt, today)
+	}
+}
+
 // A deadline of today shows up in Today.
 func TestTodayIncludesDeadlineOfToday(t *testing.T) {
 	s, _, _ := newSvc(t)

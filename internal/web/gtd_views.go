@@ -1,6 +1,7 @@
 package web
 
 import (
+	"errors"
 	"html/template"
 	"net/http"
 	"strconv"
@@ -367,6 +368,7 @@ func (s *Server) uiPatchTask(w http.ResponseWriter, r *http.Request) {
 		{"scheduled_on", &p.ScheduledOn}, {"deadline_on", &p.DeadlineOn},
 		{"waiting_for", &p.WaitingFor}, {"recurrence", &p.Recurrence},
 		{"recurrence_ends_on", &p.RecurrenceEndsOn}, {"energy", &p.Energy},
+		{"delegated_at", &p.DelegatedAt},
 	} {
 		if r.Form.Has(f.name) {
 			v := r.FormValue(f.name)
@@ -378,7 +380,19 @@ func (s *Server) uiPatchTask(w http.ResponseWriter, r *http.Request) {
 			p.TimeEstimate = &n
 		}
 	}
+	// Undo sends the version it expects, so an edit made elsewhere in the
+	// meantime (say, from Emacs) is not overwritten
+	if v := r.FormValue("version"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			p.Version = n
+		}
+	}
 	if _, err := s.gtd.Patch(ctxOf(r), id, p); err != nil {
+		var vc *gtd.VersionConflictError
+		if errors.As(err, &vc) {
+			http.Error(w, s.tr(r, "move.version_conflict"), http.StatusConflict)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

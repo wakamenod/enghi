@@ -178,6 +178,7 @@ They connect in only three places:
 | `g` `w` | Articles |
 | `j` / `k` | Move down / up a list |
 | `Enter` | Open the selected item; on a task, choose where to move it (so does clicking its title) |
+| `u` | Undo the last move, while its notice is shown at the bottom of the screen |
 | `e` | Edit the article |
 
 ## Terminology {#glossary}

@@ -2,7 +2,8 @@
 <li data-task-id="{{.ID}}" data-state="{{.State}}" data-title="{{.Title}}"
     data-project-id="{{with .ProjectID}}{{.}}{{end}}" data-project-title="{{.ProjectTitle}}" data-context-id="{{with .ContextID}}{{.}}{{end}}"
     data-waiting-for="{{.WaitingFor}}" data-scheduled-on="{{.ScheduledOn}}"
-    data-recurrence="{{.Recurrence}}" data-recurrence-ends-on="{{.RecurrenceEndsOn}}">
+    data-recurrence="{{.Recurrence}}" data-recurrence-ends-on="{{.RecurrenceEndsOn}}"
+    data-delegated-at="{{.DelegatedAt}}" data-version="{{.Version}}">
   <form method="post" action="/ui/tasks/{{.ID}}/complete" class="inline-form">
     <button type="submit" class="check" title="{{t "gtd.complete"}}">✓</button>
   </form>

@@ -12,9 +12,12 @@ var S = (function () {
   } catch (e) { return {}; }
 })();
 
-function t(key, arg) {
-  var s = S[key] || key;
-  return arg === undefined ? s : s.replace(/%[sd]/, function () { return arg; });
+// Each %s / %d takes the next argument, in order
+function t(key) {
+  var args = Array.prototype.slice.call(arguments, 1), i = 0;
+  return (S[key] || key).replace(/%[sd]/g, function (m) {
+    return i < args.length ? args[i++] : m;
+  });
 }
 
 // ---------------------------------------------------------------- focus channel
@@ -359,6 +362,7 @@ function repeatPicker(date, recurrence, endsOn) {
 //   g d/w/i/n/p  ... dashboard / wiki / inbox / next / projects
 //   e            ... edit the article on screen
 //   j / k        ... move within a list; Enter opens
+//   u            ... undo the last move, while its toast is up
 
 (function () {
   var pendingG = false;
@@ -420,7 +424,7 @@ function repeatPicker(date, recurrence, endsOn) {
     form.submit();
   }
 
-  var STATES = { n: 'next', m: 'someday' };
+  var STATES = { i: 'inbox', n: 'next', m: 'someday' };
   var PATHS = { d: 'complete', S: 'skip', f: 'file' };
   // These need a value or a confirmation first, so they open the second step
   // of the move modal instead of posting at once.
@@ -437,8 +441,136 @@ function repeatPicker(date, recurrence, endsOn) {
       contextId: d.contextId || '',
       waitingFor: d.waitingFor || '', scheduledOn: d.scheduledOn || '',
       recurrence: d.recurrence || '', recurrenceEndsOn: d.recurrenceEndsOn || '',
+      delegatedAt: d.delegatedAt || '', version: d.version || '',
     };
   }
+
+  // ---- undoing a move
+  //
+  // One level, kept on the client. Just before a move is posted, what the row
+  // said about the task goes into sessionStorage; the page the move lands on
+  // offers to put it back, with a toast and `u'.
+  //
+  // **The record lives for exactly one page load.** The next page takes it out
+  // of storage at once, and shows the toast only when it is the page the move
+  // returned to, within UNDO_ARRIVE_MS, and the row (if still on screen) shows
+  // the move took effect. From then on the record is held only by the toast:
+  // dismissing it, letting it time out, or going to another page drops it, so
+  // a stale undo can never fire on some later page.
+  //
+  // Done on a recurring task is not offered (completing it added the next
+  // instance), nor are filing as reference (it wrote an article) and Skip.
+  var UNDO_KEY = 'enghi:undo';
+  var UNDO_ARRIVE_MS = 15000;
+  var UNDO_SHOW_MS = 12000;
+  var UNDOABLE = ['inbox', 'next', 'later', 'waiting', 'scheduled', 'someday', 'done', 'dropped'];
+
+  function rememberMove(task, dest) {
+    if (UNDOABLE.indexOf(task.state) < 0 || UNDOABLE.indexOf(dest) < 0) return;
+    if (dest === task.state || !task.version) return;
+    if (dest === 'done' && task.recurrence) return;
+    var rec = {
+      id: task.id, title: task.title, dest: dest,
+      // The move bumps the version by one; anything more means the task was
+      // edited elsewhere since, and the server refuses the undo
+      version: String(+task.version + 1),
+      prev: {
+        state: task.state, scheduled_on: task.scheduledOn, waiting_for: task.waitingFor,
+        project_id: task.projectId, context_id: task.contextId,
+        recurrence: task.recurrence, recurrence_ends_on: task.recurrenceEndsOn,
+      },
+      path: window.location.pathname + window.location.search, t: Date.now(),
+    };
+    // Only when there is one: an empty date would stop the server from dating
+    // a return to waiting today
+    if (task.delegatedAt) rec.prev.delegated_at = task.delegatedAt;
+    try { sessionStorage.setItem(UNDO_KEY, JSON.stringify(rec)); } catch (e) { /* no undo then */ }
+  }
+
+  function takeMove() {
+    var raw;
+    try {
+      raw = sessionStorage.getItem(UNDO_KEY);
+      if (raw) sessionStorage.removeItem(UNDO_KEY);
+    } catch (e) { return null; }
+    if (!raw) return null;
+    var rec;
+    try { rec = JSON.parse(raw); } catch (e) { return null; }
+    if (!rec || !rec.prev || Date.now() - rec.t > UNDO_ARRIVE_MS) return null;
+    if (rec.path !== window.location.pathname + window.location.search) return null;
+    // A move the server turned down leaves the row as it was
+    var li = document.querySelector('li[data-task-id="' + rec.id + '"]');
+    if (li && (li.dataset.state !== rec.dest || li.dataset.version !== rec.version)) return null;
+    return rec;
+  }
+
+  var undoToast = null;   // { rec, node, timer } while the toast is up
+
+  function dismissUndo() {
+    if (!undoToast) return;
+    clearTimeout(undoToast.timer);
+    undoToast.node.remove();
+    undoToast = null;
+  }
+
+  function showUndo(rec) {
+    var node = el('div', 'toast');
+    node.setAttribute('role', 'status');
+    var label = rec.dest === 'dropped' ? 'undo.dropped' : 'move.choice.' + rec.dest;
+    var msg = el('span', 'toast-msg', t('undo.moved', rec.title, t(label)));
+    var undo = el('button', 'toast-action', t('undo.action'));
+    undo.type = 'button';
+    undo.addEventListener('click', runUndo);
+    var close = el('button', 'toast-close', '×');
+    close.type = 'button';
+    close.title = t('undo.dismiss');
+    close.addEventListener('click', dismissUndo);
+    node.appendChild(msg);
+    node.appendChild(undo);
+    node.appendChild(close);
+    document.body.appendChild(node);
+    undoToast = { rec: rec, node: node, msg: msg, undo: undo, timer: 0 };
+    // Hovering holds it, so it does not vanish under the pointer
+    function arm() { undoToast.timer = setTimeout(dismissUndo, UNDO_SHOW_MS); }
+    node.addEventListener('mouseenter', function () { if (undoToast) clearTimeout(undoToast.timer); });
+    node.addEventListener('mouseleave', function () { if (undoToast) arm(); });
+    arm();
+  }
+
+  // **fetch, unlike post().** On a conflict the page must stay put and say so
+  // in the toast. It is still a same-origin form post to /ui/, so it passes
+  // formAllowed as the screens do.
+  function runUndo() {
+    if (!undoToast || undoToast.busy) return;
+    var u = undoToast;
+    u.busy = true;
+    clearTimeout(u.timer);
+    var body = new URLSearchParams();
+    Object.keys(u.rec.prev).forEach(function (k) { body.append(k, u.rec.prev[k]); });
+    body.append('version', u.rec.version);
+    fetch('/ui/tasks/' + u.rec.id, { method: 'POST', body: body, credentials: 'same-origin' })
+      .then(function (r) {
+        if (r.ok) {
+          try {
+            sessionStorage.setItem('enghi:scroll:' + window.location.pathname,
+                                   JSON.stringify({ y: window.scrollY, t: Date.now() }));
+          } catch (e) { /* give up in private mode and the like */ }
+          window.location.reload();
+          return;
+        }
+        u.msg.textContent = t(r.status === 409 ? 'undo.conflict' : 'undo.failed');
+        u.undo.remove();
+        u.node.classList.add('warn');
+        u.timer = setTimeout(dismissUndo, UNDO_SHOW_MS);
+      })
+      .catch(function () {
+        u.msg.textContent = t('undo.failed');
+        u.undo.remove();
+      });
+  }
+
+  var arrived = takeMove();
+  if (arrived) showUndo(arrived);
 
   function cursorRow() {
     var list = rows();
@@ -451,14 +583,22 @@ function repeatPicker(date, recurrence, endsOn) {
     if (!task) return false;
     var base = '/ui/tasks/' + task.id;
 
-    if (STATES[key]) { post(base, { state: STATES[key] }); return true; }
+    if (STATES[key]) {
+      rememberMove(task, STATES[key]);
+      post(base, { state: STATES[key] });
+      return true;
+    }
     if (ASKS[key]) { openMove(task, ASKS[key]); return true; }
     if (key === 't') {
       var title = window.prompt(t('keys.ask_title'), task.title);
       if (title) post(base, { title: title });
       return true;
     }
-    if (PATHS[key]) { post(base + '/' + PATHS[key]); return true; }
+    if (PATHS[key]) {
+      if (PATHS[key] === 'complete') rememberMove(task, 'done');
+      post(base + '/' + PATHS[key]);
+      return true;
+    }
     return false;
   }
 
@@ -480,7 +620,7 @@ function repeatPicker(date, recurrence, endsOn) {
   // same route as the screens and lands back on this page.
   // The title's href still points at Clarify, for no-JS and modifier-clicks.
   var CHOICES = [
-    { key: 'n', state: 'next' }, { key: 'l', state: 'later' },
+    { key: 'i', state: 'inbox' }, { key: 'n', state: 'next' }, { key: 'l', state: 'later' },
     { key: 'w', state: 'waiting' }, { key: 's', state: 'scheduled' },
     { key: 'm', state: 'someday' }, { key: 'd', state: 'done' },
     { key: 'x', state: 'dropped' }, { key: 'f', state: 'filed' },
@@ -548,8 +688,12 @@ function repeatPicker(date, recurrence, endsOn) {
     }
 
     function choose(c) {
-      if (c.state === 'someday') { post(base, { state: 'someday' }); return; }
-      if (c.state === 'done') { post(base + '/complete'); return; }
+      if (c.state === 'inbox' || c.state === 'someday') {
+        rememberMove(task, c.state);
+        post(base, { state: c.state });
+        return;
+      }
+      if (c.state === 'done') { rememberMove(task, 'done'); post(base + '/complete'); return; }
       showStep2(c);
     }
 
@@ -647,6 +791,7 @@ function repeatPicker(date, recurrence, endsOn) {
           var r = repeat.value();
           Object.keys(r).forEach(function (k) { fields[k] = r[k]; });
         }
+        if (c.state !== 'filed') rememberMove(task, c.state);
         post(path, fields);
       });
       // Enter on a select or a checkbox submits too, as it does in a text box
@@ -665,6 +810,14 @@ function repeatPicker(date, recurrence, endsOn) {
     var preset = direct && CHOICES.filter(function (c) { return c.state === direct; })[0];
     if (preset) showStep2(preset); else showStep1(0);
   }
+
+  // The ✓ button on a row is an ordinary form; its completion can be undone too
+  document.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (!/\/complete$/.test(form.getAttribute('action') || '')) return;
+    var task = taskOf(form.closest('li'));
+    if (task) rememberMove(task, 'done');
+  });
 
   // A plain click on a task's title opens the modal; a modifier-click or a
   // middle click still opens Clarify.
@@ -716,6 +869,9 @@ function repeatPicker(date, recurrence, endsOn) {
         ev.preventDefault(); moveCursor(1); break;
       case 'k':
         ev.preventDefault(); moveCursor(-1); break;
+      case 'u':
+        if (undoToast) { ev.preventDefault(); runUndo(); }
+        break;
       default:
         if (taskKey(ev.key)) ev.preventDefault();
         break;
