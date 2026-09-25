@@ -77,6 +77,8 @@ This screen lists tasks with a scheduled date. **They stay out of Next Actions u
 
 Putting "think about this next month" here keeps it out of sight until then. The benefit is being able to safely forget about it in the meantime.
 
+When you move a task here (click its title, or press `s` on its row), the **Repeat** picker under the date turns it into a recurring task: every N days/weeks/months/years, on chosen weekdays, on a day of the month, or once a year. The weekday and day default to the date you picked. Each occurrence waits here until its day, then shows up in Next Actions on its own. See [Recurring Tasks](#recurrence).
+
 ## Someday/Maybe — Not Doing Now {#someday}
 
 A parking lot for things you might do, but aren't doing now.
@@ -133,7 +135,7 @@ Clicking a checklist item jumps straight to its relevant data. When you finish, 
 
 ## Recurring Tasks {#recurrence}
 
-Enter a pattern in the recurrence field on the clarify screen, and **completing the task automatically generates its next occurrence.** Tasks are never generated ahead of time in bulk, so your list will never fill up with uncompleted recurring tasks.
+Set a rule with the Repeat picker—in the move dialog's Scheduled step or on the clarify screen—and **completing the task automatically generates its next occurrence.** Tasks are never generated ahead of time in bulk, so your list will never fill up with uncompleted recurring tasks.
 
 | Rule | Meaning | Example / Best for |
 |---|---|---|
@@ -146,6 +148,8 @@ Enter a pattern in the recurrence field on the clarify screen, and **completing 
 | `yearly:04-01` | Every April 1st | |
 
 **The distinction between `+1w` and `.+2w` matters most in practice.** Use the former for fixed calendar days and the latter when the countdown should start from whenever you actually finished the task.
+
+The picker writes every rule above except `++` (without JavaScript, the clarify screen shows a text field for the rule instead). A task that already has such a rule shows it as "Custom" and keeps it; choosing "Does not repeat" removes the rule.
 
 Each new occurrence is created with a **scheduled date**, so it stays out of Next Actions until that day arrives.
 

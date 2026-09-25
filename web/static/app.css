@@ -550,7 +550,7 @@ button.danger:hover { border-color: var(--warn); }
 .move-form { display: flex; flex-direction: column; gap: var(--sp-3); }
 .move-field { display: flex; flex-direction: column; gap: var(--sp-1); margin: 0; }
 .modal .move-field input, .move-field select { font-size: var(--fs-4); }
-.move-field input[type=date] {
+.move-field input[type=date], .repeat input[type=date] {
   font-family: var(--sans); color: var(--fg); color-scheme: light dark;
   background: var(--bg-raised); border: 1px solid var(--border);
   border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3); width: 100%;
@@ -562,6 +562,35 @@ button.danger:hover { border-color: var(--warn); }
 ul.rows .row-detail { font-size: var(--fs-2); color: var(--fg-faint); margin-left: auto; }
 ul.rows .row-detail:hover { color: var(--fg-muted); }
 ul.rows .row-detail + .when { margin-left: 0; }
+
+/* ---- the repeat picker (the move modal's Scheduled step and Clarify) ---- */
+
+.repeat {
+  display: flex; flex-direction: column; gap: var(--sp-2);
+  margin: var(--sp-4) 0 0; padding: var(--sp-2) var(--sp-3) var(--sp-3);
+  border: 1px solid var(--border); border-radius: var(--r-md);
+}
+.repeat legend { padding: 0 var(--sp-1); font-size: var(--fs-2); color: var(--fg-muted); }
+.repeat select, .modal .repeat input { font-size: var(--fs-4); }
+.move-form .repeat { margin: 0; }
+.repeat-field { display: flex; flex-direction: column; gap: var(--sp-1); margin: 0; }
+.repeat-group { display: flex; flex-direction: column; gap: var(--sp-2); }
+.repeat-group[hidden], .repeat .repeat-field[hidden] { display: none; }
+.repeat-row { display: flex; align-items: center; gap: var(--sp-2); }
+.repeat-row > span { white-space: nowrap; color: var(--fg-muted); }
+.repeat-row select { flex: 1; }
+.repeat input[type=number] {
+  width: 5em; font-family: var(--sans); color: var(--fg);
+  background: var(--bg-raised); border: 1px solid var(--border);
+  border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3);
+}
+.repeat-days { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-3); }
+.repeat-days label {
+  display: inline-flex; align-items: center; gap: var(--sp-1); margin: 0;
+  font-size: var(--fs-3); color: var(--fg); cursor: pointer;
+}
+.repeat-days input { margin: 0; }
+.repeat code { font-family: var(--mono); }
 
 /* ---- theme switch ---- */
 

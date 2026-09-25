@@ -315,6 +315,13 @@ func jsStrings(lang i18n.Lang) string {
 		"move.project", "move.project_required", "move.context", "move.none",
 		"move.waiting_for", "move.scheduled_on", "move.file_title", "move.file_tags",
 		"move.confirm_drop", "move.hint",
+		"repeat", "repeat.none", "repeat.interval", "repeat.every", "repeat.weekly",
+		"repeat.monthly", "repeat.yearly", "repeat.custom",
+		"repeat.days", "repeat.weeks", "repeat.months", "repeat.years",
+		"repeat.from_scheduled", "repeat.from_done", "repeat.last_day",
+		"repeat.ends_on", "repeat.pick_day",
+		"repeat.wd.sun", "repeat.wd.mon", "repeat.wd.tue", "repeat.wd.wed",
+		"repeat.wd.thu", "repeat.wd.fri", "repeat.wd.sat",
 	}
 	m := make(map[string]string, len(keys))
 	for _, k := range keys {

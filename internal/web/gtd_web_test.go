@@ -312,12 +312,24 @@ func TestTaskRowsCarryMoveData(t *testing.T) {
 	mustJSON(t, h, "POST", "/api/tasks", `{"title":"返事待ち"}`)
 	mustJSON(t, h, "PATCH", "/api/tasks/1",
 		`{"state":"waiting","waiting_for":"田中さん","project_id":1}`)
+	mustJSON(t, h, "POST", "/api/tasks", `{"title":"ゴミ出し"}`)
+	mustJSON(t, h, "PATCH", "/api/tasks/2",
+		`{"state":"scheduled","scheduled_on":"2099-01-06","recurrence":"weekly:tue","recurrence_ends_on":"2099-12-31"}`)
 
-	body := do(h, req("GET", "/gtd/waiting", "")).Body.String()
+	body := do(h, req("GET", "/gtd/scheduled", "")).Body.String()
+	for _, want := range []string{
+		`data-recurrence="weekly:tue"`, `data-recurrence-ends-on="2099-12-31"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the scheduled row lacks %s", want)
+		}
+	}
+
+	body = do(h, req("GET", "/gtd/waiting", "")).Body.String()
 	for _, want := range []string{
 		`data-task-id="1"`, `data-state="waiting"`, `data-title="返事待ち"`,
 		`data-project-id="1"`, `data-project-title="オフィス移転"`, `data-context-id=""`,
-		`data-waiting-for="田中さん"`, `data-scheduled-on=""`,
+		`data-waiting-for="田中さん"`, `data-scheduled-on=""`, `data-recurrence=""`,
 		`<a class="task-title" href="/gtd/clarify/1">`,
 		`<a class="row-detail" href="/gtd/clarify/1">`,
 	} {
@@ -371,5 +383,89 @@ func TestMoveTaskByFormPost(t *testing.T) {
 	}
 	if got := state(); got["state"] != "dropped" {
 		t.Errorf("after drop: %v", got["state"])
+	}
+}
+
+// The Scheduled step of the move modal also sends a recurrence rule. The task
+// waits in Scheduled, and completing it adds the next scheduled instance.
+func TestScheduleRecurringByFormPost(t *testing.T) {
+	h := newServer(t)
+	mustJSON(t, h, "POST", "/api/tasks", `{"title":"ゴミ出し"}`)
+
+	post := func(path, body string) int {
+		r := httptest.NewRequest("POST", path, strings.NewReader(body+"&return_to=/gtd/inbox"))
+		r.Host = "127.0.0.1:7777"
+		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		r.Header.Set("Sec-Fetch-Site", "same-origin")
+		return do(h, r).Code
+	}
+	task := func(id string) map[string]any {
+		var got struct {
+			Task map[string]any `json:"task"`
+		}
+		w := do(h, req("GET", "/api/tasks/"+id, ""))
+		if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+			t.Fatalf("GET /api/tasks/%s: %v", id, err)
+		}
+		return got.Task
+	}
+
+	// 2099-01-06 is a Tuesday
+	if got := post("/ui/tasks/1",
+		"state=scheduled&scheduled_on=2099-01-06&recurrence=weekly:tue&recurrence_ends_on=2099-12-31"); got != http.StatusSeeOther {
+		t.Fatalf("scheduled with a rule → %d", got)
+	}
+	got := task("1")
+	if got["state"] != "scheduled" || got["recurrence"] != "weekly:tue" ||
+		got["recurrence_ends_on"] != "2099-12-31" {
+		t.Errorf("after the move: %v", got)
+	}
+	if strings.Contains(do(h, req("GET", "/gtd/next", "")).Body.String(), "ゴミ出し") {
+		t.Error("a task scheduled for 2099 is already in Next Actions")
+	}
+
+	// A bad rule is rejected by the server and changes nothing
+	if code := post("/ui/tasks/1", "state=scheduled&scheduled_on=2099-01-06&recurrence=weekly:"); code != http.StatusBadRequest {
+		t.Errorf("a bad rule → %d, want 400", code)
+	}
+
+	if code := post("/ui/tasks/1/complete", "x=1"); code != http.StatusSeeOther {
+		t.Fatalf("complete → %d", code)
+	}
+	if got := task("1"); got["state"] != "done" {
+		t.Errorf("after completion: %v", got["state"])
+	}
+	next := task("2")
+	if next["state"] != "scheduled" || next["scheduled_on"] != "2099-01-13" ||
+		next["recurrence"] != "weekly:tue" {
+		t.Errorf("next instance: %v", next)
+	}
+
+	// An empty rule ("Does not repeat") clears it
+	if code := post("/ui/tasks/2", "state=scheduled&scheduled_on=2099-01-13&recurrence=&recurrence_ends_on="); code != http.StatusSeeOther {
+		t.Fatalf("clearing the rule → %d", code)
+	}
+	if got := task("2"); got["recurrence"] != nil || got["recurrence_ends_on"] != nil {
+		t.Errorf("after clearing: %v", got)
+	}
+}
+
+// Clarify keeps the rule in a text field (for no-JS) and carries its end date,
+// both of which the picker reads and writes back.
+func TestClarifyCarriesRecurrenceFields(t *testing.T) {
+	h := newServer(t)
+	mustJSON(t, h, "POST", "/api/tasks", `{"title":"経費精算"}`)
+	mustJSON(t, h, "PATCH", "/api/tasks/1",
+		`{"state":"scheduled","scheduled_on":"2099-01-25","recurrence":"monthly:25","recurrence_ends_on":"2099-12-31"}`)
+
+	body := do(h, req("GET", "/gtd/clarify/1", "")).Body.String()
+	for _, want := range []string{
+		`id="recurrence" name="recurrence" value="monthly:25"`,
+		`id="recurrence_ends_on" name="recurrence_ends_on" value="2099-12-31"`,
+		`id="scheduled_on"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("clarify lacks %s", want)
+		}
 	}
 }

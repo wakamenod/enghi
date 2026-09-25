@@ -138,6 +138,220 @@ function t(key, arg) {
   window.scrollTo(0, saved.y);
 })();
 
+// ---------------------------------------------------------------- repeat picker
+//
+// Used by the Scheduled step of the move modal and by Clarify. It covers the
+// subset of ParseRecurrence (internal/gtd/recurrence.go) that fits a picker. Any other
+// rule, such as ++1w, is shown as Custom and sent back unchanged. The server
+// stays the validator.
+var WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];   // Date.getDay() order
+var UNITS = [['d', 'days'], ['w', 'weeks'], ['m', 'months'], ['y', 'years']];
+
+function parseRule(raw) {
+  var s = (raw || '').trim().toLowerCase(), m;
+  if (!s) return { kind: '' };
+  if ((m = /^weekly:(.+)$/.exec(s))) {
+    var days = m[1].split(',').map(function (d) { return d.trim(); });
+    if (days.every(function (d) { return WEEKDAYS.indexOf(d) >= 0; })) {
+      return { kind: 'weekly', days: days };
+    }
+  } else if ((m = /^monthly:\s*(last|\d{1,2})\s*$/.exec(s))) {
+    if (m[1] === 'last' || (+m[1] >= 1 && +m[1] <= 31)) {
+      return { kind: 'monthly', dom: m[1] === 'last' ? 'last' : String(+m[1]) };
+    }
+  } else if ((m = /^yearly:(\d{1,2})-(\d{1,2})$/.exec(s))) {
+    if (+m[1] >= 1 && +m[1] <= 12 && +m[2] >= 1 && +m[2] <= 31) {
+      return { kind: 'yearly', mon: String(+m[1]), day: String(+m[2]) };
+    }
+  } else if ((m = /^(\.?\+)(\d+)([dwmy])$/.exec(s))) {   // ++ falls through to Custom
+    if (+m[2] >= 1) return { kind: 'interval', n: +m[2], unit: m[3], fromDone: m[1] === '.+' };
+  }
+  return { kind: 'custom', raw: raw };
+}
+
+function pad2(n) { return (+n < 10 ? '0' : '') + (+n); }
+
+function el(tag, cls, text) {
+  var e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+function numberSelect(from, to, extra) {
+  var s = el('select');
+  for (var i = from; i <= to; i++) s.appendChild(new Option(String(i), String(i)));
+  if (extra) s.appendChild(extra);
+  return s;
+}
+
+function picked(type, value) {
+  var i = el('input');
+  i.type = type; i.value = value;
+  return i;
+}
+
+// The "Repeat" group that goes under a date field. Only the controls of the
+// chosen kind are shown; the rest are disabled so the browser does not
+// validate them. The weekday, day of month and month-day follow the date field
+// until they are set by hand (or prefilled from the rule), so picking a kind
+// right after the date needs no more typing.
+// Returns the fieldset and a function giving the rule and its end date.
+function repeatPicker(date, recurrence, endsOn) {
+  var rule = parseRule(recurrence);
+  var fs = el('fieldset', 'repeat');
+  fs.appendChild(el('legend', '', t('repeat')));
+
+  var kinds = ['', 'interval', 'weekly', 'monthly', 'yearly'];
+  if (rule.kind === 'custom') kinds.push('custom');
+  var kind = el('select');
+  kinds.forEach(function (k) {
+    kind.appendChild(new Option(t('repeat.' + (k || 'none')), k));
+  });
+  kind.value = rule.kind;
+  fs.appendChild(kind);
+
+  var groups = {};
+  function group(k) {
+    var g = el('div', 'repeat-group');
+    fs.appendChild(g);
+    groups[k] = g;
+    return g;
+  }
+
+  // Every N days / weeks / months / years, counted from either date
+  var g = group('interval');
+  var row = el('div', 'repeat-row');
+  row.appendChild(el('span', '', t('repeat.every')));
+  var n = picked('number', String(rule.n || 1));
+  n.required = true;
+  n.min = '1';
+  var unit = el('select');
+  UNITS.forEach(function (u) { unit.appendChild(new Option(t('repeat.' + u[1]), u[0])); });
+  unit.value = rule.unit || 'w';
+  row.appendChild(n);
+  row.appendChild(unit);
+  g.appendChild(row);
+  var from = el('select');
+  from.appendChild(new Option(t('repeat.from_scheduled'), '+'));
+  from.appendChild(new Option(t('repeat.from_done'), '.+'));
+  from.value = rule.fromDone ? '.+' : '+';
+  g.appendChild(from);
+
+  // On weekdays
+  g = group('weekly');
+  var days = el('div', 'repeat-days');
+  var checks = WEEKDAYS.map(function (d) {
+    var label = el('label');
+    var c = picked('checkbox', d);
+    c.checked = !!rule.days && rule.days.indexOf(d) >= 0;
+    label.appendChild(c);
+    label.appendChild(el('span', '', t('repeat.wd.' + d)));
+    days.appendChild(label);
+    return c;
+  });
+  g.appendChild(days);
+
+  // Monthly on day
+  g = group('monthly');
+  var dom = numberSelect(1, 31, new Option(t('repeat.last_day'), 'last'));
+  g.appendChild(dom);
+
+  // Yearly on MM-DD
+  g = group('yearly');
+  row = el('div', 'repeat-row');
+  var ymon = numberSelect(1, 12), yday = numberSelect(1, 31);
+  row.appendChild(ymon);
+  row.appendChild(el('span', '', '-'));
+  row.appendChild(yday);
+  g.appendChild(row);
+
+  g = group('custom');
+  g.appendChild(el('code', '', rule.raw || ''));
+
+  var ends = picked('date', endsOn || '');
+  var endsLabel = el('label', 'repeat-field');
+  endsLabel.appendChild(el('span', '', t('repeat.ends_on')));
+  endsLabel.appendChild(ends);
+  fs.appendChild(endsLabel);
+
+  var byHand = {
+    weekly: rule.kind === 'weekly', monthly: rule.kind === 'monthly',
+    yearly: rule.kind === 'yearly',
+  };
+  if (rule.kind === 'monthly') dom.value = rule.dom;
+  if (rule.kind === 'yearly') { ymon.value = rule.mon; yday.value = rule.day; }
+  ['weekly', 'monthly', 'yearly'].forEach(function (k) {
+    groups[k].addEventListener('change', function () { byHand[k] = true; check(); });
+  });
+
+  function followDate() {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date.value);
+    var d = m ? new Date(+m[1], m[2] - 1, +m[3]) : new Date();
+    if (!byHand.weekly) checks.forEach(function (c, i) { c.checked = i === d.getDay(); });
+    if (!byHand.monthly) dom.value = String(d.getDate());
+    if (!byHand.yearly) { ymon.value = String(d.getMonth() + 1); yday.value = String(d.getDate()); }
+    check();
+  }
+
+  // A weekly rule needs at least one day
+  function check() {
+    var none = !checks.some(function (c) { return c.checked; });
+    checks[0].setCustomValidity(kind.value === 'weekly' && none ? t('repeat.pick_day') : '');
+  }
+
+  function show() {
+    Object.keys(groups).forEach(function (k) {
+      var off = kind.value !== k;
+      groups[k].hidden = off;
+      Array.prototype.forEach.call(groups[k].querySelectorAll('input, select'),
+        function (x) { x.disabled = off; });
+    });
+    endsLabel.hidden = ends.disabled = kind.value === '';
+    check();
+  }
+
+  kind.addEventListener('change', show);
+  date.addEventListener('input', followDate);
+  followDate();
+  show();
+
+  return { node: fs, value: function () {
+    var r = '';
+    switch (kind.value) {
+      case 'interval': r = from.value + Math.max(1, parseInt(n.value, 10) || 1) + unit.value; break;
+      case 'weekly':
+        r = 'weekly:' + checks.filter(function (c) { return c.checked; })
+          .map(function (c) { return c.value; }).join(',');
+        break;
+      case 'monthly': r = 'monthly:' + dom.value; break;
+      case 'yearly': r = 'yearly:' + pad2(ymon.value) + '-' + pad2(yday.value); break;
+      case 'custom': r = rule.raw; break;
+    }
+    // "None" clears the rule; the picker was prefilled, so this is deliberate
+    return { recurrence: r, recurrence_ends_on: r ? ends.value : '' };
+  } };
+}
+
+// On Clarify the text field for the rule stays for no-JS. With JS it gives way
+// to the picker, and the rule is written back into it on submit.
+(function () {
+  var raw = document.getElementById('recurrence');
+  var ends = document.getElementById('recurrence_ends_on');
+  var date = document.getElementById('scheduled_on');
+  if (!raw || !ends || !date) return;
+  var picker = repeatPicker(date, raw.value, ends.value);
+  var label = document.querySelector('label[for=recurrence]');
+  if (label) label.remove();
+  raw.type = 'hidden';
+  raw.parentNode.insertBefore(picker.node, raw);
+  raw.form.addEventListener('submit', function () {
+    var v = picker.value();
+    raw.value = v.recurrence;
+    ends.value = v.recurrence_ends_on;
+  });
+})();
+
 // ---------------------------------------------------------------- keyboard
 //
 // DESIGN 6: the keyboard is a first-class way to drive this.
@@ -222,6 +436,7 @@ function t(key, arg) {
       projectId: d.projectId || '', projectTitle: d.projectTitle || '',
       contextId: d.contextId || '',
       waitingFor: d.waitingFor || '', scheduledOn: d.scheduledOn || '',
+      recurrence: d.recurrence || '', recurrenceEndsOn: d.recurrenceEndsOn || '',
     };
   }
 
@@ -270,13 +485,6 @@ function t(key, arg) {
     { key: 'm', state: 'someday' }, { key: 'd', state: 'done' },
     { key: 'x', state: 'dropped' }, { key: 'f', state: 'filed' },
   ];
-
-  function el(tag, cls, text) {
-    var e = document.createElement(tag);
-    if (cls) e.className = cls;
-    if (text !== undefined) e.textContent = text;
-    return e;
-  }
 
   function getList(url, field) {
     return fetch(url, { headers: { Accept: 'application/json' } })
@@ -388,6 +596,7 @@ function t(key, arg) {
       var path = base;
       var fixed = { state: c.state };
       var title = function (p) { return p.title; };
+      var repeat = null;
 
       if (c.state === 'next') {
         field(form, 'move.project', select('project_id', projects, title,
@@ -402,7 +611,10 @@ function t(key, arg) {
       } else if (c.state === 'waiting') {
         field(form, 'move.waiting_for', input('text', 'waiting_for', task.waitingFor, true));
       } else if (c.state === 'scheduled') {
-        field(form, 'move.scheduled_on', input('date', 'scheduled_on', task.scheduledOn, true));
+        repeat = repeatPicker(
+          field(form, 'move.scheduled_on', input('date', 'scheduled_on', task.scheduledOn, true)),
+          task.recurrence, task.recurrenceEndsOn);
+        form.appendChild(repeat.node);
       } else if (c.state === 'dropped') {
         form.appendChild(el('p', 'move-confirm', t('move.confirm_drop', task.title)));
       } else if (c.state === 'filed') {
@@ -431,11 +643,15 @@ function t(key, arg) {
         Array.prototype.forEach.call(form.elements, function (f) {
           if (f.name) fields[f.name] = f.value;
         });
+        if (repeat) {
+          var r = repeat.value();
+          Object.keys(r).forEach(function (k) { fields[k] = r[k]; });
+        }
         post(path, fields);
       });
-      // Enter on a select submits too, as it does in a text box
+      // Enter on a select or a checkbox submits too, as it does in a text box
       form.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' && e.target.tagName === 'SELECT') {
+        if (e.key === 'Enter' && (e.target.tagName === 'SELECT' || e.target.type === 'checkbox')) {
           e.preventDefault();
           form.requestSubmit();
         }
