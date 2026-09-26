@@ -761,7 +761,13 @@ section.panel > h2 a:hover { text-decoration: underline; text-underline-offset: 
 
 .log-entry { padding: var(--sp-3) 0; border-top: 1px solid var(--border); scroll-margin-top: var(--sp-6); }
 .log-entry:first-of-type { border-top: none; }
-.log-entry:target { background: var(--bg-sunken); box-shadow: -8px 0 0 var(--bg-sunken), 8px 0 0 var(--bg-sunken); }
+/* The entry just landed on gets a bar in the margin, not a fill: code blocks
+   and inline code are drawn with --bg-sunken and vanish into any tinted
+   background. The negative margin keeps the text where it was. */
+.log-entry:target {
+  border-left: 3px solid var(--accent);
+  margin-left: calc(-1 * var(--sp-3)); padding-left: calc(var(--sp-3) - 3px);
+}
 .log-head { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
 .log-head .when {
   color: var(--fg-faint); font-size: var(--fs-2); font-family: var(--mono);
