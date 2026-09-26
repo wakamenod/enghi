@@ -10,8 +10,8 @@
 class Enghi < Formula
   desc "Local-only personal wiki and GTD server"
   homepage "https://github.com/wakamenod/enghi"
-  url "https://github.com/wakamenod/enghi/archive/refs/tags/v0.3.2.tar.gz"
-  sha256 "d849d1eb61225d141224f452866acd7032769a0988f4941c3816d48721f462ee"
+  url "https://github.com/wakamenod/enghi/archive/refs/tags/v0.3.3.tar.gz"
+  sha256 "e51bb96855c58fee23790f055b14e2713aa58a51528651a29cfa6bb0d050c4bc"
   license "MIT"
   head "https://github.com/wakamenod/enghi.git", branch: "main"
 
