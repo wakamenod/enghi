@@ -388,6 +388,8 @@ func (s *Server) uiPatchTask(w http.ResponseWriter, r *http.Request) {
 			p.Version = n
 		}
 	}
+	// Undo of a move that paused a working task puts the work back too
+	p.Resume = r.FormValue("resume") == "1"
 	if _, err := s.gtd.Patch(ctxOf(r), id, p); err != nil {
 		var vc *gtd.VersionConflictError
 		if errors.As(err, &vc) {

@@ -2,7 +2,9 @@ package web_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"testing"
@@ -112,7 +114,7 @@ func TestDayMarkdown(t *testing.T) {
 	for _, re := range []string{
 		`^# Work record \d{4}-\d\d-\d\d \(\w{3}\)\n`,
 		`\n## Done\n\n- ` + hm + ` Call the agent — Office move\n  - ` + hm + ` ▶ Started\n  - ` + hm + ` Line one\n\n    Line \*two\*\n`,
-		`\n## In progress\n\n- Pack the books \(since ` + hm + `\)\n  - ` + hm + ` ▶ Started from the top shelf\n`,
+		`\n## In progress\n\n- Pack the books \(since ` + hm + `\)\n  - ` + hm + ` ▶ Started — from the top shelf\n`,
 		`\n## Worked on\n\n- Check the lease\n  - ` + hm + ` Clause 4 is the one\n`,
 		`\n## Dropped\n\n- ` + hm + ` Old idea\n$`,
 	} {
@@ -224,5 +226,182 @@ func TestDashboardWorking(t *testing.T) {
 	json.Unmarshal(do(h, req("GET", "/api/dashboard", "")).Body.Bytes(), &d)
 	if len(d.GTD.Working) != 1 || d.GTD.Working[0].ID != 2 {
 		t.Errorf("working = %+v", d.GTD.Working)
+	}
+}
+
+// A done task carries its last entries from before the day, apart from the
+// day's own: earlier_logs in JSON, a dated sub-list in Markdown, a folded
+// block on the page.
+func TestDayEarlierLogs(t *testing.T) {
+	h, db := newServerDB(t)
+	dayFixture(t, h)
+	mustJSON(t, h, "POST", "/api/tasks/1/logs", `{"body":"The background"}`)
+	if _, err := db.Exec(`UPDATE task_logs SET created_at = datetime('now','-2 days') WHERE body = 'The background'`); err != nil {
+		t.Fatal(err)
+	}
+
+	var got struct {
+		Done []struct {
+			Logs        []struct{ Body string } `json:"logs"`
+			EarlierLogs []struct {
+				Body      string `json:"body"`
+				CreatedAt string `json:"created_at"`
+			} `json:"earlier_logs"`
+		} `json:"done"`
+	}
+	w := do(h, req("GET", "/api/day", ""))
+	decode(t, w, &got)
+	if len(got.Done) != 1 || len(got.Done[0].Logs) != 2 || len(got.Done[0].EarlierLogs) != 1 ||
+		got.Done[0].EarlierLogs[0].Body != "The background" || got.Done[0].EarlierLogs[0].CreatedAt == "" {
+		t.Errorf("done = %+v", got.Done)
+	}
+	// Only done items have the field
+	var raw map[string][]map[string]json.RawMessage
+	json.Unmarshal(w.Body.Bytes(), &raw)
+	if _, ok := raw["working"][0]["earlier_logs"]; ok {
+		t.Error("a working item has earlier_logs")
+	}
+
+	r := req("GET", "/api/day?format=markdown", "")
+	r.Header.Set("Accept-Language", "en")
+	md := do(h, r).Body.String()
+	re := `    Line \*two\*\n  - Earlier entries\n    - \d{4}-\d\d-\d\d \d\d:\d\d The background\n`
+	if !regexp.MustCompile(re).MatchString(md) {
+		t.Errorf("markdown does not match %q:\n%s", re, md)
+	}
+
+	r = req("GET", "/gtd/day", "")
+	r.Header.Set("Accept-Language", "en")
+	page := do(h, r).Body.String()
+	if !regexp.MustCompile(`<details class="day-earlier" open>\s*<summary>Earlier entries <span class="count">1</span>`).MatchString(page) ||
+		!regexp.MustCompile(`#log-\d+">\d{4}-\d\d-\d\d \d\d:\d\d</a>`).MatchString(page) {
+		t.Errorf("the page lacks the earlier entries:\n%s", page)
+	}
+}
+
+// Rows on the day page are task rows: the cursor, the single keys and the
+// move modal read these.
+func TestDayRowsAreTaskRows(t *testing.T) {
+	h := newServer(t)
+	dayFixture(t, h)
+	page := do(h, req("GET", "/gtd/day", "")).Body.String()
+	for _, want := range []string{
+		`data-task-id="1" data-state="done" data-title="Call the agent"`,
+		`data-task-id="2" data-state="inbox"`,
+		`data-working="true"`, `data-version="`, `data-project-title="Office move"`,
+		`class="task-title day-title" href="/gtd/clarify/2"`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the day page lacks %s", want)
+		}
+	}
+}
+
+// Moving a working task out of Next pauses it, the page says why, and Undo
+// puts the work back without leaving a trace.
+func TestAutoPauseOnMove(t *testing.T) {
+	h := newServer(t)
+	mustJSON(t, h, "POST", "/api/tasks", `{"title":"Write the report"}`)
+	mustJSON(t, h, "PATCH", "/api/tasks/1", `{"state":"next"}`)
+	mustJSON(t, h, "POST", "/api/tasks/1/logs", `{"kind":"start"}`)
+
+	var tk struct {
+		Working bool `json:"working"`
+		Version int  `json:"version"`
+	}
+	w := do(h, req("PATCH", "/api/tasks/1", `{"state":"someday"}`))
+	decode(t, w, &tk)
+	if tk.Working {
+		t.Fatal("still working after the move to someday")
+	}
+	w = do(h, req("PATCH", "/api/tasks/1", `{"state":"waiting","waiting_for":"Ann"}`))
+	decode(t, w, &tk)
+	var logs struct {
+		Logs []struct {
+			Kind    string `json:"kind"`
+			MovedTo string `json:"moved_to"`
+		} `json:"logs"`
+	}
+	decode(t, do(h, req("GET", "/api/tasks/1/logs", "")), &logs)
+	if len(logs.Logs) != 2 || logs.Logs[1].Kind != "pause" || logs.Logs[1].MovedTo != "someday" {
+		t.Errorf("logs = %+v, want start and one automatic pause", logs.Logs)
+	}
+
+	for path, want := range map[string]string{
+		"/gtd/day":                 `⏸ paused `,
+		"/gtd/clarify/1":           `(moved to Someday)`,
+		"/api/day?format=markdown": `⏸ Paused (moved to Someday)`,
+		"/api/day":                 `"moved_to":"someday"`,
+	} {
+		r := req("GET", path, "")
+		r.Header.Set("Accept-Language", "en")
+		if body := do(h, r).Body.String(); !strings.Contains(body, want) {
+			t.Errorf("%s lacks %s", path, want)
+		}
+	}
+
+	// Undo of the first move: back to next, working again, the pause gone
+	if w := postForm(h, "/ui/tasks/1", url.Values{"state": {"next"}, "resume": {"1"}}); w.Code != http.StatusSeeOther {
+		t.Fatalf("undo → %d %s", w.Code, w.Body)
+	}
+	var one struct {
+		Task struct {
+			Working bool `json:"working"`
+		} `json:"task"`
+	}
+	decode(t, do(h, req("GET", "/api/tasks/1", "")), &one)
+	tk.Working = one.Task.Working
+	decode(t, do(h, req("GET", "/api/tasks/1/logs", "")), &logs)
+	if !tk.Working || len(logs.Logs) != 1 {
+		t.Errorf("after the undo: working = %v, logs = %+v", tk.Working, logs.Logs)
+	}
+	// An undo that does not resume writes nothing
+	postForm(h, "/ui/tasks/1", url.Values{"state": {"next"}})
+	decode(t, do(h, req("GET", "/api/tasks/1/logs", "")), &logs)
+	if len(logs.Logs) != 1 {
+		t.Errorf("logs = %+v", logs.Logs)
+	}
+}
+
+// The review's look back links the same days its completions come from: the
+// seven days before today.
+func TestReviewPastDaysMatchCompletions(t *testing.T) {
+	h, db := newServerDB(t)
+	today := time.Now()
+	for i, ago := range []int{0, 1, 7, 8} {
+		mustJSON(t, h, "POST", "/api/tasks", `{"title":"t"}`)
+		id := fmt.Sprint(i + 1)
+		mustJSON(t, h, "POST", "/api/tasks/"+id+"/complete", `{}`)
+		// Noon local on that day, as UTC
+		d := today.AddDate(0, 0, -ago)
+		noon := time.Date(d.Year(), d.Month(), d.Day(), 12, 0, 0, 0, time.Local).UTC().Format("2006-01-02 15:04:05")
+		if _, err := db.Exec(`UPDATE tasks SET completed_at = ?, title = ? WHERE id = ?`, noon, "ago "+fmt.Sprint(ago), id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var rv struct {
+		Completed []struct{ Title string } `json:"completed_last_week"`
+	}
+	decode(t, do(h, req("GET", "/api/review", "")), &rv)
+	var titles []string
+	for _, c := range rv.Completed {
+		titles = append(titles, c.Title)
+	}
+	if strings.Join(titles, ",") != "ago 1,ago 7" {
+		t.Errorf("completed_last_week = %v, want ago 1 and ago 7", titles)
+	}
+
+	page := do(h, req("GET", "/gtd/review", "")).Body.String()
+	links := regexp.MustCompile(`<a href="/gtd/day/(\d{4}-\d\d-\d\d)">`).FindAllStringSubmatch(page, -1)
+	var got []string
+	for _, m := range links {
+		got = append(got, m[1])
+	}
+	var want []string
+	for i := 7; i >= 1; i-- {
+		want = append(want, today.AddDate(0, 0, -i).Format("2006-01-02"))
+	}
+	if strings.Join(got, " ") != strings.Join(want, " ") {
+		t.Errorf("day links = %v, want %v", got, want)
 	}
 }

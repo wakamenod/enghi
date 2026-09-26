@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/wakamenod/enghi/internal/gtd"
+	"github.com/wakamenod/enghi/internal/i18n"
 )
 
 // The work log on a task. Entries are Markdown, rendered with the same
@@ -42,6 +43,19 @@ func (s *Server) logViews(r *http.Request, taskID int64) []logView {
 		out = append(out, v)
 	}
 	return out
+}
+
+// markLabel is the head of a start or pause mark: "▶ started 10:00", or for
+// the pause a move out of Next wrote, "⏸ paused 10:00 (moved to Someday)".
+func markLabel(lang i18n.Lang, kind, movedTo, when string) string {
+	switch {
+	case kind == gtd.LogStart:
+		return i18n.T(lang, "log.started", when)
+	case movedTo != "":
+		return i18n.T(lang, "log.paused_moved", when, i18n.T(lang, "move.choice."+movedTo))
+	default:
+		return i18n.T(lang, "log.paused", when)
+	}
 }
 
 // ---------------------------------------------------------------- form posts

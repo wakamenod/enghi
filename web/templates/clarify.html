@@ -123,14 +123,14 @@
   {{else}}
   <div class="log-entry log-mark" id="log-{{.ID}}">
     <div class="log-head">
-      <a class="when" href="#log-{{.ID}}">{{if eq .Kind "start"}}{{t "log.started" (shortTime .CreatedAt)}}{{else}}{{t "log.paused" (shortTime .CreatedAt)}}{{end}}</a>
+      <a class="when" href="#log-{{.ID}}">{{markLabel .Kind .MovedTo (shortTime .CreatedAt)}}</a>
+      {{if .HTML}}<span class="log-sep">—</span><div class="prose log-comment">{{.HTML}}</div>{{end}}
       <span class="spacer"></span>
       <form method="post" action="/ui/task-logs/{{.ID}}/delete" class="inline-form"
             onsubmit="return confirm('{{t "log.delete_confirm"}}')">
         <button type="submit" class="link danger">{{t "common.delete"}}</button>
       </form>
     </div>
-    {{if .HTML}}<div class="prose">{{.HTML}}</div>{{end}}
   </div>
   {{end}}
   {{else}}

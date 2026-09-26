@@ -65,6 +65,10 @@ type TaskPatch struct {
 	ClearContext bool `json:"clear_context,omitempty"`
 	ClearArea    bool `json:"clear_area,omitempty"`
 	Version      int  `json:"version"`
+	// Resume starts work on the task again after the change, unless it is
+	// already working. Undo sets it to put back a working task that a move
+	// paused; nothing else does, so it is not part of the API.
+	Resume bool `json:"-"`
 }
 
 // setBuilder builds the SET clause of an UPDATE, keeping the column-to-value
@@ -221,9 +225,17 @@ func (s *Service) Patch(ctx context.Context, id int64, p TaskPatch) (*Task, erro
 		if p.SortOrder != nil {
 			b.Set("sort_order", *p.SortOrder)
 		}
-		if b.Empty() {
+		if b.Empty() && !p.Resume {
 			out = cur
 			return nil
+		}
+		if b.Empty() {
+			// Only Resume: the task's own fields stay, version included
+			if err := resumeWork(ctx, tx, id); err != nil {
+				return err
+			}
+			out, err = scanTask(tx.QueryRowContext(ctx, `SELECT `+taskCols+` `+taskFrom+` WHERE t.id = ?`, id))
+			return err
 		}
 
 		b.Raw("version = version + 1")
@@ -236,6 +248,18 @@ func (s *Service) Patch(ctx context.Context, id int64, p TaskPatch) (*Task, erro
 		if err := validateTask(ctx, tx, id); err != nil {
 			return err
 		}
+		if p.State != nil && *p.State != cur.State && cur.Working && pausesWork[*p.State] {
+			if _, err := tx.ExecContext(ctx,
+				`INSERT INTO task_logs(task_id, kind, moved_to) VALUES (?, 'pause', ?)`,
+				id, *p.State); err != nil {
+				return err
+			}
+		}
+		if p.Resume {
+			if err := resumeWork(ctx, tx, id); err != nil {
+				return err
+			}
+		}
 		out, err = scanTask(tx.QueryRowContext(ctx, `SELECT `+taskCols+` `+taskFrom+` WHERE t.id = ?`, id))
 		return err
 	})
@@ -243,6 +267,46 @@ func (s *Service) Patch(ctx context.Context, id int64, p TaskPatch) (*Task, erro
 		return nil, err
 	}
 	return out, nil
+}
+
+// pausesWork are the states a working task is paused by moving to: every open
+// state but Next. **The pause is written as a mark**, with moved_to set, never
+// derived from the state, so a past day still reconstructs from the marks.
+// done/dropped/filed need none; the derivation already ends work there.
+var pausesWork = map[string]bool{
+	StateInbox: true, StateLater: true, StateWaiting: true, StateScheduled: true, StateSomeday: true,
+}
+
+// resumeWork makes the task working again, for Undo. Nothing is written when
+// it already is, as when a completed task goes back to Next and its last start
+// counts again. When the latest mark is the automatic pause the undone move
+// wrote, that pause is taken back rather than answered with a start, so a
+// move and its undo leave no trace in the log; otherwise a start is written.
+func resumeWork(ctx context.Context, tx *sql.Tx, id int64) error {
+	var state string
+	var working bool
+	if err := tx.QueryRowContext(ctx,
+		`SELECT t.state, `+workingExpr+` FROM tasks t WHERE t.id = ?`, id).Scan(&state, &working); err != nil {
+		return err
+	}
+	if working || state == StateDone || state == StateDropped || state == StateFiled {
+		return nil
+	}
+	var markID int64
+	var movedTo sql.NullString
+	err := tx.QueryRowContext(ctx,
+		`SELECT id, moved_to FROM task_logs WHERE task_id = ? AND kind IN ('start','pause')
+		  ORDER BY created_at DESC, id DESC LIMIT 1`, id).Scan(&markID, &movedTo)
+	switch {
+	case err == nil && movedTo.Valid:
+		_, err = tx.ExecContext(ctx, `DELETE FROM task_logs WHERE id = ?`, markID)
+	case err == nil || errors.Is(err, sql.ErrNoRows):
+		_, err = tx.ExecContext(ctx, `INSERT INTO task_logs(task_id, kind) VALUES (?, 'start')`, id)
+	}
+	if err != nil {
+		return err
+	}
+	return touchTask(ctx, tx, id)
 }
 
 // validateTask checks that the state and the columns agree.

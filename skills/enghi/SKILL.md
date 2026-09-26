@@ -180,7 +180,9 @@ Start and pause mark when the user was actually working on a task. Write them on
 the user says they are starting or stopping; that request is the go-ahead. A start on a
 task already started, or a pause on one that is not, changes nothing and answers
 `created: false`. Completing or dropping a task ends the work by itself — no pause is
-needed. Editing an entry takes the `version` you read; a `409` works like a page one.
+needed. Moving a working task to any other open state (inbox, later, waiting, scheduled,
+someday) writes a pause by itself, with `moved_to` set to the new state; do not add one.
+Moving it to next keeps it working. Editing an entry takes the `version` you read; a `409` works like a page one.
 
 ### Clarify the inbox
 
@@ -235,7 +237,7 @@ report of one day's work, drawn from the work record. The user sees the same day
 
 ```sh
 curl -s 'http://127.0.0.1:7777/api/day?date=2026-09-26' | jq '{date, weekday,
-  done:    [.done[]    | {title: .task.title, project: .task.project_title, completed_at, logs}],
+  done:    [.done[]    | {title: .task.title, project: .task.project_title, completed_at, logs, earlier_logs}],
   working: [.working[] | {title: .task.title, project: .task.project_title, since, logs}],
   worked:  [.worked[]  | {title: .task.title, project: .task.project_title, logs}],
   dropped: [.dropped[] | {title: .task.title, completed_at}]}'
@@ -248,6 +250,10 @@ Leave out `date` for today. A day is the user's **local** calendar day.
   `dropped` — dropped or skipped that day.
 - `logs` are only that day's entries of the task's work log, oldest first: `kind` is
   `note`, `start` or `pause`, and `body` is raw Markdown (may be empty for start/pause).
+  A pause with `moved_to` was written by moving the task to that state, not by the user.
+- `earlier_logs`, on `done` items only, are the task's last three entries with a body
+  from **before** that day, oldest first — the context of a task worked on over several
+  days. They are not that day's work.
 - **The day's own times — `completed_at`, `since`, each log's `created_at` — are ISO 8601
   in local time with the offset** (`2026-09-26T14:05:00+09:00`); `timezone` names the zone.
   The embedded `task` object keeps the API's usual UTC `YYYY-MM-DD HH:MM:SS` fields; do
@@ -257,7 +263,9 @@ Leave out `date` for today. A day is the user's **local** calendar day.
 
 1. Fetch the day. If it is empty, say so in one line; do not pad the report.
 2. Write a short report **in the language the user is speaking**:
-   - **Done** — what was finished.
+   - **Done** — what was finished, and what it amounted to: use `earlier_logs` for
+     context when the day's own `logs` say little. Do not report earlier entries as
+     that day's work.
    - **In progress** — what is under way and where it stands, from the latest log entries.
    - **Findings and decisions** — anything notable in the log bodies: causes found,
      numbers, choices made and why. Quote sparingly; summarise.

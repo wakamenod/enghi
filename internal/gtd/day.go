@@ -46,7 +46,16 @@ type DayTask struct {
 	CompletedAt string
 	Since       string
 	Logs        []*TaskLog
+	// EarlierLogs, on Done only, are the task's last entries written before the
+	// day, oldest first: the context of a finish that took several days.
+	EarlierLogs []*TaskLog
 }
+
+// EarlierLogCount is how many earlier entries a done task carries. Three is
+// enough to say what the work was about and short enough to read at a
+// glance; the whole log is a click away. Only entries with a body count, so a
+// bare start or pause does not take a slot.
+const EarlierLogCount = 3
 
 // DayRecord is one day. The groups are disjoint, in this order:
 //   - Done    ... completed within the day, by completed_at
@@ -110,6 +119,9 @@ func (s *Service) Day(ctx context.Context, day time.Time) (*DayRecord, error) {
 		}
 		seen[t.ID] = true
 	}
+	if err := s.fillEarlierLogs(ctx, d.Done, from); err != nil {
+		return nil, err
+	}
 
 	// 2. Working at the end of the day.
 	working, err := s.workingAt(ctx, to)
@@ -153,6 +165,43 @@ func (s *Service) Day(ctx context.Context, day time.Time) (*DayRecord, error) {
 		}
 	}
 	return d, nil
+}
+
+// fillEarlierLogs sets EarlierLogs on each task: its last EarlierLogCount
+// entries with a body written before `before`. One query for all of them; the
+// window runs over idx_task_logs_task for just these tasks.
+func (s *Service) fillEarlierLogs(ctx context.Context, ts []*DayTask, before string) error {
+	if len(ts) == 0 {
+		return nil
+	}
+	byID := map[int64]*DayTask{}
+	args := []any{before}
+	for _, t := range ts {
+		byID[t.Task.ID] = t
+		args = append(args, t.Task.ID)
+	}
+	args = append(args, EarlierLogCount)
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT `+logCols+` FROM (
+		  SELECT *, row_number() OVER (PARTITION BY task_id ORDER BY created_at DESC, id DESC) AS rn
+		    FROM task_logs
+		   WHERE created_at < ? AND body <> ''
+		     AND task_id IN (`+strings.Repeat(",?", len(ts))[1:]+`))
+		 WHERE rn <= ?
+		 ORDER BY created_at, id`, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		l, err := scanLog(rows)
+		if err != nil {
+			return err
+		}
+		t := byID[l.TaskID]
+		t.EarlierLogs = append(t.EarlierLogs, l)
+	}
+	return rows.Err()
 }
 
 // workingAt are the tasks being worked on at the UTC moment `at`,

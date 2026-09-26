@@ -781,7 +781,11 @@ section.panel > h2 a:hover { text-decoration: underline; text-underline-offset: 
 /* Start and pause are markers, not prose: one quiet line */
 .log-mark { padding: var(--sp-1) 0; }
 .log-mark .log-head .when { color: var(--fg-muted); }
-.log-mark > .prose { font-size: var(--fs-4); color: var(--fg-muted); }
+/* A comment on a mark follows it on the same line, after a dash */
+.log-sep { color: var(--fg-faint); }
+.log-head > .log-comment { flex: 0 1 auto; min-width: 0; font-size: var(--fs-4); color: var(--fg-muted); }
+.log-comment > :first-child { margin-top: 0; }
+.log-comment > :last-child { margin-bottom: 0; }
 
 /* Edit sits in the header line; open, it takes a full row under it */
 .log-edit[open] { order: 10; flex-basis: 100%; margin-top: var(--sp-2); }
@@ -842,6 +846,13 @@ ul.rows .day-logs .prose a { text-decoration: underline; text-decoration-color: 
 .day-logs .log-head .when { margin-left: 0; }
 .day-logs .log-mark { padding: 2px 0; }
 .day-logs .prose { font-size: var(--fs-5); }
+.day-logs .log-head > .log-comment { font-size: var(--fs-4); }
+
+/* A done task's entries from before the day: context, quieter than the day's */
+details.day-earlier { margin-top: var(--sp-1); }
+details.day-earlier > summary { cursor: pointer; font-size: var(--fs-2); color: var(--fg-faint); }
+details.day-earlier .log-entry, details.day-earlier .prose { color: var(--fg-muted); }
+details.day-earlier .prose { font-size: var(--fs-4); }
 
 /* Dropped is folded, and reads as a quiet footnote to the day */
 details.day-dropped { margin-top: var(--sp-6); padding-top: var(--sp-4); border-top: 1px solid var(--border); }

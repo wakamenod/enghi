@@ -362,18 +362,18 @@ func exportTasks(ctx context.Context, db *store.DB, rewriteFiles func(string) (s
 			if err != nil {
 				return "", err
 			}
-			writeLogEntry(&b, l.kind, l.createdAt, body)
+			writeLogEntry(&b, l.kind, l.movedTo, l.createdAt, body)
 		}
 	}
 	return b.String(), rows.Err()
 }
 
-type logEntry struct{ kind, body, createdAt string }
+type logEntry struct{ kind, movedTo, body, createdAt string }
 
 // taskLogs reads every work log entry, oldest first, keyed by task.
 func taskLogs(ctx context.Context, db *store.DB) (map[int64][]logEntry, error) {
 	rows, err := db.QueryContext(ctx,
-		`SELECT task_id, kind, body, created_at FROM task_logs ORDER BY task_id, created_at, id`)
+		`SELECT task_id, kind, COALESCE(moved_to,''), body, created_at FROM task_logs ORDER BY task_id, created_at, id`)
 	if err != nil {
 		return nil, err
 	}
@@ -382,7 +382,7 @@ func taskLogs(ctx context.Context, db *store.DB) (map[int64][]logEntry, error) {
 	for rows.Next() {
 		var id int64
 		var l logEntry
-		if err := rows.Scan(&id, &l.kind, &l.body, &l.createdAt); err != nil {
+		if err := rows.Scan(&id, &l.kind, &l.movedTo, &l.body, &l.createdAt); err != nil {
 			return nil, err
 		}
 		out[id] = append(out[id], l)
@@ -393,7 +393,7 @@ func taskLogs(ctx context.Context, db *store.DB) (map[int64][]logEntry, error) {
 // writeLogEntry writes one entry as a nested list item under its task: the
 // local time with its offset (stored times are UTC), then the Markdown body
 // indented so that it stays inside the item, code blocks and all.
-func writeLogEntry(b *strings.Builder, kind, createdAt, body string) {
+func writeLogEntry(b *strings.Builder, kind, movedTo, createdAt, body string) {
 	when := createdAt
 	if t, err := time.Parse("2006-01-02 15:04:05", createdAt); err == nil {
 		when = t.In(time.Local).Format("2006-01-02 15:04 -07:00")
@@ -403,6 +403,9 @@ func writeLogEntry(b *strings.Builder, kind, createdAt, body string) {
 		when += " started"
 	case "pause":
 		when += " paused"
+		if movedTo != "" {
+			when += " (moved to " + movedTo + ")"
+		}
 	}
 	fmt.Fprintf(b, "  - %s\n", when)
 	if body == "" {

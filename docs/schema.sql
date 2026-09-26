@@ -242,7 +242,10 @@ CREATE TABLE task_logs (
   body        TEXT    NOT NULL DEFAULT '',    -- raw Markdown; may be empty for start/pause
   version     INTEGER NOT NULL DEFAULT 1,     -- optimistic lock, as with pages
   created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
-  updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+  updated_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+  -- set on the pause a state change writes when it takes a working task out
+  -- of Next: the state it moved to (0005). NULL on a manual pause.
+  moved_to    TEXT
 );
 CREATE INDEX idx_task_logs_task ON task_logs(task_id, created_at);
 -- the day page: entries written within a day, a pure time range (0004)

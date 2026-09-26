@@ -1,9 +1,5 @@
 {{define "task_row"}}
-<li data-task-id="{{.ID}}" data-state="{{.State}}" data-title="{{.Title}}"
-    data-project-id="{{with .ProjectID}}{{.}}{{end}}" data-project-title="{{.ProjectTitle}}" data-context-id="{{with .ContextID}}{{.}}{{end}}"
-    data-waiting-for="{{.WaitingFor}}" data-scheduled-on="{{.ScheduledOn}}"
-    data-recurrence="{{.Recurrence}}" data-recurrence-ends-on="{{.RecurrenceEndsOn}}"
-    data-delegated-at="{{.DelegatedAt}}" data-version="{{.Version}}" data-working="{{.Working}}">
+<li {{template "task_attrs" .}}>
   <form method="post" action="/ui/tasks/{{.ID}}/complete" class="inline-form">
     <button type="submit" class="check" title="{{t "gtd.complete"}}">✓</button>
   </form>
@@ -19,3 +15,10 @@
   <span class="when">{{.State}}</span>
 </li>
 {{end}}
+
+{{/* What app.js reads off a task row (taskOf): shared with the day page */}}
+{{define "task_attrs"}}data-task-id="{{.ID}}" data-state="{{.State}}" data-title="{{.Title}}"
+    data-project-id="{{with .ProjectID}}{{.}}{{end}}" data-project-title="{{.ProjectTitle}}" data-context-id="{{with .ContextID}}{{.}}{{end}}"
+    data-waiting-for="{{.WaitingFor}}" data-scheduled-on="{{.ScheduledOn}}"
+    data-recurrence="{{.Recurrence}}" data-recurrence-ends-on="{{.RecurrenceEndsOn}}"
+    data-delegated-at="{{.DelegatedAt}}" data-version="{{.Version}}" data-working="{{.Working}}"{{end}}
