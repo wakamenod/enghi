@@ -164,6 +164,35 @@ function t(key) {
   setInterval(tick, 60 * 1000);
 })();
 
+// ------------------------------------------------- time since a start
+//
+// The dashboard's working tasks show how long ago they were started. The
+// server renders it; this keeps it current each minute from data-since, with
+// the same messages as dashboard.go. At midnight the date in front of the
+// start changes, so the page reloads.
+
+(function () {
+  var spans = document.querySelectorAll('[data-since]');
+  if (!spans.length) return;
+  var day = new Date().toDateString();
+  function tick() {
+    if (new Date().toDateString() !== day &&
+        (!document.activeElement || document.activeElement === document.body)) {
+      window.location.reload();
+      return;
+    }
+    spans.forEach(function (el) {
+      var start = Date.parse(el.dataset.since);
+      if (isNaN(start)) return;
+      var m = Math.max(0, Math.floor((Date.now() - start) / 60000));
+      el.textContent = m < 60 ? t("dur.m", m)
+        : m < 24 * 60 ? t("dur.hm", Math.floor(m / 60), m % 60)
+        : t("dur.dh", Math.floor(m / (24 * 60)), Math.floor(m % (24 * 60) / 60));
+    });
+  }
+  setInterval(tick, 60 * 1000);
+})();
+
 // ------------------------------------------------- carrying the scroll position
 //
 // Only a reload triggered by the updated event above returns to the previous

@@ -6,6 +6,7 @@ import (
 
 	"github.com/wakamenod/enghi/internal/calendar"
 	"github.com/wakamenod/enghi/internal/gtd"
+	"github.com/wakamenod/enghi/internal/i18n"
 	"github.com/wakamenod/enghi/internal/wiki"
 )
 
@@ -42,7 +43,7 @@ type GTDSummary struct {
 	WaitingOverdue []*gtd.Task `json:"waiting_overdue"`
 	// The tasks being worked on now: started and not paused, oldest start
 	// first. The day page (/gtd/day) has the rest of today.
-	Working []*gtd.Task `json:"working"`
+	Working []*WorkingTask `json:"working"`
 
 	Enabled bool `json:"enabled"` // whether there is any GTD data at all
 }
@@ -68,6 +69,13 @@ func (g GTDSummary) DueToday() []*gtd.Task {
 		}
 	}
 	return out
+}
+
+// WorkingTask is a task being worked on with when that work started. The task
+// is embedded so the JSON stays a plain task with one more field.
+type WorkingTask struct {
+	*gtd.Task
+	Since string `json:"since"` // the latest start, RFC 3339 with the local offset
 }
 
 // WikiSummary is the lower half.
@@ -152,9 +160,44 @@ func (s *Server) dashboardData(ctx context.Context) (*Dashboard, error) {
 	if err != nil {
 		return nil, err
 	}
-	d.GTD.Working = make([]*gtd.Task, 0, len(working))
+	d.GTD.Working = make([]*WorkingTask, 0, len(working))
 	for _, w := range working {
-		d.GTD.Working = append(d.GTD.Working, w.Task)
+		d.GTD.Working = append(d.GTD.Working, &WorkingTask{Task: w.Task, Since: isoLocal(w.Since)})
 	}
 	return d, nil
+}
+
+// sinceClock is a Since value as local HH:MM, with the date in front when the
+// start was on an earlier local day than now.
+func sinceClock(since string, now time.Time) string {
+	t, err := time.Parse(time.RFC3339, since)
+	if err != nil {
+		return since
+	}
+	t, now = t.In(time.Local), now.In(time.Local)
+	if t.Year() != now.Year() || t.YearDay() != now.YearDay() {
+		return t.Format("01/02 15:04")
+	}
+	return t.Format("15:04")
+}
+
+// elapsed is the time from a Since value to now, as "2h 5m"; in days and
+// hours past a day. app.js keeps it current with the same messages.
+func elapsed(lang i18n.Lang, since string, now time.Time) string {
+	t, err := time.Parse(time.RFC3339, since)
+	if err != nil {
+		return ""
+	}
+	m := int(now.Sub(t) / time.Minute)
+	switch {
+	case m < 0:
+		m = 0
+		fallthrough
+	case m < 60:
+		return i18n.T(lang, "dur.m", m)
+	case m < 24*60:
+		return i18n.T(lang, "dur.hm", m/60, m%60)
+	default:
+		return i18n.T(lang, "dur.dh", m/(24*60), m%(24*60)/60)
+	}
 }

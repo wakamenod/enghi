@@ -362,6 +362,9 @@ func init() {
 		"day.earlier":         "Earlier entries",
 		"day.keys":            "[ / ] previous / next day · t today · j / k and the task keys on the rows",
 		"dash.working":        "Working now",
+		"dur.m":               "%dm",
+		"dur.hm":              "%dh %dm",
+		"dur.dh":              "%dd %dh",
 		"dash.day_link":       "Today's work →",
 		"review.by_day":       "By day",
 

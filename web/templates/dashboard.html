@@ -97,7 +97,9 @@
           <ul class="rows">
             {{range $d.GTD.Working}}
             <li><a href="/gtd/clarify/{{.ID}}">{{.Title}}</a>
-                {{if .ProjectTitle}}<span class="tag">{{.ProjectTitle}}</span>{{end}}</li>
+                {{if .ProjectTitle}}<span class="tag">{{.ProjectTitle}}</span>{{end}}
+                {{/* app.js keeps the elapsed time current */}}
+                <span class="when">{{t "day.since" (sinceClock .Since)}} (<span data-since="{{.Since}}">{{elapsed .Since}}</span>)</span></li>
             {{end}}
           </ul>
           <div class="meta"><a href="/gtd/day">{{t "dash.day_link"}}</a></div>
