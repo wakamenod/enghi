@@ -454,6 +454,8 @@ func init() {
 		"settings.skill_install":       "Install",
 		"settings.skill_update":        "Update",
 		"settings.skill_next_session":  "Claude Code picks it up in its next session.",
+		"settings.about":               "About enghi",
+		"settings.version":             "Version:",
 		"settings.skill_local_only":    "This writes into the home directory, so it is only available from the machine enghi runs on. Open enghi there, or run enghi install-skill.",
 		"settings.skill_failed":        "Could not install the skill: %s",
 		"settings.feature_off_title":   "This feature is turned off",

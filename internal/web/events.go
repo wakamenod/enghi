@@ -172,5 +172,6 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"event_clients": s.hub.Count(),
 		"db":            s.db.Path,
 		"export_dir":    s.cfg.ExportDir,
+		"version":       s.Version,
 	})
 }

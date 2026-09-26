@@ -455,6 +455,8 @@ func init() {
 		"settings.skill_install":       "インストール",
 		"settings.skill_update":        "更新",
 		"settings.skill_next_session":  "Claude Code は次のセッションから読み込みます。",
+		"settings.about":               "enghi について",
+		"settings.version":             "バージョン:",
 		"settings.skill_local_only":    "ホームディレクトリに書き込むため、enghi が動いているマシンからのみ実行できます。そのマシンで開くか、そこで enghi install-skill を実行してください。",
 		"settings.skill_failed":        "スキルをインストールできませんでした: %s",
 		"settings.feature_off_title":   "この機能は off になっています",

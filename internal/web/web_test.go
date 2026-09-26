@@ -68,6 +68,7 @@ func newServerFull(t *testing.T, edit func(*config.Config)) (http.Handler, confi
 	if err != nil {
 		t.Fatal(err)
 	}
+	srv.Version = testVersion
 	return srv.Handler(), cfg, db
 }
 
