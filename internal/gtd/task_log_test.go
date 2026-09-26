@@ -245,3 +245,146 @@ func TestLogDayFollowsLocalCalendar(t *testing.T) {
 		t.Errorf("Day() = %s, want %s (created_at %s UTC)", got, want, l.CreatedAt)
 	}
 }
+
+func marks(t *testing.T, s *gtd.Service, id int64) []*gtd.TaskLog {
+	t.Helper()
+	logs, err := s.Logs(context.Background(), id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := []*gtd.TaskLog{}
+	for _, l := range logs {
+		if l.Kind != gtd.LogNote {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+// Moving a working task to any open state but Next pauses it, with a mark that
+// says where it went.
+func TestMoveOutOfNextPauses(t *testing.T) {
+	s, _, _ := newSvc(t)
+	for _, to := range []string{gtd.StateInbox, gtd.StateLater, gtd.StateWaiting,
+		gtd.StateScheduled, gtd.StateSomeday} {
+		tk := capture(t, s, "作業中に移す "+to)
+		patch(t, s, tk.ID, gtd.TaskPatch{State: str(gtd.StateNext)})
+		addLog(t, s, tk.ID, gtd.LogStart, "")
+		p := gtd.TaskPatch{State: str(to)}
+		if to == gtd.StateScheduled {
+			p.ScheduledOn = str("2099-01-01")
+		}
+		if got := patch(t, s, tk.ID, p); got.Working {
+			t.Errorf("%s: still working after the move", to)
+		}
+		m := marks(t, s, tk.ID)
+		if len(m) != 2 || m[1].Kind != gtd.LogPause || m[1].MovedTo != to || m[1].Body != "" {
+			t.Errorf("%s: marks = %+v, want start then an automatic pause", to, m)
+		}
+	}
+}
+
+// No mark when the task was not working, when it goes to Next, when the state
+// does not change, or when it is closed: the derivation ends work there.
+func TestMoveWritesNoMarkOtherwise(t *testing.T) {
+	s, pages, _ := newSvc(t)
+	ctx := context.Background()
+
+	idle := capture(t, s, "作業していない")
+	patch(t, s, idle.ID, gtd.TaskPatch{State: str(gtd.StateSomeday)})
+	if m := marks(t, s, idle.ID); len(m) != 0 {
+		t.Errorf("not working: marks = %+v", m)
+	}
+	paused := capture(t, s, "止めてから移す")
+	addLog(t, s, paused.ID, gtd.LogStart, "")
+	addLog(t, s, paused.ID, gtd.LogPause, "")
+	patch(t, s, paused.ID, gtd.TaskPatch{State: str(gtd.StateSomeday)})
+	if m := marks(t, s, paused.ID); len(m) != 2 {
+		t.Errorf("paused first: marks = %+v", m)
+	}
+
+	toNext := capture(t, s, "Next へ")
+	patch(t, s, toNext.ID, gtd.TaskPatch{State: str(gtd.StateWaiting), WaitingFor: str("誰か")})
+	addLog(t, s, toNext.ID, gtd.LogStart, "")
+	// Same state, another field: no change of state, no mark
+	patch(t, s, toNext.ID, gtd.TaskPatch{State: str(gtd.StateWaiting), WaitingFor: str("別の人")})
+	if got := patch(t, s, toNext.ID, gtd.TaskPatch{State: str(gtd.StateNext)}); !got.Working {
+		t.Error("moving to next stopped the work")
+	}
+	if m := marks(t, s, toNext.ID); len(m) != 1 {
+		t.Errorf("to next: marks = %+v", m)
+	}
+
+	for i, closeTask := range []func(id int64) error{
+		func(id int64) error { _, err := s.Patch(ctx, id, gtd.TaskPatch{State: str(gtd.StateDone)}); return err },
+		func(id int64) error {
+			_, err := s.Patch(ctx, id, gtd.TaskPatch{State: str(gtd.StateDropped)})
+			return err
+		},
+		func(id int64) error { _, err := s.Complete(ctx, id, false); return err },
+		func(id int64) error { _, err := s.Complete(ctx, id, true); return err },
+		func(id int64) error {
+			_, _, err := s.FileAsReference(ctx, pages, id, gtd.FileAsReferenceInput{})
+			return err
+		},
+	} {
+		tk := capture(t, s, "閉じる")
+		addLog(t, s, tk.ID, gtd.LogStart, "")
+		if err := closeTask(tk.ID); err != nil {
+			t.Fatal(err)
+		}
+		if m := marks(t, s, tk.ID); len(m) != 1 || working(t, s, tk.ID) {
+			t.Errorf("close #%d: marks = %+v, working = %v", i, m, working(t, s, tk.ID))
+		}
+	}
+}
+
+// Undo of a move that paused a working task takes the automatic pause back;
+// undo of a move of an idle task writes nothing.
+func TestResumeForUndo(t *testing.T) {
+	s, _, _ := newSvc(t)
+	ctx := context.Background()
+
+	tk := capture(t, s, "取り消す")
+	patch(t, s, tk.ID, gtd.TaskPatch{State: str(gtd.StateNext)})
+	addLog(t, s, tk.ID, gtd.LogStart, "")
+	moved := patch(t, s, tk.ID, gtd.TaskPatch{State: str(gtd.StateSomeday)})
+	back := patch(t, s, tk.ID, gtd.TaskPatch{State: str(gtd.StateNext), Version: moved.Version, Resume: true})
+	if !back.Working {
+		t.Error("not working after the undo")
+	}
+	if m := marks(t, s, tk.ID); len(m) != 1 || m[0].Kind != gtd.LogStart {
+		t.Errorf("marks = %+v, want the first start alone", m)
+	}
+
+	idle := capture(t, s, "作業していない")
+	patch(t, s, idle.ID, gtd.TaskPatch{State: str(gtd.StateSomeday)})
+	patch(t, s, idle.ID, gtd.TaskPatch{State: str(gtd.StateInbox)})
+	if m := marks(t, s, idle.ID); len(m) != 0 || working(t, s, idle.ID) {
+		t.Errorf("idle: marks = %+v", m)
+	}
+
+	// Done ended the work with no mark; going back revives the start as is
+	done := capture(t, s, "完了を取り消す")
+	addLog(t, s, done.ID, gtd.LogStart, "")
+	if _, err := s.Complete(ctx, done.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	if got := patch(t, s, done.ID, gtd.TaskPatch{State: str(gtd.StateInbox), Resume: true}); !got.Working {
+		t.Error("done: not working after the undo")
+	}
+	if m := marks(t, s, done.ID); len(m) != 1 {
+		t.Errorf("done: marks = %+v", m)
+	}
+
+	// A manual pause is the user's own: Resume answers it with a start
+	manual := capture(t, s, "手で止めた")
+	addLog(t, s, manual.ID, gtd.LogStart, "")
+	addLog(t, s, manual.ID, gtd.LogPause, "")
+	if got := patch(t, s, manual.ID, gtd.TaskPatch{Resume: true}); !got.Working {
+		t.Error("manual: not working")
+	}
+	if m := marks(t, s, manual.ID); len(m) != 3 || m[2].Kind != gtd.LogStart {
+		t.Errorf("manual: marks = %+v", m)
+	}
+}

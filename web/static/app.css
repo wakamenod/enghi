@@ -781,7 +781,11 @@ section.panel > h2 a:hover { text-decoration: underline; text-underline-offset: 
 /* Start and pause are markers, not prose: one quiet line */
 .log-mark { padding: var(--sp-1) 0; }
 .log-mark .log-head .when { color: var(--fg-muted); }
-.log-mark > .prose { font-size: var(--fs-4); color: var(--fg-muted); }
+/* A comment on a mark follows it on the same line, after a dash */
+.log-sep { color: var(--fg-faint); }
+.log-head > .log-comment { flex: 0 1 auto; min-width: 0; font-size: var(--fs-4); color: var(--fg-muted); }
+.log-comment > :first-child { margin-top: 0; }
+.log-comment > :last-child { margin-bottom: 0; }
 
 /* Edit sits in the header line; open, it takes a full row under it */
 .log-edit[open] { order: 10; flex-basis: 100%; margin-top: var(--sp-2); }

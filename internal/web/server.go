@@ -82,6 +82,8 @@ func parseTemplates(lang i18n.Lang) (*template.Template, error) {
 		// t looks a message up; the language is fixed at parse time.
 		"t":         func(key string, args ...any) string { return i18n.T(lang, key, args...) },
 		"kindLabel": func(kind string) string { return i18n.T(lang, "kind."+kind) },
+		// markLabel is the head of a start/pause mark, as "⏸ paused 10:00".
+		"markLabel": func(kind, movedTo, when string) string { return markLabel(lang, kind, movedTo, when) },
 		"lang":      func() string { return string(lang) },
 		"langs":     func() []i18n.Lang { return i18n.All },
 		"langName":  func(l i18n.Lang) string { return i18n.Name[l] },

@@ -17,10 +17,13 @@ import (
 // **CreatedAt never changes on edit.** It is the moment the entry was written,
 // and what a per-day view groups by.
 type TaskLog struct {
-	ID        int64  `json:"id"`
-	TaskID    int64  `json:"task_id"`
-	Kind      string `json:"kind"` // note / start / pause
-	Body      string `json:"body"` // Markdown; may be empty for start/pause
+	ID     int64  `json:"id"`
+	TaskID int64  `json:"task_id"`
+	Kind   string `json:"kind"` // note / start / pause
+	Body   string `json:"body"` // Markdown; may be empty for start/pause
+	// MovedTo is set on an automatic pause: the state a change moved the
+	// working task to. Empty on a manual one.
+	MovedTo   string `json:"moved_to,omitempty"`
 	Version   int    `json:"version"`
 	CreatedAt string `json:"created_at"` // UTC, as everywhere else
 	UpdatedAt string `json:"updated_at"`
@@ -64,11 +67,11 @@ const workingExpr = `(t.state NOT IN ('done','dropped','filed') AND COALESCE((
 	 WHERE l.task_id = t.id AND l.kind IN ('start','pause')
 	 ORDER BY l.created_at DESC, l.id DESC LIMIT 1), '') = 'start')`
 
-const logCols = `id, task_id, kind, body, version, created_at, updated_at`
+const logCols = `id, task_id, kind, body, COALESCE(moved_to,''), version, created_at, updated_at`
 
 func scanLog(row interface{ Scan(...any) error }) (*TaskLog, error) {
 	var l TaskLog
-	if err := row.Scan(&l.ID, &l.TaskID, &l.Kind, &l.Body, &l.Version, &l.CreatedAt, &l.UpdatedAt); err != nil {
+	if err := row.Scan(&l.ID, &l.TaskID, &l.Kind, &l.Body, &l.MovedTo, &l.Version, &l.CreatedAt, &l.UpdatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}

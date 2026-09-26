@@ -221,3 +221,30 @@ func TestWorkingNow(t *testing.T) {
 		t.Errorf("today working=%v worked=%v", ids(today.Working), ids(today.Worked))
 	}
 }
+
+// Started on D-1 and moved to Someday on D: working at the end of D-1, not at
+// the end of D, and worked on during D through the automatic pause.
+func TestDayMoveOutOfNextEndsWorking(t *testing.T) {
+	s, _, db := newSvc(t)
+	tk := capture(t, s, "Someday へ回した")
+	patch(t, s, tk.ID, gtd.TaskPatch{State: str(gtd.StateNext)})
+	st, _ := addLog(t, s, tk.ID, gtd.LogStart, "")
+	mustExec(t, db, `UPDATE task_logs SET created_at = ? WHERE id = ?`, at(-1, 16, 0), st.ID)
+	patch(t, s, tk.ID, gtd.TaskPatch{State: str(gtd.StateSomeday)})
+	mustExec(t, db, `UPDATE task_logs SET created_at = ? WHERE kind = 'pause' AND task_id = ?`, at(0, 10, 0), tk.ID)
+
+	if prev := day(t, s, -1); !has(prev.Working, tk.ID) {
+		t.Errorf("D-1 working = %v", ids(prev.Working))
+	}
+	d := day(t, s, 0)
+	if has(d.Working, tk.ID) || !has(d.Worked, tk.ID) {
+		t.Fatalf("D working = %v, worked = %v", ids(d.Working), ids(d.Worked))
+	}
+	if l := d.Worked[0].Logs; len(l) != 1 || l[0].MovedTo != gtd.StateSomeday {
+		t.Errorf("D logs = %+v", l)
+	}
+	if d := day(t, s, 1); !d.Empty() {
+		t.Errorf("D+1 is not empty: %+v", d)
+	}
+}
+

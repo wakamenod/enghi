@@ -475,6 +475,8 @@ function repeatPicker(date, recurrence, endsOn) {
     if (dest === 'done' && task.recurrence) return;
     var rec = {
       id: task.id, title: task.title, dest: dest,
+      // A move out of Next pauses a working task; undoing it resumes the work
+      working: task.working,
       // The move bumps the version by one; anything more means the task was
       // edited elsewhere since, and the server refuses the undo
       version: String(+task.version + 1),
@@ -552,6 +554,7 @@ function repeatPicker(date, recurrence, endsOn) {
     var body = new URLSearchParams();
     Object.keys(u.rec.prev).forEach(function (k) { body.append(k, u.rec.prev[k]); });
     body.append('version', u.rec.version);
+    if (u.rec.working) body.append('resume', '1');
     fetch('/ui/tasks/' + u.rec.id, { method: 'POST', body: body, credentials: 'same-origin' })
       .then(function (r) {
         if (r.ok) {
