@@ -1089,9 +1089,10 @@ document.querySelectorAll('textarea[data-paste-upload]').forEach(function (ta) {
 // ---------------------------------------------------------------- Ctrl/Cmd+Enter
 //
 // Submits the form of a textarea marked data-ctrl-enter (the work log), going
-// through validation like a click on its first button.
+// through validation like a click on its first button. A key the [[ completion
+// already took (it picks a candidate on Enter) is left alone.
 document.addEventListener('keydown', function (ev) {
-  if (ev.key !== 'Enter' || !(ev.ctrlKey || ev.metaKey) || ev.isComposing) return;
+  if (ev.key !== 'Enter' || !(ev.ctrlKey || ev.metaKey) || ev.isComposing || ev.defaultPrevented) return;
   var ta = ev.target;
   if (!ta.matches || !ta.matches('textarea[data-ctrl-enter]') || !ta.form) return;
   ev.preventDefault();
