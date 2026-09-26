@@ -13,8 +13,9 @@ import (
 // Result is one search hit. Every kind is mixed into a single list, each with
 // its own badge (DESIGN 3.1).
 type Result struct {
-	Kind      string  `json:"kind"` // page / project / task / area
-	ID        int64   `json:"id"`
+	Kind      string  `json:"kind"`              // page / project / task / log / area
+	ID        int64   `json:"id"`                // for a log, the entry's id
+	TaskID    int64   `json:"task_id,omitempty"` // the task a log entry belongs to
 	Slug      string  `json:"slug,omitempty"`
 	Title     string  `json:"title"`
 	Snippet   string  `json:"snippet,omitempty"`
@@ -86,6 +87,13 @@ func (s *Service) Search(ctx context.Context, q string, kinds []string, limit, o
 	}
 	if want("task") {
 		rs, err := s.searchSimpleFTS(ctx, "task", "tasks", "tasks_fts", "note", q, fetch)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, rs...)
+	}
+	if want("log") {
+		rs, err := s.searchLogs(ctx, q, fetch)
 		if err != nil {
 			return nil, err
 		}
@@ -419,6 +427,158 @@ func (s *Service) searchSimpleFTS(ctx context.Context, kind, table, ftsTable, se
 	return out, rows.Err()
 }
 
+// searchLogs searches the work log on tasks. Each hit is titled with its task
+// and links to the entry; **several hits in one task collapse to its best
+// entry**, so one long-running task cannot flood the list.
+//
+// The body is the only indexed column, so every hit lands in the body bucket.
+func (s *Service) searchLogs(ctx context.Context, q string, fetch int) ([]Result, error) {
+	if RuneLen(q) >= 3 {
+		return s.logsFTS(ctx, q, fetch)
+	}
+	return s.logsShortQuery(ctx, q, fetch)
+}
+
+// logsFTS is the path for three characters or more, ranked by bm25 in SQL
+// (DESIGN 3.5). The collapse to one entry per task happens in SQL too, before
+// the LIMIT; collapsing afterwards would let one task use up the LIMIT.
+//
+// **The ranking query touches only the index and the head of each row.**
+// bm25() cannot be called inside an aggregate, so the scores are materialized
+// first; with min() as the only aggregate, SQLite then takes the bare id from
+// the row holding the minimum, i.e. the task's best entry (measured faster than
+// a row_number() window). updated_at sits after the body in the row, so reading
+// it for every hit means reading every body: the tie-break is the id (newer
+// first), and title, updated_at and the body for the snippet are read
+// afterwards, for the rows that survived.
+func (s *Service) logsFTS(ctx context.Context, q string, fetch int) ([]Result, error) {
+	match := Phrase(q)
+	rows, err := s.db.QueryContext(ctx,
+		`WITH hits AS MATERIALIZED (
+		   SELECT l.id, l.task_id, bm25(task_logs_fts) AS score
+		     FROM task_logs_fts JOIN task_logs l ON l.id = task_logs_fts.rowid
+		    WHERE task_logs_fts MATCH ?)
+		 SELECT id, task_id, min(score) AS score FROM hits
+		  GROUP BY task_id
+		  ORDER BY score, id DESC
+		  LIMIT ?`, match, fetch)
+	if err != nil {
+		return nil, err
+	}
+	var out []Result
+	for rows.Next() {
+		var r Result
+		if err := rows.Scan(&r.ID, &r.TaskID, &r.Score); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		r.Kind, r.korder, r.bucket, r.Via = "log", 3, bucketBody, "body"
+		out = append(out, r)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil || len(out) == 0 {
+		return out, err
+	}
+
+	// The rows that survived, by primary key. snippet() would need a second
+	// MATCH, measured slower than the whole ranking query; a trigram phrase hit
+	// is a literal substring, so excerpt() finds the same spot in the body.
+	ids := make([]any, len(out))
+	for i, r := range out {
+		ids[i] = r.ID
+	}
+	rows, err = s.db.QueryContext(ctx,
+		`SELECT l.id, t.title, l.updated_at, l.body
+		   FROM task_logs l JOIN tasks t ON t.id = l.task_id
+		  WHERE l.id IN (?`+strings.Repeat(",?", len(out)-1)+`)`, ids...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	type detail struct{ title, updated, body string }
+	details := make(map[int64]detail, len(out))
+	for rows.Next() {
+		var id int64
+		var d detail
+		if err := rows.Scan(&id, &d.title, &d.updated, &d.body); err != nil {
+			return nil, err
+		}
+		details[id] = d
+	}
+	for i := range out {
+		d := details[out[i].ID]
+		out[i].Title, out[i].UpdatedAt, out[i].Snippet = d.title, d.updated, excerpt(d.body, q)
+	}
+	return out, rows.Err()
+}
+
+// logsShortQuery is the path for two characters or fewer: a body LIKE,
+// updated_at descending, with the ASCII-2 word-boundary filter (DESIGN 3.4).
+// **Entries can be article-length, so this is the same linear scan as for page
+// bodies** - not the small-table shortcut of searchSimpleFTS.
+//
+// One task can hold many matching entries, so a LIMIT in SQL would let it use
+// up the whole LIMIT before the collapse to one entry per task. The collapse
+// needs the boundary filter, which only the application can apply, so this
+// runs in two steps: the scan returns just (id, task_id) in order, keeping the
+// sort small, and bodies are then read one by one for the entries that could
+// still make the list.
+func (s *Service) logsShortQuery(ctx context.Context, q string, fetch int) ([]Result, error) {
+	ascii2 := IsASCII2(q)
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, task_id FROM task_logs
+		  WHERE body LIKE '%' || ? || '%' ESCAPE '\'
+		  ORDER BY updated_at DESC, id DESC`, LikeEscape(q))
+	if err != nil {
+		return nil, err
+	}
+	type cand struct{ id, taskID int64 }
+	var cands []cand
+	seen := map[int64]bool{}
+	for rows.Next() {
+		var c cand
+		if err := rows.Scan(&c.id, &c.taskID); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		cands = append(cands, c)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	var out []Result
+	// Bound the body reads as the page path bounds its LIKE: without it, a query
+	// like "go" that the boundary filter mostly rejects could read every entry.
+	reads := 0
+	for _, c := range cands {
+		if len(out) >= fetch || reads >= fetch*3 {
+			break
+		}
+		if seen[c.taskID] {
+			continue
+		}
+		r := Result{ID: c.id, TaskID: c.taskID}
+		var body string
+		if err := s.db.QueryRowContext(ctx,
+			`SELECT t.title, l.updated_at, l.body
+			   FROM task_logs l JOIN tasks t ON t.id = l.task_id WHERE l.id = ?`, c.id).
+			Scan(&r.Title, &r.UpdatedAt, &body); err != nil {
+			return nil, err
+		}
+		reads++
+		if ascii2 && !WordBoundaryMatch(body, q) {
+			continue
+		}
+		seen[c.taskID] = true
+		r.Kind, r.korder, r.bucket, r.Via = "log", 3, bucketBody, "body"
+		r.Snippet = excerpt(body, q)
+		out = append(out, r)
+	}
+	return out, nil
+}
+
 // searchAreas looks areas up by name. They have no FTS table, being few.
 func (s *Service) searchAreas(ctx context.Context, q string, fetch int) ([]Result, error) {
 	rows, err := s.db.QueryContext(ctx,
@@ -439,7 +599,7 @@ func (s *Service) searchAreas(ctx context.Context, q string, fetch int) ([]Resul
 		if IsASCII2(q) && !WordBoundaryMatch(r.Title, q) && !WordBoundaryMatch(desc, q) {
 			continue
 		}
-		r.Kind, r.korder = "area", 3
+		r.Kind, r.korder = "area", 4
 		if containsFold(r.Title, q) {
 			r.bucket, r.Via = bucketTitle, "title"
 		} else {
