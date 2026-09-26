@@ -72,15 +72,15 @@ function t(key) {
         try { hereDecoded = decodeURIComponent(here); } catch (e) { /* malformed URL */ }
         if ((here === '/wiki/' + msg.slug || hereDecoded === '/wiki/' + msg.slug) &&
             !document.querySelector('textarea')) {
-          // When reading along while editing in Emacs, jumping back to the top
-          // on every reload makes it useless. The scroll position is carried
-          // over (restored by restoreScroll below).
-          try {
-            sessionStorage.setItem('enghi:scroll:' + here,
-                                   JSON.stringify({ y: window.scrollY, t: Date.now() }));
-          } catch (e) { /* give up in private mode and the like */ }
-          window.location.reload();
+          reloadKeepingScroll();
         }
+      }
+      // A sync that changed the calendar: reload a page showing events (the
+      // dashboard, a day) or the sync's status, unless something has focus
+      if (msg.type === 'updated' && msg.kind === 'calendar' &&
+          document.querySelector('#schedule, #calendar') &&
+          (!document.activeElement || document.activeElement === document.body)) {
+        reloadKeepingScroll();
       }
     };
 
@@ -89,6 +89,17 @@ function t(key) {
     // for some reason" for the rest of the day.
     ws.onclose = function () { ws = null; schedule(); };
     ws.onerror = function () { if (ws) { ws.close(); } };
+  }
+
+  // When reading along while editing in Emacs, jumping back to the top on
+  // every reload makes it useless. The scroll position is carried over
+  // (restored by restoreScroll below).
+  function reloadKeepingScroll() {
+    try {
+      sessionStorage.setItem('enghi:scroll:' + window.location.pathname,
+                             JSON.stringify({ y: window.scrollY, t: Date.now() }));
+    } catch (e) { /* give up in private mode and the like */ }
+    window.location.reload();
   }
 
   function disconnect() {
@@ -119,6 +130,38 @@ function t(key) {
   });
 
   connect();
+})();
+
+// ------------------------------------------------- today's schedule
+//
+// The now marker and the dimming of ended events follow the clock, checked
+// each minute, without asking the server: the times are on the rows
+// (data-start / data-end, Unix ms). The marker goes after every event that
+// has started. At midnight "today" is another day, so the page reloads.
+
+(function () {
+  var lists = document.querySelectorAll('[data-timeline-live]');
+  if (!lists.length) return;
+  var day = new Date().toDateString();
+  function tick() {
+    if (new Date().toDateString() !== day &&
+        (!document.activeElement || document.activeElement === document.body)) {
+      window.location.reload();
+      return;
+    }
+    var now = Date.now();
+    lists.forEach(function (ul) {
+      var marker = ul.querySelector('.tl-now');
+      var next = null;         // the first event not started yet
+      ul.querySelectorAll('.tl-event[data-start]').forEach(function (li) {
+        li.classList.toggle('past', Number(li.dataset.end) <= now);
+        if (!next && Number(li.dataset.start) > now) next = li;
+      });
+      if (!marker) return;
+      if (next) { ul.insertBefore(marker, next); } else { ul.appendChild(marker); }
+    });
+  }
+  setInterval(tick, 60 * 1000);
 })();
 
 // ------------------------------------------------- carrying the scroll position

@@ -1,0 +1,35 @@
+{{/* A day's calendar events (web/calendar.go timeline): all-day ones first,
+     then the timed ones in order. On today a now marker sits after every event
+     that has started and ended ones are dimmed; app.js moves both each minute
+     from data-start/data-end. Not ul.rows: j/k is for tasks. */}}
+{{define "timeline"}}
+{{if .Shown}}
+{{if or .AllDay .Timed}}
+<ul class="timeline"{{if .IsToday}} data-timeline-live{{end}}>
+  {{range .AllDay}}{{template "tl_event" .}}{{end}}
+  {{range $i, $e := .Timed}}
+    {{if and $.IsToday (eq $i $.NowAt)}}{{template "tl_now"}}{{end}}
+    {{template "tl_event" $e}}
+  {{end}}
+  {{if and .IsToday (eq .NowAt (len .Timed))}}{{template "tl_now"}}{{end}}
+</ul>
+{{else}}
+<div class="empty">{{if .IsToday}}{{t "cal.none_today"}}{{else}}{{t "cal.none_day"}}{{end}}</div>
+{{end}}
+{{end}}
+{{end}}
+
+{{define "tl_now"}}<li class="tl-now" aria-hidden="true"><span>{{t "cal.now"}}</span></li>{{end}}
+
+{{define "tl_event"}}
+<li class="tl-event{{if .Past}} past{{end}}"{{if not .AllDay}} data-start="{{.StartMS}}" data-end="{{.EndMS}}"{{end}}>
+  <span class="tl-time">{{if .AllDay}}{{t "cal.all_day"}}{{else}}{{.Time}}{{end}}</span>
+  <span class="tl-title">{{.Title}}</span>
+  {{if .Location}}<span class="tl-loc">{{.Location}}</span>{{end}}
+  {{if .Calendar}}<span class="tag tl-cal" title="{{.Calendar}}">{{.Calendar}}</span>{{end}}
+  {{if .TaskID}}<a class="tag tl-task" href="/gtd/clarify/{{.TaskID}}">{{t "cal.task"}}</a>
+  {{else}}<form method="post" action="/ui/calendar/events/{{.ID}}/task" class="inline-form tl-make">
+    <button type="submit" class="link" title="{{t "cal.make_task_hint"}}">{{t "cal.make_task"}}</button>
+  </form>{{end}}
+</li>
+{{end}}

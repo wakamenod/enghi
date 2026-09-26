@@ -28,11 +28,13 @@ type settingsData struct {
 	SkillPath string     // where install-skill writes the Claude Code skill
 	Skill     skill.Info // what is there now
 	Local     bool       // the request came from this machine (fromThisMachine)
+
+	Calendar calendarPanel
 }
 
 func (s *Server) viewSettings(w http.ResponseWriter, r *http.Request) {
 	d := settingsData{Set: s.settings(r), Export: s.cfg.ExportDir, Dir: s.cfg.BackupDir,
-		SkillPath: s.skillDest(), Local: fromThisMachine(r)}
+		SkillPath: s.skillDest(), Local: fromThisMachine(r), Calendar: s.calendarPanel(ctxOf(r))}
 	d.Backups, _ = store.Backups(s.cfg.BackupDir)
 	var err error
 	if d.Skill, err = skill.Status(d.SkillPath, s.baseURL()); err != nil {

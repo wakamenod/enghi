@@ -14,8 +14,13 @@
 
 <div class="day-layout">
 <div class="day-main">
-  {{/* Top to bottom. Calendar events for the day are meant to go here, above
-       the groups, as a section of their own. */}}
+  {{/* Top to bottom: the day's calendar events, then the groups */}}
+  {{if $d.Events.Shown}}
+  <section class="panel" id="schedule">
+    <h2>{{t "cal.schedule"}}{{with $d.Events}}{{if or .AllDay .Timed}} <span class="count">{{add (len .AllDay) (len .Timed)}}</span>{{end}}{{end}}</h2>
+    {{template "timeline" $d.Events}}
+  </section>
+  {{end}}
 
   {{if $d.Empty}}
   <div class="empty">{{t "day.empty"}}</div>

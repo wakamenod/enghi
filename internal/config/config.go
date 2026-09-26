@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/BurntSushi/toml"
 )
@@ -50,6 +51,11 @@ type Config struct {
 	// SkillsDir: where install-skill writes the Claude Code skill (as
 	// <SkillsDir>/enghi).
 	SkillsDir string `toml:"skills_dir"`
+
+	// Calendar events, macOS only: the Shortcuts shortcut the server runs, and
+	// how often. The on/off switch is in the settings screen, not here.
+	CalendarShortcut     string        `toml:"calendar_shortcut"`
+	CalendarSyncInterval time.Duration `toml:"calendar_sync_interval"` // "30m"
 }
 
 // BackupOn reports whether backups are enabled (unset means enabled).
@@ -123,6 +129,12 @@ func withDefaults(c Config) Config {
 	if c.DeadlineWarningDays == 0 {
 		c.DeadlineWarningDays = 7
 	}
+	if c.CalendarShortcut == "" {
+		c.CalendarShortcut = "enghi-events"
+	}
+	if c.CalendarSyncInterval == 0 {
+		c.CalendarSyncInterval = 30 * time.Minute
+	}
 	c.FilesDBPath = expand(c.FilesDBPath)
 	c.ExportDir = expand(c.ExportDir)
 	c.BackupDir = expand(c.BackupDir)
@@ -161,6 +173,10 @@ func (c Config) validate() error {
 	}
 	if c.DeadlineWarningDays < 0 {
 		return fmt.Errorf("deadline_warning_days %d: must be positive", c.DeadlineWarningDays)
+	}
+	// The shortcut runs every interval; under a minute is a typo, not a wish
+	if c.CalendarSyncInterval < time.Minute {
+		return fmt.Errorf("calendar_sync_interval %s: must be at least 1m", c.CalendarSyncInterval)
 	}
 	for _, h := range c.AllowedHosts {
 		// Hand-written config, so surrounding spaces are fine. A space inside is

@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/wakamenod/enghi/internal/calendar"
 	"github.com/wakamenod/enghi/internal/gtd"
 	"github.com/wakamenod/enghi/internal/i18n"
 )
@@ -17,8 +18,8 @@ import (
 // is decided in gtd.Day; this file shows it, as a page, JSON and Markdown.
 //
 // **The sections are listed top to bottom in one place each** (dayPageData,
-// dayJSON, dayMarkdown). Calendar events for the day are meant to go above the
-// groups later; adding them is a new field and a new block, not a reshape.
+// dayJSON, dayMarkdown). The day's calendar events come first, above the
+// groups; for a past day they come from the stored history.
 
 // dayWeekdayKeys are the i18n keys for weekday names, Sunday first as
 // time.Weekday counts.
@@ -146,7 +147,8 @@ type dayPageData struct {
 	Markdown string
 	Calendar calendarData
 
-	// In the order they are shown. Calendar events will go before Done.
+	// In the order they are shown
+	Events  *timeline
 	Done    []dayRow
 	Working []dayRow
 	Worked  []dayRow
@@ -201,6 +203,11 @@ func (s *Server) viewDay(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	events, evs, err := s.dayTimeline(ctx, day)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	lang := s.langOf(r)
 	now := time.Now()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
@@ -213,7 +220,8 @@ func (s *Server) viewDay(w http.ResponseWriter, r *http.Request) {
 		Next:     day.AddDate(0, 0, 1).Format(gtd.DateLayout),
 		Today:    today.Format(gtd.DateLayout),
 		Empty:    rec.Empty(),
-		Markdown: dayMarkdown(lang, day, rec),
+		Markdown: dayMarkdown(lang, day, rec, evs),
+		Events:   events,
 		Done:     s.dayRows(r, day, rec.Done),
 		Working:  s.dayRows(r, day, rec.Working),
 		Worked:   s.dayRows(r, day, rec.Worked),
@@ -300,11 +308,13 @@ type dayJSON struct {
 	Timezone  string `json:"timezone"`
 	UTCOffset string `json:"utc_offset"`
 
-	// In the order they are shown. Calendar events will go before done.
-	Done    []dayTaskJSON `json:"done"`
-	Working []dayTaskJSON `json:"working"`
-	Worked  []dayTaskJSON `json:"worked"`
-	Dropped []dayTaskJSON `json:"dropped"`
+	// In the order they are shown. events are the day's calendar events,
+	// hidden calendars left out, all-day ones first.
+	Events  []*calendar.Event `json:"events"`
+	Done    []dayTaskJSON     `json:"done"`
+	Working []dayTaskJSON     `json:"working"`
+	Worked  []dayTaskJSON     `json:"worked"`
+	Dropped []dayTaskJSON     `json:"dropped"`
 }
 
 func dayLogsJSON(ls []*gtd.TaskLog) []dayLogJSON {
@@ -349,11 +359,16 @@ func (s *Server) apiDay(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
+	evs, err := s.cal.Day(ctxOf(r), day, s.hiddenCalendars(ctxOf(r)))
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
 	switch r.URL.Query().Get("format") {
 	case "", "json":
 	case "markdown", "md":
 		w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
-		_, _ = w.Write([]byte(dayMarkdown(s.langOf(r), day, rec)))
+		_, _ = w.Write([]byte(dayMarkdown(s.langOf(r), day, rec, evs)))
 		return
 	default:
 		writeErr(w, http.StatusBadRequest, "bad_request", "format is json or markdown")
@@ -364,6 +379,7 @@ func (s *Server) apiDay(w http.ResponseWriter, r *http.Request) {
 		Weekday:   day.Weekday().String()[:3],
 		Timezone:  localZoneName(),
 		UTCOffset: day.Format("-07:00"),
+		Events:    evs,
 		Done:      dayTasksJSON(rec.Done, true),
 		Working:   dayTasksJSON(rec.Working, false),
 		Worked:    dayTasksJSON(rec.Worked, false),
@@ -394,12 +410,12 @@ func (s *Server) apiDays(w http.ResponseWriter, r *http.Request) {
 
 // ---------------------------------------------------------------- Markdown
 
-// dayMarkdown is the day as plain Markdown, for pasting elsewhere: a heading
-// per group, a bullet per task, the day's entries indented under it. A done
-// task's entries from before the day follow as a labelled sub-list, each with
-// its date. **Keep the shape stable**; people paste it into reports and tools
-// read it.
-func dayMarkdown(lang i18n.Lang, day time.Time, rec *gtd.DayRecord) string {
+// dayMarkdown is the day as plain Markdown, for pasting elsewhere: the day's
+// calendar events first, then a heading per group, a bullet per task, the
+// day's entries indented under it. A done task's entries from before the day
+// follow as a labelled sub-list, each with its date. **Keep the shape
+// stable**; people paste it into reports and tools read it.
+func dayMarkdown(lang i18n.Lang, day time.Time, rec *gtd.DayRecord, evs []*calendar.Event) string {
 	tr := func(key string, args ...any) string { return i18n.T(lang, key, args...) }
 	var b strings.Builder
 	// entry writes one log entry as a list item at indent: the time, the mark
@@ -432,6 +448,16 @@ func dayMarkdown(lang i18n.Lang, day time.Time, rec *gtd.DayRecord) string {
 		b.WriteString("\n")
 	}
 	b.WriteString("# " + tr("day.title") + " " + rec.Date + " (" + weekdayLabel(lang, day) + ")\n")
+	if len(evs) > 0 {
+		b.WriteString("\n## " + tr("cal.schedule") + "\n\n")
+		for _, e := range evs {
+			when := e.TimeRange()
+			if when == "" {
+				when = tr("cal.all_day")
+			}
+			b.WriteString("- " + when + " " + e.Title + "\n")
+		}
+	}
 	if rec.Empty() {
 		b.WriteString("\n" + tr("day.empty") + "\n")
 		return b.String()

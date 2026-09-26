@@ -252,6 +252,38 @@ CREATE INDEX idx_task_logs_task ON task_logs(task_id, created_at);
 CREATE INDEX idx_task_logs_created ON task_logs(created_at);
 
 -- ============================================================
+-- Calendar events (migration 0006)
+-- ============================================================
+-- Imported read-only, from a macOS Shortcuts shortcut or PUT
+-- /api/calendar/events. A sync replaces one source's events whose start falls
+-- in the window it covers; rows outside it stay, as history. An all-day event
+-- runs from local midnight to the local midnight after its last day.
+CREATE TABLE calendar_events (
+  -- never reused, so a page left open cannot act on another event by its id
+  id        INTEGER PRIMARY KEY AUTOINCREMENT,
+  source    TEXT    NOT NULL,              -- 'shortcuts', or the name a PUT gave
+  calendar  TEXT    NOT NULL DEFAULT '',
+  title     TEXT    NOT NULL DEFAULT '',
+  starts_at TEXT    NOT NULL,              -- UTC
+  ends_at   TEXT    NOT NULL,              -- UTC, exclusive
+  all_day   INTEGER NOT NULL DEFAULT 0,
+  location  TEXT    NOT NULL DEFAULT '',
+  -- sha1(calendar | title | starts_at): Shortcuts exposes no stable event ID,
+  -- so a moved event is a new event
+  event_key TEXT    NOT NULL,
+  synced_at TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE UNIQUE INDEX idx_calendar_events_key ON calendar_events(source, event_key);
+CREATE INDEX idx_calendar_events_starts ON calendar_events(starts_at);
+
+-- Events turned into tasks, keyed by event_key so the link survives a resync.
+CREATE TABLE event_tasks (
+  event_key TEXT    NOT NULL PRIMARY KEY,
+  task_id   INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE
+);
+CREATE INDEX idx_event_tasks_task ON event_tasks(task_id);
+
+-- ============================================================
 -- Full-text search
 -- ============================================================
 -- Details and reasoning are in DESIGN.md section 3 (measured on 30k rows).

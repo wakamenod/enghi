@@ -891,3 +891,41 @@ table.cal .dot {
 
 /* The week's day links on the Weekly Review */
 .day-links { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-3); margin-bottom: var(--sp-3); }
+
+/* ---- calendar events: the timeline on the dashboard and the day page ----
+   Not ul.rows: the j/k cursor is for tasks. The time column has a fixed width
+   so titles line up; the now marker is the one accent, since "now" is state. */
+ul.timeline { list-style: none; margin: 0; padding: 0; }
+.tl-event {
+  display: flex; align-items: baseline; gap: var(--sp-3);
+  padding: var(--sp-1) 0; line-height: var(--lh-snug);
+}
+.tl-time {
+  flex: none; min-width: 7.5em; color: var(--fg-muted); font-size: var(--fs-2);
+  font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+/* The title takes the slack and wraps; a long calendar name (a Google
+   account's address) is cut short instead of pushing the action off the line */
+.tl-title { flex: 1 1 auto; min-width: 0; color: var(--fg); overflow-wrap: anywhere; }
+.tl-loc { flex: 0 1 auto; min-width: 0; color: var(--fg-muted); font-size: var(--fs-2); }
+.tl-cal {
+  flex: 0 1 auto; min-width: 3em; max-width: 14em;
+  overflow: hidden; text-overflow: ellipsis; color: var(--fg-faint);
+}
+.tl-make, .tl-task { flex: none; }
+.tl-make button.link { white-space: nowrap; }
+.tl-make button.link:hover { color: var(--fg); }
+/* Ended: dropped back in tone, like done items */
+.tl-event.past .tl-title, .tl-event.past .tl-time, .tl-event.past .tl-loc { color: var(--fg-faint); }
+.tl-now {
+  display: flex; align-items: center; gap: var(--sp-2); margin: var(--sp-1) 0;
+  color: var(--accent); font-family: var(--mono); font-size: var(--fs-1);
+}
+.tl-now::after { content: ""; flex: 1; height: 1px; background: var(--accent); }
+.tl-block + .col-block, .tl-block + .meta { margin-top: var(--sp-5); }
+.tl-block .subhead { margin-bottom: var(--sp-1); }
+.cal-form .subhead, .cal-status-head { margin-top: var(--sp-5); }
+@media (max-width: 560px) {
+  .tl-event { flex-wrap: wrap; }
+  .tl-time { min-width: 0; }
+}

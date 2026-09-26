@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/wakamenod/enghi/internal/config"
 )
@@ -143,5 +144,26 @@ func TestAbbrev(t *testing.T) {
 		if got := config.Abbrev(in); got != want {
 			t.Errorf("Abbrev(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+func TestCalendarDefaultsAndInterval(t *testing.T) {
+	c := config.Default()
+	if c.CalendarShortcut != "enghi-events" || c.CalendarSyncInterval != 30*time.Minute {
+		t.Fatalf("defaults = %q %s", c.CalendarShortcut, c.CalendarSyncInterval)
+	}
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte("calendar_sync_interval = \"15m\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c, err := config.Load(path)
+	if err != nil || c.CalendarSyncInterval != 15*time.Minute {
+		t.Fatalf("Load = %s, %v", c.CalendarSyncInterval, err)
+	}
+	if err := os.WriteFile(path, []byte("calendar_sync_interval = \"5s\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := config.Load(path); err == nil {
+		t.Fatal("an interval under a minute was accepted")
 	}
 }
