@@ -126,7 +126,7 @@ Reading:
 
 | | |
 |---|---|
-| `GET /api/dashboard` | Today at a glance: `gtd.today`, `gtd.upcoming` (deadlines in the next `gtd.deadline_warning_days` days), `gtd.inbox_count`, `gtd.waiting_overdue`, `gtd.stalled_projects`, `gtd.working` (started and not paused; each also carries `since`, when the work started). A task with a deadline carries `deadline_days`: days left, negative when overdue |
+| `GET /api/dashboard` | Today at a glance: `gtd.today`, `gtd.upcoming` (deadlines in the next `gtd.deadline_warning_days` days), `gtd.inbox_count`, `gtd.waiting_overdue`, `gtd.stalled_projects`, `gtd.working` (tasks started and not paused, each with `since`: when the work started). A task with a deadline carries `deadline_days`: days left, negative when overdue |
 | `GET /api/review` | Everything the weekly review needs, in one call (see below) |
 | `GET /api/tasks?state=inbox` | Tasks by state, as `{"tasks": [...]}`; `state=next_actions` gives the Next Actions view |
 | `GET /api/tasks/<id>` | One task and the pages it links to. `working: true` means it has been started and not paused |
