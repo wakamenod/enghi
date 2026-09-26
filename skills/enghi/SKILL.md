@@ -124,7 +124,7 @@ Reading:
 
 | | |
 |---|---|
-| `GET /api/dashboard` | Today at a glance: `gtd.today`, `gtd.inbox_count`, `gtd.waiting_overdue`, `gtd.stalled_projects` |
+| `GET /api/dashboard` | Today at a glance: `gtd.today`, `gtd.upcoming` (deadlines in the next `gtd.deadline_warning_days` days), `gtd.inbox_count`, `gtd.waiting_overdue`, `gtd.stalled_projects`. A task with a deadline carries `deadline_days`: days left, negative when overdue |
 | `GET /api/review` | Everything the weekly review needs, in one call (see below) |
 | `GET /api/tasks?state=inbox` | Tasks by state, as `{"tasks": [...]}`; `state=next_actions` gives the Next Actions view |
 | `GET /api/tasks/<id>` | One task and the pages it links to |
@@ -167,13 +167,14 @@ For "what should I do today", a morning check-in and the like. It takes a few mi
 not an hour; keep it short and do not turn it into a weekly review.
 
 ```sh
-curl -s http://127.0.0.1:7777/api/dashboard | jq '.gtd | {inbox_count, today, waiting_overdue}'
+curl -s http://127.0.0.1:7777/api/dashboard | jq '.gtd | {inbox_count, today, upcoming, waiting_overdue}'
 curl -s 'http://127.0.0.1:7777/api/tasks?state=next_actions' |
   jq '[.tasks[] | {id, title, context_name, project_title, deadline_on, energy, time_estimate}]'
 ```
 
 1. **Today** — `today` holds what is due or scheduled for today or earlier. Lead with
-   these, overdue deadlines first. Scheduled tasks show up in Next Actions by themselves
+   these, overdue deadlines (negative `deadline_days`) first, then briefly the deadlines
+   of the coming week in `upcoming`. Scheduled tasks show up in Next Actions by themselves
    once their day comes; they need no state change.
 2. **Inbox** — if `inbox_count` is not zero, offer to clarify it (as below). If the user
    has no time now, just say how many are waiting and move on.

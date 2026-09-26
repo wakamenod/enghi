@@ -3,12 +3,14 @@ package web_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/wakamenod/enghi/internal/config"
 	"github.com/wakamenod/enghi/internal/gtd"
 )
 
@@ -35,6 +37,7 @@ func TestAllScreensRenderCompletely(t *testing.T) {
 	mustJSON(t, h, "POST", "/api/tasks", `{"title":"いつかやる"}`)
 	mustJSON(t, h, "PATCH", "/api/tasks/4", `{"state":"someday"}`)
 	mustJSON(t, h, "POST", "/api/tasks", `{"title":"Inbox に残すもの"}`)
+	addDeadlines(t, h)
 
 	screens := []string{
 		"/", "/wiki", "/wiki/参考資料", "/wiki/参考資料/edit", "/wiki/参考資料/history",
@@ -153,6 +156,66 @@ func TestDashboardIncludesGTD(t *testing.T) {
 	}
 }
 
+// addDeadlines adds one overdue task and one with a deadline coming up, so the
+// dashboard's Overdue and Upcoming groups have something to render. It returns
+// their IDs.
+func addDeadlines(t *testing.T, h http.Handler) (overdue, upcoming int64) {
+	t.Helper()
+	add := func(title string, days int) int64 {
+		var tk struct {
+			ID int64 `json:"id"`
+		}
+		w := do(h, req("POST", "/api/tasks", `{"title":"`+title+`"}`))
+		json.Unmarshal(w.Body.Bytes(), &tk)
+		mustJSON(t, h, "PATCH", fmt.Sprintf("/api/tasks/%d", tk.ID),
+			fmt.Sprintf(`{"state":"next","deadline_on":%q}`, gtd.FormatDate(gtd.Today().AddDate(0, 0, days))))
+		return tk.ID
+	}
+	return add("Past deadline", -2), add("Deadline ahead", 3)
+}
+
+// Overdue deadlines are flagged within Today, and deadlines within
+// deadline_warning_days come back as upcoming.
+func TestDashboardDeadlines(t *testing.T) {
+	h, _ := newServerWith(t, func(c *config.Config) { c.DeadlineWarningDays = 3 })
+	overdue, upcoming := addDeadlines(t, h)
+	var d struct {
+		GTD struct {
+			Today []struct {
+				ID           int64 `json:"id"`
+				DeadlineDays *int  `json:"deadline_days"`
+			} `json:"today"`
+			Upcoming []struct {
+				ID           int64 `json:"id"`
+				DeadlineDays *int  `json:"deadline_days"`
+			} `json:"upcoming"`
+			WarningDays int `json:"deadline_warning_days"`
+		} `json:"gtd"`
+	}
+	if err := json.Unmarshal(do(h, req("GET", "/api/dashboard", "")).Body.Bytes(), &d); err != nil {
+		t.Fatal(err)
+	}
+	g := d.GTD
+	if len(g.Today) != 1 || g.Today[0].ID != overdue || g.Today[0].DeadlineDays == nil || *g.Today[0].DeadlineDays != -2 {
+		t.Errorf("today = %+v, want the overdue task with deadline_days -2", g.Today)
+	}
+	if len(g.Upcoming) != 1 || g.Upcoming[0].ID != upcoming || *g.Upcoming[0].DeadlineDays != 3 {
+		t.Errorf("upcoming = %+v, want the task due in 3 days", g.Upcoming)
+	}
+	if g.WarningDays != 3 {
+		t.Errorf("deadline_warning_days = %d, want 3", g.WarningDays)
+	}
+
+	r := req("GET", "/", "")
+	r.Header.Set("Accept-Language", "en")
+	body := do(h, r).Body.String()
+	for _, want := range []string{"Overdue", "2 day(s) overdue", "Deadlines in the next 3 day(s)", "in 3 days"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the dashboard does not show %q", want)
+		}
+	}
+}
+
 // Without GTD in use at all, the wiki still works fully and the screens hold
 // up (DESIGN 0).
 func TestWikiWorksWithoutGTD(t *testing.T) {
@@ -194,6 +257,7 @@ func TestEnglishScreensHaveNoJapanese(t *testing.T) {
 	mustJSON(t, h, "POST", "/api/areas", `{"name":"Finances"}`)
 	mustJSON(t, h, "POST", "/api/projects", `{"title":"Office move","outcome":"Moved in"}`)
 	mustJSON(t, h, "POST", "/api/tasks", `{"title":"Call the agent"}`)
+	addDeadlines(t, h)
 
 	japanese := regexp.MustCompile(`[ぁ-んァ-ヶ一-龠]`)
 	screens := []string{

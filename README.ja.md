@@ -42,6 +42,7 @@ port = 7777
 db_path    = "~/.local/share/enghi/enghi.db"
 export_dir = "~/.local/share/enghi/export"
 revision_compact_minutes = 10   # この時間内の再編集は直前のリビジョンを上書きする
+deadline_warning_days    = 7    # 締切を何日前からダッシュボードに出すか
 
 files_db_path  = "~/.local/share/enghi/enghi-files.db"   # 省略時は db_path に追従する
 backup_dir     = "~/.local/share/enghi/backup"

@@ -96,6 +96,29 @@ type Task struct {
 
 	// WaitingDays is the days since delegated_at when state='waiting'.
 	WaitingDays int `json:"waiting_days"`
+	// DeadlineDays is deadline_on minus today, in days, when there is a
+	// deadline: 0 is due today, a negative value is that many days overdue.
+	DeadlineDays *int `json:"deadline_days,omitempty"`
+}
+
+// Overdue reports whether the deadline has passed. **Only a deadline makes a
+// task overdue**; a scheduled date that has passed just means it is due.
+func (t *Task) Overdue() bool { return t.DeadlineDays != nil && *t.DeadlineDays < 0 }
+
+// DaysOverdue is how many days past the deadline; 0 unless Overdue.
+func (t *Task) DaysOverdue() int {
+	if !t.Overdue() {
+		return 0
+	}
+	return -*t.DeadlineDays
+}
+
+// DaysLeft is how many days until the deadline; 0 without one.
+func (t *Task) DaysLeft() int {
+	if t.DeadlineDays == nil {
+		return 0
+	}
+	return *t.DeadlineDays
 }
 
 // Recurring reports whether this is a recurring task.

@@ -30,7 +30,9 @@ const taskCols = `t.id, t.title, t.note, t.state, t.project_id, t.context_id, t.
 	t.sort_order, t.version, COALESCE(t.completed_at,''), t.created_at, t.updated_at,
 	COALESCE(p.title,''), COALESCE(c.name,''), COALESCE(a.name,''),
 	CASE WHEN t.state = 'waiting' AND t.delegated_at IS NOT NULL
-	     THEN CAST(julianday(` + sqlToday + `) - julianday(t.delegated_at) AS INTEGER) ELSE 0 END`
+	     THEN CAST(julianday(` + sqlToday + `) - julianday(t.delegated_at) AS INTEGER) ELSE 0 END,
+	CASE WHEN t.deadline_on IS NOT NULL
+	     THEN CAST(julianday(t.deadline_on) - julianday(` + sqlToday + `) AS INTEGER) END`
 
 const taskFrom = `FROM tasks t
 	LEFT JOIN projects p ON p.id = t.project_id
@@ -43,7 +45,7 @@ func scanTask(row interface{ Scan(...any) error }) (*Task, error) {
 		&t.ScheduledOn, &t.DeadlineOn, &t.WaitingFor, &t.DelegatedAt, &t.Energy, &t.TimeEstimate,
 		&t.Priority, &t.Recurrence, &t.SeriesID, &t.RecurrenceEndsOn,
 		&t.SortOrder, &t.Version, &t.CompletedAt, &t.CreatedAt, &t.UpdatedAt,
-		&t.ProjectTitle, &t.ContextName, &t.AreaName, &t.WaitingDays)
+		&t.ProjectTitle, &t.ContextName, &t.AreaName, &t.WaitingDays, &t.DeadlineDays)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
@@ -203,6 +205,25 @@ func (s *Service) Today(ctx context.Context) ([]*Task, error) {
 		   AND ((t.deadline_on  IS NOT NULL AND t.deadline_on  <= `+sqlToday+`)
 		     OR (t.scheduled_on IS NOT NULL AND t.scheduled_on <= `+sqlToday+`))
 		 ORDER BY COALESCE(t.deadline_on, t.scheduled_on), t.priority DESC`)
+}
+
+// UpcomingDeadlines are the open tasks whose deadline falls within the next
+// `days` days, tomorrow through today+days: the warning ahead of a deadline,
+// like org-deadline-warning-days.
+// **Anything Today() already shows is left out**, so no task appears twice: a
+// deadline of today or earlier, or a scheduled date that has arrived. Someday
+// is excluded for the same reason it is excluded from Today().
+func (s *Service) UpcomingDeadlines(ctx context.Context, days int) ([]*Task, error) {
+	if days <= 0 {
+		return []*Task{}, nil
+	}
+	return s.tasks(ctx,
+		`WHERE t.state NOT IN ('done','dropped','filed','someday')
+		   AND t.deadline_on IS NOT NULL
+		   AND t.deadline_on >  `+sqlToday+`
+		   AND t.deadline_on <= date('now','localtime',?)
+		   AND NOT (t.scheduled_on IS NOT NULL AND t.scheduled_on <= `+sqlToday+`)
+		 ORDER BY t.deadline_on, t.priority DESC, t.id`, fmt.Sprintf("+%d days", days))
 }
 
 // WaitingOverdue are waiting-for items delegated more than a number of days

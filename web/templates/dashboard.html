@@ -21,11 +21,27 @@
 
     <div class="cols">
       <div>
+        {{/* Overdue is a deadline that has passed; a past scheduled date is
+             merely due. These are set apart at the top, in the warn color */}}
+        {{with $d.GTD.Overdue}}
+        <div class="col-block">
+          <div class="subhead">{{t "dash.overdue"}}</div>
+          <ul class="rows">
+            {{range .}}
+            <li><a href="/gtd/clarify/{{.ID}}">{{.Title}}</a>
+                <span class="tag warn">{{t "gtd.overdue_by" .DaysOverdue}}</span>
+                {{if and $.Set.Contexts .ContextName}}<span class="tag">{{.ContextName}}</span>{{end}}
+                <span class="when">{{t "gtd.deadline" .DeadlineOn}}</span></li>
+            {{end}}
+          </ul>
+        </div>
+        {{end}}
+
         <div class="col-block">
           <div class="subhead">{{t "dash.today"}}</div>
-          {{if $d.GTD.Today}}
+          {{with $d.GTD.DueToday}}
           <ul class="rows">
-            {{range $d.GTD.Today}}
+            {{range .}}
             <li><a href="/gtd/clarify/{{.ID}}">{{.Title}}</a>
                 {{if .DeadlineOn}}<span class="tag warn">{{t "gtd.deadline" .DeadlineOn}}</span>{{end}}
                 {{if and $.Set.Contexts .ContextName}}<span class="tag">{{.ContextName}}</span>{{end}}
@@ -34,6 +50,22 @@
           </ul>
           {{else}}<div class="empty">{{t "dash.today_empty"}}</div>{{end}}
         </div>
+
+        {{/* Deadlines ahead, like org-deadline-warning-days. Not urgent yet,
+             so no warn color; shown only when there are any */}}
+        {{if $d.GTD.Upcoming}}
+        <div class="col-block">
+          <div class="subhead">{{t "dash.upcoming" $d.GTD.WarningDays}}</div>
+          <ul class="rows">
+            {{range $d.GTD.Upcoming}}
+            <li><a href="/gtd/clarify/{{.ID}}">{{.Title}}</a>
+                <span class="tag">{{t "gtd.deadline" .DeadlineOn}}</span>
+                {{if and $.Set.Contexts .ContextName}}<span class="tag">{{.ContextName}}</span>{{end}}
+                <span class="when">{{if eq .DaysLeft 1}}{{t "gtd.due_tomorrow"}}{{else}}{{t "gtd.due_in" .DaysLeft}}{{end}}</span></li>
+            {{end}}
+          </ul>
+        </div>
+        {{end}}
 
         {{if $d.GTD.WaitingOverdue}}
         <div class="col-block">

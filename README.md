@@ -43,6 +43,7 @@ port = 7777
 db_path    = "~/.local/share/enghi/enghi.db"
 export_dir = "~/.local/share/enghi/export"
 revision_compact_minutes = 10   # re-edits within this window overwrite the last revision
+deadline_warning_days    = 7    # how many days ahead the dashboard shows a deadline
 
 files_db_path  = "~/.local/share/enghi/enghi-files.db"   # Tracks db_path if omitted
 backup_dir     = "~/.local/share/enghi/backup"

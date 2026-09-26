@@ -57,6 +57,14 @@ These are the available states on the clarify screen. **This distinction is the 
 
 **`later` and `someday` are different.** `later` means "committed, but not yet next," waiting in line inside a project. `someday` means "not committed." The former waits inside its project; the latter asks you "still not doing this?" at every review.
 
+## Dashboard — Today at a Glance {#dashboard}
+
+The dashboard (`g` `d`) opens with the state of your GTD system: the Inbox count, what is due today, stalled projects, and Waiting For items delegated more than a week ago.
+
+- **Overdue** comes first: tasks whose **deadline** has passed, with how many days late. A scheduled date that has passed is not overdue; the task simply shows up under Today.
+- **Today** lists tasks with a deadline or scheduled date of today or earlier.
+- **Deadlines in the next 7 days** gives warning before a deadline arrives: tomorrow through a week ahead, soonest first, with the days left. Nothing already under Today appears here, and Someday items are left out. Change the window with `deadline_warning_days` in `config.toml`.
+
 ## Next Actions — The Active List {#next}
 
 **This is the screen you will use most.** It holds only actions you can physically perform right now. `scheduled` tasks automatically appear here once their scheduled date arrives (no need to change their state manually).
