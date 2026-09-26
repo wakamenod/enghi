@@ -237,7 +237,7 @@ func TestDashboardTimeline(t *testing.T) {
 		t.Errorf("order: all-day %d, 09:00 %d, 16:00 %d", iHol, iStand, iRev)
 	}
 	for _, want := range []string{"data-timeline-live", `class="tl-now"`, "09:00–10:00", "all day",
-		`class="tag tl-cal">Work`, "/ui/calendar/events/"} {
+		`class="tag tl-cal" title="Work">Work`, "/ui/calendar/events/"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("dashboard lacks %q", want)
 		}

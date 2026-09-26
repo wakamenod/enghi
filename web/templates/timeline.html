@@ -26,7 +26,7 @@
   <span class="tl-time">{{if .AllDay}}{{t "cal.all_day"}}{{else}}{{.Time}}{{end}}</span>
   <span class="tl-title">{{.Title}}</span>
   {{if .Location}}<span class="tl-loc">{{.Location}}</span>{{end}}
-  {{if .Calendar}}<span class="tag tl-cal">{{.Calendar}}</span>{{end}}
+  {{if .Calendar}}<span class="tag tl-cal" title="{{.Calendar}}">{{.Calendar}}</span>{{end}}
   {{if .TaskID}}<a class="tag tl-task" href="/gtd/clarify/{{.TaskID}}">{{t "cal.task"}}</a>
   {{else}}<form method="post" action="/ui/calendar/events/{{.ID}}/task" class="inline-form tl-make">
     <button type="submit" class="link" title="{{t "cal.make_task_hint"}}">{{t "cal.make_task"}}</button>
