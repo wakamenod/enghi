@@ -369,7 +369,7 @@ func (s *Server) uiPatchTask(w http.ResponseWriter, r *http.Request) {
 		{"scheduled_on", &p.ScheduledOn}, {"deadline_on", &p.DeadlineOn},
 		{"waiting_for", &p.WaitingFor}, {"recurrence", &p.Recurrence},
 		{"recurrence_ends_on", &p.RecurrenceEndsOn}, {"energy", &p.Energy},
-		{"delegated_at", &p.DelegatedAt},
+		{"delegated_at", &p.DelegatedAt}, {"url", &p.URL},
 	} {
 		if r.Form.Has(f.name) {
 			v := r.FormValue(f.name)

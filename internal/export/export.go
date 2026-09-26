@@ -330,7 +330,7 @@ func exportTasks(ctx context.Context, db *store.DB, rewriteFiles func(string) (s
 	b.WriteString("# Tasks\n\n")
 	rows, err := db.QueryContext(ctx,
 		`SELECT t.id, t.title, t.state, COALESCE(c.name,''), COALESCE(t.scheduled_on,''),
-		        COALESCE(t.deadline_on,''), COALESCE(t.waiting_for,''), COALESCE(t.recurrence,'')
+		        COALESCE(t.deadline_on,''), COALESCE(t.waiting_for,''), COALESCE(t.recurrence,''), t.url
 		   FROM tasks t LEFT JOIN contexts c ON c.id = t.context_id
 		  ORDER BY t.state, t.sort_order, t.id`)
 	if err != nil {
@@ -339,8 +339,8 @@ func exportTasks(ctx context.Context, db *store.DB, rewriteFiles func(string) (s
 	defer rows.Close()
 	for rows.Next() {
 		var id int64
-		var title, state, ctxName, sched, dead, waiting, rec string
-		if err := rows.Scan(&id, &title, &state, &ctxName, &sched, &dead, &waiting, &rec); err != nil {
+		var title, state, ctxName, sched, dead, waiting, rec, link string
+		if err := rows.Scan(&id, &title, &state, &ctxName, &sched, &dead, &waiting, &rec, &link); err != nil {
 			return "", err
 		}
 		mark := " "
@@ -350,7 +350,7 @@ func exportTasks(ctx context.Context, db *store.DB, rewriteFiles func(string) (s
 		fmt.Fprintf(&b, "- [%s] %s (%s)", mark, title, state)
 		for _, kv := range [][2]string{
 			{"context", ctxName}, {"scheduled", sched}, {"deadline", dead},
-			{"waiting_for", waiting}, {"recurrence", rec},
+			{"waiting_for", waiting}, {"recurrence", rec}, {"url", link},
 		} {
 			if kv[1] != "" {
 				fmt.Fprintf(&b, " %s:%s", kv[0], kv[1])

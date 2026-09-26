@@ -258,6 +258,7 @@ func init() {
 		"clarify.as_action_note":     "Next Actions holds only single, physical actions you can do right now.",
 		"clarify.action_label":       "Action (start with a verb)",
 		"clarify.note":               "Notes",
+		"clarify.url":                "URL",
 		"clarify.state":              "Status",
 		"clarify.state_help":         "Help me choose",
 		"clarify.project":            "Project",

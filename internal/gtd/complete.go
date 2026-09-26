@@ -98,11 +98,11 @@ func (s *Service) Complete(ctx context.Context, id int64, skip bool) (*CompleteR
 		// **The generated instance is always state=scheduled.**
 		// Never next: a weekly:tue,fri bin day would sit in next actions forever.
 		ins, err := tx.ExecContext(ctx,
-			`INSERT INTO tasks(title, note, state, project_id, context_id, area_id,
+			`INSERT INTO tasks(title, note, url, state, project_id, context_id, area_id,
 			                   scheduled_on, energy, time_estimate, priority,
 			                   recurrence, series_id, recurrence_ends_on, sort_order)
-			 VALUES (?, ?, 'scheduled', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			cur.Title, cur.Note, cur.ProjectID, cur.ContextID, cur.AreaID,
+			 VALUES (?, ?, ?, 'scheduled', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			cur.Title, cur.Note, cur.URL, cur.ProjectID, cur.ContextID, cur.AreaID,
 			FormatDate(nextOn), nullIfEmpty(cur.Energy), cur.TimeEstimate, cur.Priority,
 			cur.Recurrence, seriesID, nullIfEmpty(cur.RecurrenceEndsOn), cur.SortOrder)
 		if err != nil {

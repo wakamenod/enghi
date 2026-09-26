@@ -57,6 +57,51 @@ func TestCaptureNeedsOnlyTitle(t *testing.T) {
 	}
 }
 
+// A URL in a captured title becomes the task's URL. A title that is only the
+// URL keeps it, and a URL given explicitly leaves the title alone.
+func TestCaptureTakesURLOutOfTitle(t *testing.T) {
+	s, _, _ := newSvc(t)
+	for _, c := range []struct{ title, url, wantTitle, wantURL string }{
+		{"記事を読む https://example.com/a?b=1", "", "記事を読む", "https://example.com/a?b=1"},
+		{"https://example.com/aを読む", "", "を読む", "https://example.com/a"},
+		{"見る: https://example.com/x. あとで", "", "見る: あとで", "https://example.com/x"},
+		{"https://example.com/", "", "https://example.com/", "https://example.com/"},
+		{"URLなし", "", "URLなし", ""},
+		{"比較 https://a.example", "https://b.example", "比較 https://a.example", "https://b.example"},
+	} {
+		tk, err := s.Capture(context.Background(), gtd.CaptureInput{Title: c.title, URL: c.url})
+		if err != nil {
+			t.Fatalf("Capture(%q): %v", c.title, err)
+		}
+		if tk.Title != c.wantTitle || tk.URL != c.wantURL {
+			t.Errorf("Capture(%q) = %q, %q; want %q, %q", c.title, tk.Title, tk.URL, c.wantTitle, c.wantURL)
+		}
+	}
+	if _, err := s.Capture(context.Background(), gtd.CaptureInput{Title: "x", URL: "ftp://example.com"}); err == nil {
+		t.Error("an ftp URL was accepted")
+	}
+}
+
+// Only http(s) is stored, since the `o' key hands the URL to the browser; an
+// empty string clears it.
+func TestPatchURL(t *testing.T) {
+	s, _, _ := newSvc(t)
+	tk := capture(t, s, "調べる")
+	tk = patch(t, s, tk.ID, gtd.TaskPatch{URL: str(" https://example.com/issue/1 ")})
+	if tk.URL != "https://example.com/issue/1" {
+		t.Fatalf("url = %q", tk.URL)
+	}
+	for _, bad := range []string{"javascript:alert(1)", "example.com", "file:///etc/passwd", "https://"} {
+		if _, err := s.Patch(context.Background(), tk.ID, gtd.TaskPatch{URL: str(bad)}); err == nil {
+			t.Errorf("url %q was accepted", bad)
+		}
+	}
+	tk = patch(t, s, tk.ID, gtd.TaskPatch{URL: str("")})
+	if tk.URL != "" {
+		t.Errorf("url = %q after clearing", tk.URL)
+	}
+}
+
 // 2.6: the condition selecting next actions is
 // state='next' OR (state='scheduled' AND scheduled_on <= today)。
 // **a query condition; there is no batch job rewriting state.**
@@ -151,6 +196,7 @@ func TestRecurringTaskGeneratesNextAsScheduled(t *testing.T) {
 		State:       str(gtd.StateScheduled),
 		ScheduledOn: str(gtd.FormatDate(gtd.Today())),
 		Recurrence:  str("weekly:tue,fri"),
+		URL:         str("https://example.com/garbage"),
 	})
 
 	res, err := s.Complete(ctx, tk.ID, false)
@@ -171,6 +217,9 @@ func TestRecurringTaskGeneratesNextAsScheduled(t *testing.T) {
 	}
 	if res.Next.Recurrence != "weekly:tue,fri" {
 		t.Errorf("recurrence was not carried over: %q", res.Next.Recurrence)
+	}
+	if res.Next.URL != "https://example.com/garbage" {
+		t.Errorf("url was not carried over: %q", res.Next.URL)
 	}
 	// The series must be followable
 	if res.Next.SeriesID == nil || *res.Next.SeriesID != tk.ID {

@@ -198,7 +198,8 @@ with `PUT /api/calendar/events`.
 ## Keyboard Shortcuts (Web UI)
 
 `/` Search · `g d`/`g w`/`g i`/`g n`/`g p` Navigation · `c` Quick capture ·
-`e` Edit · `j`/`k` List navigation · `Enter` Open · `Esc` Dismiss
+`e` Edit · `j`/`k` List navigation · `Enter` Open · `o` Open the task's URL ·
+`Esc` Dismiss
 
 ## Using from Claude Code
 

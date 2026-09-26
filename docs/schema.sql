@@ -202,7 +202,9 @@ CREATE TABLE tasks (
   version       INTEGER NOT NULL DEFAULT 1,
   completed_at  TEXT,
   created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
-  updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+  updated_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+  -- a link that goes with the task, http(s) only; `o' on a list opens it (0007)
+  url           TEXT    NOT NULL DEFAULT ''
 );
 CREATE INDEX idx_tasks_state     ON tasks(state, sort_order);
 CREATE INDEX idx_tasks_project   ON tasks(project_id, state);

@@ -385,7 +385,7 @@ func TestTaskRowsCarryMoveData(t *testing.T) {
 	mustJSON(t, h, "POST", "/api/projects", `{"title":"オフィス移転","outcome":"移転完了"}`)
 	mustJSON(t, h, "POST", "/api/tasks", `{"title":"返事待ち"}`)
 	mustJSON(t, h, "PATCH", "/api/tasks/1",
-		`{"state":"waiting","waiting_for":"田中さん","project_id":1}`)
+		`{"state":"waiting","waiting_for":"田中さん","project_id":1,"url":"https://example.com/q?a=1&b=2"}`)
 	mustJSON(t, h, "POST", "/api/tasks", `{"title":"ゴミ出し"}`)
 	mustJSON(t, h, "PATCH", "/api/tasks/2",
 		`{"state":"scheduled","scheduled_on":"2099-01-06","recurrence":"weekly:tue","recurrence_ends_on":"2099-12-31"}`)
@@ -405,6 +405,8 @@ func TestTaskRowsCarryMoveData(t *testing.T) {
 		`data-project-id="1"`, `data-project-title="オフィス移転"`, `data-context-id=""`,
 		`data-waiting-for="田中さん"`, `data-scheduled-on=""`, `data-recurrence=""`,
 		`data-delegated-at="` + gtd.FormatDate(gtd.Today()) + `"`, `data-version="2"`,
+		`data-url="https://example.com/q?a=1&amp;b=2"`,
+		`<a class="tag" href="https://example.com/q?a=1&amp;b=2" target="_blank" rel="noopener noreferrer"`,
 		`<a class="task-title" href="/gtd/clarify/1">`,
 		`<a class="row-detail" href="/gtd/clarify/1">`,
 	} {
@@ -442,6 +444,23 @@ func TestMoveTaskByFormPost(t *testing.T) {
 	}
 	if got := state(); got["state"] != "waiting" || got["waiting_for"] != "X" {
 		t.Errorf("after waiting: %v", got)
+	}
+
+	// Clarify sends url; an empty one clears it
+	if got := form("url=https%3A%2F%2Fexample.com%2F1"); got != http.StatusSeeOther {
+		t.Fatalf("url → %d", got)
+	}
+	if got := state(); got["url"] != "https://example.com/1" {
+		t.Errorf("after url: %v", got)
+	}
+	if got := form("url=javascript%3Aalert(1)"); got != http.StatusBadRequest {
+		t.Errorf("url=javascript: → %d, want 400", got)
+	}
+	if got := form("url="); got != http.StatusSeeOther {
+		t.Fatalf("url= → %d", got)
+	}
+	if got := state(); got["url"] != nil {
+		t.Errorf("after clearing url: %v", got["url"])
 	}
 
 	// The date is required; the task must stay as it was
