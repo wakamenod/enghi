@@ -360,6 +360,8 @@ function repeatPicker(date, recurrence, endsOn) {
 // DESIGN 6: the keyboard is a first-class way to drive this.
 //   /            ... focus the search box
 //   g d/w/i/n/p  ... dashboard / wiki / inbox / next / projects
+//   g l          ... the day page (today's work record)
+//   [ / ] / t    ... on the day page: previous / next day / today
 //   e            ... edit the article on screen
 //   j / k        ... move within a list; Enter opens
 //   u            ... undo the last move, while its toast is up
@@ -851,7 +853,8 @@ function repeatPicker(date, recurrence, endsOn) {
     if (pendingG) {
       pendingG = false;
       clearTimeout(gTimer);
-      var dest = { d: '/', w: '/wiki', i: '/gtd/inbox', n: '/gtd/next', p: '/gtd/projects' }[ev.key];
+      var dest = { d: '/', w: '/wiki', i: '/gtd/inbox', n: '/gtd/next', p: '/gtd/projects',
+                   l: '/gtd/day' }[ev.key];
       if (dest) { ev.preventDefault(); window.location.assign(dest); return; }
     }
 
@@ -879,6 +882,16 @@ function repeatPicker(date, recurrence, endsOn) {
         ev.preventDefault(); moveCursor(-1); break;
       case 'u':
         if (undoToast) { ev.preventDefault(); runUndo(); }
+        break;
+      // The day page's links carry data-key; elsewhere these keys do nothing.
+      // t renames the task under the cursor first, where there is one.
+      case '[':
+      case ']':
+      case 't':
+        if (ev.key === 't' && taskKey('t')) { ev.preventDefault(); break; }
+        var nav = document.querySelector('a[data-key="' +
+          { '[': 'prev-day', ']': 'next-day', t: 'today' }[ev.key] + '"]');
+        if (nav) { ev.preventDefault(); window.location.assign(nav.getAttribute('href')); }
         break;
       default:
         if (taskKey(ev.key)) ev.preventDefault();
@@ -1277,3 +1290,35 @@ document.querySelectorAll('textarea[data-wikilink]').forEach(function (ta) {
     }
   });
 });
+
+// ---------------------------------------------------------------- the day page
+//
+// "Copy as Markdown" copies the text the server rendered into a hidden
+// textarea, the same text /api/day?format=markdown answers. The Clipboard API
+// is missing in some embedded browsers (the Emacs xwidget) and outside secure
+// contexts, so the fallback shows the text selected, tries execCommand, and
+// otherwise asks for a manual copy.
+
+(function () {
+  document.addEventListener('click', function (ev) {
+    var btn = ev.target.closest && ev.target.closest('button[data-copy]');
+    if (!btn) return;
+    var ta = document.getElementById(btn.getAttribute('data-copy'));
+    if (!ta) return;
+    var status = btn.parentNode.querySelector('[data-copy-status]');
+    function say(key) { if (status) status.textContent = t(key); }
+    function fallback() {
+      ta.hidden = false;
+      ta.focus();
+      ta.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) {}
+      say(ok ? 'day.copied' : 'day.copy_manual');
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext) {
+      navigator.clipboard.writeText(ta.value).then(function () { say('day.copied'); }, fallback);
+    } else {
+      fallback();
+    }
+  });
+})();

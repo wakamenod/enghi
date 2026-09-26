@@ -1,6 +1,6 @@
 ---
 name: enghi
-description: Use the user's local enghi wiki and GTD system. Use when the user wants to capture something for later ("add to my inbox", "remind me to", "後でやる", "Inbox に入れて"), save notes or a design decision as a wiki page ("write this up in the wiki", "wiki にまとめて", "メモしておいて"), look up something they wrote before ("my notes on X", "前に書いた○○のメモ"), keep a work log on a task ("log what I did on X", "作業ログに残して"), or get help with GTD: planning the day ("what should I do today", "今日やること", "朝の確認"), clarifying the inbox, the weekly review ("週次レビュー"), stalled projects, next actions, waiting-for items.
+description: Use the user's local enghi wiki and GTD system. Use when the user wants to capture something for later ("add to my inbox", "remind me to", "後でやる", "Inbox に入れて"), save notes or a design decision as a wiki page ("write this up in the wiki", "wiki にまとめて", "メモしておいて"), look up something they wrote before ("my notes on X", "前に書いた○○のメモ"), keep a work log on a task ("log what I did on X", "作業ログに残して"), write a daily report from what was done ("write today's report", "日報を書いて", "今日やったこと"), or get help with GTD: planning the day ("what should I do today", "今日やること", "朝の確認"), clarifying the inbox, the weekly review ("週次レビュー"), stalled projects, next actions, waiting-for items.
 ---
 
 # enghi
@@ -131,6 +131,8 @@ Reading:
 | `GET /api/tasks?state=inbox` | Tasks by state, as `{"tasks": [...]}`; `state=next_actions` gives the Next Actions view |
 | `GET /api/tasks/<id>` | One task and the pages it links to. `working: true` means it has been started and not paused |
 | `GET /api/tasks/<id>/logs` | The task's work log, oldest first, as `{"working": ..., "logs": [...]}` |
+| `GET /api/day?date=YYYY-MM-DD` | One day's work record (today by default); see "The daily report" |
+| `GET /api/days?month=YYYY-MM` | Per-day counts for a month, `{"days": {"2026-09-26": {"done", "dropped", "logs"}}}`; days with nothing are absent |
 | `GET /api/projects?status=active` | Projects (`active`, `someday`, `done`, `dropped`) |
 | `GET /api/projects/stalled` | Active projects with no next action |
 | `GET /api/projects/<id>` | A project, its tasks and linked pages |
@@ -224,6 +226,52 @@ enghi has no "today" list, so the picks stay in the conversation; do not change 
 record them. Completing, moving or rewriting tasks follows the usual rule: propose, then
 write after the user agrees. Leave stalled projects for the weekly review unless the user
 asks.
+
+### The daily report
+
+For "write today's report", "日報を書いて", "what did I do yesterday" and the like: a short
+report of one day's work, drawn from the work record. The user sees the same day at
+`http://127.0.0.1:7777/gtd/day/YYYY-MM-DD`.
+
+```sh
+curl -s 'http://127.0.0.1:7777/api/day?date=2026-09-26' | jq '{date, weekday,
+  done:    [.done[]    | {title: .task.title, project: .task.project_title, completed_at, logs}],
+  working: [.working[] | {title: .task.title, project: .task.project_title, since, logs}],
+  worked:  [.worked[]  | {title: .task.title, project: .task.project_title, logs}],
+  dropped: [.dropped[] | {title: .task.title, completed_at}]}'
+```
+
+Leave out `date` for today. A day is the user's **local** calendar day.
+
+- `done` — completed that day. `working` — started and not paused at the end of the day
+  (for today: still in progress now). `worked` — anything else with a log entry that day.
+  `dropped` — dropped or skipped that day.
+- `logs` are only that day's entries of the task's work log, oldest first: `kind` is
+  `note`, `start` or `pause`, and `body` is raw Markdown (may be empty for start/pause).
+- **The day's own times — `completed_at`, `since`, each log's `created_at` — are ISO 8601
+  in local time with the offset** (`2026-09-26T14:05:00+09:00`); `timezone` names the zone.
+  The embedded `task` object keeps the API's usual UTC `YYYY-MM-DD HH:MM:SS` fields; do
+  not mix the two when quoting times.
+- `format=markdown` gives the same day as plain Markdown (what the page's copy button
+  copies), if the user wants the raw record rather than a report.
+
+1. Fetch the day. If it is empty, say so in one line; do not pad the report.
+2. Write a short report **in the language the user is speaking**:
+   - **Done** — what was finished.
+   - **In progress** — what is under way and where it stands, from the latest log entries.
+   - **Findings and decisions** — anything notable in the log bodies: causes found,
+     numbers, choices made and why. Quote sparingly; summarise.
+   - **Next** — what comes next, from the last entries of in-progress tasks and the
+     next actions of the projects involved. Do not invent plans the log does not support.
+   Keep it to what a colleague would read in a minute. Link pages the logs mention with
+   `[[Page title]]`.
+3. **Show it in the conversation first.** That is the report; stop here unless asked.
+4. Only if the user asks to save it: a wiki page titled `日報 YYYY-MM-DD` with tag `日報`
+   (in English, `Daily report YYYY-MM-DD` with tag `daily-report`), following "Write a
+   wiki page" above — show the final text and wait for the go-ahead. If the create answers
+   `409 title_conflict`, the day already has a report: read it from `conflicting_page`,
+   show what would change, and on the go-ahead `PUT` it with the `version` you read, as in
+   "Update an existing page". **Never overwrite it blindly.**
 
 ### The weekly review
 

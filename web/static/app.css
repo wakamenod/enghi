@@ -800,3 +800,83 @@ textarea.log-body { min-height: 8em; }
 .log-composer { margin-top: var(--sp-4); }
 .log-composer .actions { margin-top: var(--sp-2); }
 .log-composer .actions .meta { margin: 0; }
+
+/* ---- the day page (/gtd/day) ---- */
+
+.day-wd { color: var(--fg-muted); font-weight: 500; }
+.day-nav { display: flex; gap: var(--sp-3); align-items: center; flex-wrap: wrap; }
+.day-nav > span:first-child { color: var(--fg-muted); }
+.day-jump { display: inline-flex; gap: var(--sp-2); align-items: center; margin-left: auto; }
+.day-jump input[type=date] { font-family: var(--mono); font-size: var(--fs-2); padding: 2px var(--sp-2); }
+.day-jump button { font-size: var(--fs-2); padding: 2px var(--sp-3); }
+
+/* The groups on the left, the month on the right; stacked when narrow */
+.day-layout { display: grid; grid-template-columns: minmax(0, 1fr) 232px; gap: var(--sp-6); margin-top: var(--sp-5); }
+.day-main > section.panel:first-child, .day-main > .empty:first-child { margin-top: 0; }
+.day-main > .empty:first-child + section.panel { margin-top: var(--sp-4); }
+@media (max-width: 720px) {
+  .day-layout { grid-template-columns: 1fr; }
+  .day-cal { order: -1; }
+}
+
+/* A task row carries the day's entries under it, full width */
+ul.rows.day-tasks li { flex-wrap: wrap; }
+ul.rows.day-tasks li:hover { background: none; }
+ul.rows.day-tasks li.cur { background: var(--bg-hover); }
+.day-time {
+  color: var(--fg-muted); font-size: var(--fs-2); font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+.day-logs { flex-basis: 100%; padding-left: var(--sp-4); border-left: 1px solid var(--border); margin: var(--sp-1) 0 var(--sp-1) var(--sp-1); }
+.day-logs .log-entry { padding: var(--sp-2) 0; }
+/* The row rules (ul.rows li, ul.rows a) are descendant selectors and would
+   reach the lists and links in an entry's prose; put those back */
+ul.rows .day-logs li {
+  display: list-item; position: static; padding: 0; border-radius: 0;
+  line-height: inherit; gap: 0;
+}
+ul.rows .day-logs li:hover { background: none; }
+ul.rows .day-logs li + li::before { content: none; }
+ul.rows .day-logs .prose a { text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; }
+/* Inside a row, .when would be pushed right like the row's own */
+.day-logs .log-head .when { margin-left: 0; }
+.day-logs .log-mark { padding: 2px 0; }
+.day-logs .prose { font-size: var(--fs-5); }
+
+/* Dropped is folded, and reads as a quiet footnote to the day */
+details.day-dropped { margin-top: var(--sp-6); padding-top: var(--sp-4); border-top: 1px solid var(--border); }
+details.day-dropped > summary {
+  cursor: pointer; font-size: var(--fs-2); font-weight: 600; letter-spacing: var(--tracking-label);
+  text-transform: uppercase; color: var(--fg-faint);
+}
+details.day-dropped[open] > summary { margin-bottom: var(--sp-2); }
+details.day-dropped ul.rows a { color: var(--fg-muted); }
+
+.day-copy { margin-top: var(--sp-6); }
+textarea.day-md { width: 100%; min-height: 16em; margin-top: var(--sp-3); font-family: var(--mono); font-size: var(--fs-2); }
+
+/* The month. A dot marks a day with anything recorded; the accent is state */
+.day-cal { font-size: var(--fs-2); }
+.cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-2); }
+.cal-head a { color: var(--fg-muted); text-decoration: none; padding: 0 var(--sp-2); font-size: var(--fs-4); }
+.cal-head a:hover { color: var(--fg); }
+.cal-month { font-family: var(--mono); color: var(--fg-muted); }
+table.cal { width: 100%; border-collapse: collapse; table-layout: fixed; }
+table.cal th { font-weight: 500; color: var(--fg-faint); padding: 2px 0; text-align: center; }
+table.cal td { padding: 1px; text-align: center; }
+table.cal td a {
+  position: relative; display: block; padding: 5px 0 7px; border-radius: var(--r-sm);
+  color: var(--fg); text-decoration: none; font-family: var(--mono); font-variant-numeric: tabular-nums;
+}
+table.cal td a:hover { background: var(--bg-hover); }
+table.cal td.out a { color: var(--fg-faint); }
+table.cal td.today a { box-shadow: inset 0 0 0 1px var(--border-strong); }
+table.cal td.sel a { background: var(--bg-sunken); font-weight: 650; box-shadow: inset 0 0 0 1px var(--accent); }
+table.cal .dot {
+  position: absolute; left: 50%; bottom: 2px; width: 4px; height: 4px; margin-left: -2px;
+  border-radius: 50%; background: var(--accent);
+}
+.day-cal > .meta { margin-top: var(--sp-3); }
+
+/* The week's day links on the Weekly Review */
+.day-links { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-3); margin-bottom: var(--sp-3); }

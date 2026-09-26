@@ -98,6 +98,8 @@
 <div class="cols">
 <section class="panel" id="review_past_calendar">
   <h2>{{t "review.last_week"}}</h2>
+  <div class="meta day-links">{{t "review.by_day"}}:
+    {{range $d.PastDays}}<a href="/gtd/day/{{.Date}}">{{.Label}}</a> {{end}}</div>
   {{if $d.CompletedLastWeek}}
   <ul class="rows">
     {{range $d.CompletedLastWeek}}

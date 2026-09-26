@@ -1,0 +1,111 @@
+{{template "head" .}}
+{{$d := .Data}}
+<h1>{{$d.Date}} <span class="day-wd">({{$d.Weekday}})</span>{{template "help" "enghi#day"}}</h1>
+<div class="meta day-nav">
+  <span>{{t "day.title"}}</span>
+  <a href="/gtd/day/{{$d.Prev}}" data-key="prev-day">{{t "day.prev"}}</a>
+  {{if not $d.IsToday}}<a href="/gtd/day" data-key="today">{{t "day.today"}}</a>{{end}}
+  <a href="/gtd/day/{{$d.Next}}" data-key="next-day">{{t "day.next"}}</a>
+  <form method="get" action="/gtd/day" class="day-jump">
+    <input type="date" name="date" value="{{$d.Date}}" aria-label="{{t "day.jump"}}">
+    <button type="submit">{{t "day.go"}}</button>
+  </form>
+</div>
+
+<div class="day-layout">
+<div class="day-main">
+  {{/* Top to bottom. Calendar events for the day are meant to go here, above
+       the groups, as a section of their own. */}}
+
+  {{if $d.Empty}}
+  <div class="empty">{{t "day.empty"}}</div>
+  {{end}}
+
+  {{with $d.Done}}
+  <section class="panel" id="done">
+    <h2>{{t "day.done"}} <span class="count">{{len .}}</span></h2>
+    <ul class="rows day-tasks">{{range .}}{{template "day_task" .}}{{end}}</ul>
+  </section>
+  {{end}}
+
+  {{with $d.Working}}
+  <section class="panel" id="working">
+    <h2>{{t "day.working"}} <span class="count">{{len .}}</span></h2>
+    {{if not $d.IsToday}}<div class="meta">{{t "day.working_note"}}</div>{{end}}
+    <ul class="rows day-tasks">{{range .}}{{template "day_task" .}}{{end}}</ul>
+  </section>
+  {{end}}
+
+  {{with $d.Worked}}
+  <section class="panel" id="worked">
+    <h2>{{t "day.worked"}} <span class="count">{{len .}}</span></h2>
+    <ul class="rows day-tasks">{{range .}}{{template "day_task" .}}{{end}}</ul>
+  </section>
+  {{end}}
+
+  {{/* Dropped, skipped recurring instances included, stays folded: it is
+       rarely what the day is about */}}
+  {{with $d.Dropped}}
+  <details class="panel day-dropped" id="dropped">
+    <summary>{{t "day.dropped"}} <span class="count">{{len .}}</span></summary>
+    <ul class="rows day-tasks">{{range .}}{{template "day_task" .}}{{end}}</ul>
+  </details>
+  {{end}}
+
+  {{if not $d.Empty}}
+  <div class="actions day-copy">
+    <button type="button" data-copy="day-md">{{t "day.copy"}}</button>
+    <span class="meta" data-copy-status role="status"></span>
+  </div>
+  <textarea id="day-md" class="day-md" readonly hidden>{{$d.Markdown}}</textarea>
+  {{end}}
+</div>
+
+<aside class="day-cal">
+  {{with $d.Calendar}}
+  <div class="cal-head">
+    <a href="/gtd/day/{{$d.Date}}?month={{.PrevMonth}}" title="{{t "day.prev_month"}}" aria-label="{{t "day.prev_month"}}">‹</a>
+    <span class="cal-month">{{.Month}}</span>
+    <a href="/gtd/day/{{$d.Date}}?month={{.NextMonth}}" title="{{t "day.next_month"}}" aria-label="{{t "day.next_month"}}">›</a>
+  </div>
+  <table class="cal">
+    <thead><tr>{{range .Weekdays}}<th>{{.}}</th>{{end}}</tr></thead>
+    <tbody>
+      {{range .Weeks}}<tr>
+        {{range .}}<td class="{{if not .InMonth}}out{{end}}{{if .Selected}} sel{{end}}{{if .Today}} today{{end}}"><a href="/gtd/day/{{.Date}}"{{if .Title}} title="{{.Title}}"{{end}}{{if .Selected}} aria-current="date"{{end}}>{{.Day}}{{if .Active}}<span class="dot" aria-hidden="true"></span>{{end}}</a></td>{{end}}
+      </tr>{{end}}
+    </tbody>
+  </table>
+  {{end}}
+  <div class="meta">{{t "day.keys"}}</div>
+</aside>
+</div>
+{{template "foot" .}}
+
+{{/* One task on the day, with that day's entries of its log under it */}}
+{{define "day_task"}}
+<li>
+  {{if .Time}}<span class="day-time">{{.Time}}</span>{{end}}
+  <a class="day-title" href="/gtd/clarify/{{.Task.ID}}">{{.Task.Title}}</a>
+  {{if .Task.Working}}<a class="tag working" href="/gtd/clarify/{{.Task.ID}}#log">{{t "gtd.working"}}</a>{{end}}
+  {{if .Task.ProjectTitle}}<a class="tag" href="/gtd/project/{{.Task.ProjectID}}">{{.Task.ProjectTitle}}</a>{{end}}
+  <span class="when">{{if .Since}}{{t "day.since" .Since}}{{end}}{{if and .Since .Logs}} · {{end}}{{if .Logs}}{{t "day.entries" (len .Logs)}}{{end}}</span>
+  {{if .Logs}}
+  <div class="day-logs">
+    {{range .Logs}}
+    {{if eq .Kind "note"}}
+    <div class="log-entry">
+      <div class="log-head"><a class="when" href="/gtd/clarify/{{.TaskID}}#log-{{.ID}}">{{.Time}}</a></div>
+      <div class="prose">{{.HTML}}</div>
+    </div>
+    {{else}}
+    <div class="log-entry log-mark">
+      <div class="log-head"><a class="when" href="/gtd/clarify/{{.TaskID}}#log-{{.ID}}">{{if eq .Kind "start"}}{{t "log.started" .Time}}{{else}}{{t "log.paused" .Time}}{{end}}</a></div>
+      {{if .HTML}}<div class="prose">{{.HTML}}</div>{{end}}
+    </div>
+    {{end}}
+    {{end}}
+  </div>
+  {{end}}
+</li>
+{{end}}

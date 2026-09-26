@@ -473,7 +473,8 @@ func TestDatesFollowLocalCalendar(t *testing.T) {
 		t.Skip("already running in a child")
 	}
 	const tests = `^(TestScheduledTaskAppearsInNextActionsWhenDue|TestWaitingGetsDelegatedAt|` +
-		`TestTodayIncludesDeadlineOfToday|TestSomedayDueReview|TestUpcomingDeadlines|TestLogDayFollowsLocalCalendar)$`
+		`TestTodayIncludesDeadlineOfToday|TestSomedayDueReview|TestUpcomingDeadlines|TestLogDayFollowsLocalCalendar|` +
+		`TestDay.*|TestMonthActivity|TestWorkingNow)$`
 	for _, tz := range []string{"Etc/GMT-14", "Etc/GMT+12"} {
 		cmd := exec.Command(os.Args[0], "-test.run="+tests, "-test.count=1")
 		cmd.Env = append(os.Environ(), "TZ="+tz, "ENGHI_TZ_CHILD=1")

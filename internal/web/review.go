@@ -23,6 +23,8 @@ type ReviewData struct {
 	NextActions []*gtd.Task    `json:"next_actions"`
 	// review_past_calendar
 	CompletedLastWeek []*gtd.Task `json:"completed_last_week"`
+	// The same week, a link to each day's work record. Screen only.
+	PastDays []reviewDay `json:"-"`
 	// review_upcoming_calendar
 	Upcoming []*gtd.Task `json:"upcoming"`
 	// review_waiting_for
@@ -33,6 +35,12 @@ type ReviewData struct {
 	SomedayDue []*gtd.Project `json:"someday_due_review"`
 	// review_recurring - the list of recurring series (DESIGN 2.6)
 	Series []gtd.Series `json:"series"`
+}
+
+// reviewDay is one day of the past week, linking to /gtd/day/{date}.
+type reviewDay struct {
+	Date  string
+	Label string
 }
 
 // ChecklistItem is a checklist item as displayed.
@@ -74,6 +82,11 @@ func (s *Server) reviewData(ctx context.Context, lang i18n.Lang) (*ReviewData, e
 	lastWeek := gtd.FormatDate(today.AddDate(0, 0, -7))
 	if d.CompletedLastWeek, err = s.gtd.CompletedBetween(ctx, lastWeek, gtd.FormatDate(today)); err != nil {
 		return nil, err
+	}
+	for i := 7; i >= 0; i-- {
+		day := today.AddDate(0, 0, -i)
+		d.PastDays = append(d.PastDays, reviewDay{Date: gtd.FormatDate(day),
+			Label: day.Format("01/02") + " " + i18n.T(lang, dayWeekdayKeys[day.Weekday()])})
 	}
 	// The next two weeks
 	if d.Upcoming, err = s.gtd.UpcomingBetween(ctx,

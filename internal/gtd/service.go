@@ -180,11 +180,22 @@ func (s *Service) QueryTasks(ctx context.Context, q TaskQuery) ([]*Task, error) 
 }
 
 // CompletedBetween are the tasks completed in a period, for the weekly
-// review's look back at last week.
+// review's look back at last week. from and to are local dates, both
+// included; completed_at is UTC, so they are turned into a UTC range first.
 func (s *Service) CompletedBetween(ctx context.Context, from, to string) ([]*Task, error) {
+	f, err := ParseDay(from)
+	if err != nil {
+		return nil, err
+	}
+	t, err := ParseDay(to)
+	if err != nil {
+		return nil, err
+	}
+	lo, _ := DayBounds(f)
+	_, hi := DayBounds(t)
 	return s.tasks(ctx,
-		`WHERE t.completed_at IS NOT NULL AND date(t.completed_at) >= ? AND date(t.completed_at) <= ?
-		 ORDER BY t.completed_at DESC`, from, to)
+		`WHERE t.completed_at >= ? AND t.completed_at < ?
+		 ORDER BY t.completed_at DESC`, lo, hi)
 }
 
 // UpcomingBetween are the upcoming scheduled dates and deadlines.

@@ -212,6 +212,8 @@ CREATE INDEX idx_tasks_deadline  ON tasks(deadline_on)  WHERE deadline_on  IS NO
 CREATE INDEX idx_tasks_series    ON tasks(series_id)     WHERE series_id    IS NOT NULL;
 -- Keep at most one open instance per series; never generate ahead (DESIGN.md 2.6).
 CREATE INDEX idx_tasks_recurring ON tasks(recurrence)    WHERE recurrence   IS NOT NULL;
+-- the day page: tasks completed or dropped within a day (0004)
+CREATE INDEX idx_tasks_completed ON tasks(completed_at)  WHERE completed_at IS NOT NULL;
 
 -- Weekly Review. No wizard: one screen with a checklist on it.
 CREATE TABLE reviews (
@@ -243,6 +245,8 @@ CREATE TABLE task_logs (
   updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX idx_task_logs_task ON task_logs(task_id, created_at);
+-- the day page: entries written within a day, a pure time range (0004)
+CREATE INDEX idx_task_logs_created ON task_logs(created_at);
 
 -- ============================================================
 -- Full-text search

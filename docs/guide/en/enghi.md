@@ -171,6 +171,25 @@ Every task has a **work log** at the bottom of its clarify screen: timestamped e
 
 The log is included in search, labeled "Log"; when several entries of one task match, only its best one is shown. Entries can be edited or deleted, and deleting a Start or Pause takes back a mistaken press. There is no revision history for entries—an edit overwrites.
 
+## Work Record — What You Did Each Day {#day}
+
+The **work record** shows one day's work. Open it with `g` `l`, or with "Today's work →" on the dashboard. It lists the tasks you finished and the tasks you worked on, each with the work-log entries you wrote that day.
+
+It opens on today. To see another day, pick a date in the month calendar on the right, or press `[` and `]` for the previous and next day. Press `t` to come back to today, or type a date in the date field. Days with anything recorded have a dot in the calendar.
+
+A day has four groups:
+
+- **Done** — tasks completed that day, with the time. If you reopen a task later, it no longer appears here.
+- **In progress** — tasks you had started and not paused by the end of the day. For today, these are the tasks you are working on now. For a past day, enghi works them out from the Start and Pause entries.
+- **Worked on** — any other task with a log entry written that day.
+- **Dropped** — tasks dropped that day, including skipped recurring occurrences. This group starts folded.
+
+"Copy as Markdown" copies the day as plain Markdown, ready to paste into a report or a chat. Where the browser can't copy, such as inside Emacs, the text appears selected so you can copy it by hand.
+
+The same data is available at `/api/day?date=YYYY-MM-DD`. It returns JSON, or Markdown with `&format=markdown`. When you ask the Claude Code skill for a daily report, it reads this to write a draft.
+
+The dashboard also lists the tasks you are working on now, and the Weekly Review links to the work record of each day of the past week.
+
 ## Wiki Integration {#wiki}
 
 GTD and the wiki are independent. **The wiki works fully without touching GTD**, and vice versa.
@@ -192,11 +211,14 @@ They connect in only three places:
 | `g` `n` | Next Actions |
 | `g` `p` | Projects |
 | `g` `w` | Articles |
+| `g` `l` | Today's work record |
 | `j` / `k` | Move down / up a list |
 | `Enter` | Open the selected item; on a task, choose where to move it (so does clicking its title) |
 | `u` | Undo the last move, while its notice is shown at the bottom of the screen |
 | `p` | Start or pause work on the selected task |
 | `e` | Edit the article |
+| `[` / `]` | Work record: previous / next day |
+| `t` | Work record: back to today. With a task selected, rename it |
 
 ## Terminology {#glossary}
 
