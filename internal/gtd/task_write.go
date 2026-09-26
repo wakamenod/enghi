@@ -131,17 +131,29 @@ func (s *Service) Patch(ctx context.Context, id int64, p TaskPatch) (*Task, erro
 				return fmt.Errorf("invalid state: %q", *p.State)
 			}
 			b.Set("state", *p.State)
+			// completed_at and delegated_at belong to the state that set them.
+			// Leaving it clears them, so a task put back (say, by Undo) does not
+			// count as completed in the review, and a later move to waiting
+			// starts counting days afresh.
 			switch *p.State {
 			case StateDone, StateDropped:
 				if cur.CompletedAt == "" {
 					b.Raw("completed_at = datetime('now')")
 				}
-			case StateWaiting:
+			default:
+				if cur.CompletedAt != "" {
+					b.Raw("completed_at = NULL")
+				}
+			}
+			switch {
+			case *p.State == StateWaiting:
 				// Without a delegation date, use today; the days-elapsed warning
 				// needs it
-				if cur.DelegatedAt == "" && p.DelegatedAt == nil {
+				if (cur.DelegatedAt == "" || cur.State != StateWaiting) && p.DelegatedAt == nil {
 					b.Raw("delegated_at = " + sqlToday)
 				}
+			case cur.DelegatedAt != "" && p.DelegatedAt == nil:
+				b.Raw("delegated_at = NULL")
 			}
 		}
 		if p.ProjectID != nil {
