@@ -31,7 +31,7 @@ Then update `url` and `sha256` in `packaging/homebrew/enghi.rb`, and copy the re
 
 **Before tagging, re-sign the calendar shortcut and commit it.** The signature carries an
 Apple certificate that expires about a year after signing. The current one expires on
-2027-10-20. A shortcut with an expired certificate no longer imports. Signing contacts
+2027-10-26. A shortcut with an expired certificate no longer imports. Signing contacts
 Apple and needs a Mac signed into iCloud:
 
 ```sh
