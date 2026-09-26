@@ -1,6 +1,6 @@
 ---
 name: enghi
-description: Use the user's local enghi wiki and GTD system. Use when the user wants to capture something for later ("add to my inbox", "remind me to", "後でやる", "Inbox に入れて"), save notes or a design decision as a wiki page ("write this up in the wiki", "wiki にまとめて", "メモしておいて"), look up something they wrote before ("my notes on X", "前に書いた○○のメモ"), or get help with GTD: planning the day ("what should I do today", "今日やること", "朝の確認"), clarifying the inbox, the weekly review ("週次レビュー"), stalled projects, next actions, waiting-for items.
+description: Use the user's local enghi wiki and GTD system. Use when the user wants to capture something for later ("add to my inbox", "remind me to", "後でやる", "Inbox に入れて"), save notes or a design decision as a wiki page ("write this up in the wiki", "wiki にまとめて", "メモしておいて"), look up something they wrote before ("my notes on X", "前に書いた○○のメモ"), keep a work log on a task ("log what I did on X", "作業ログに残して"), or get help with GTD: planning the day ("what should I do today", "今日やること", "朝の確認"), clarifying the inbox, the weekly review ("週次レビュー"), stalled projects, next actions, waiting-for items.
 ---
 
 # enghi
@@ -102,7 +102,9 @@ curl -s http://127.0.0.1:7777/api/pages/<slug> | jq '{title, tags, body, links, 
 
 - Search matches titles, aliases, tags and bodies, Japanese included. Try a couple of
   wordings before concluding there is nothing.
-- Leave out `kind` to search projects, tasks and areas as well.
+- Leave out `kind` to search projects, tasks, task work logs and areas as well. A `log`
+  result is one entry of a task's work log: `title` is the task's, `task_id` says which
+  task, and `id` is the entry.
 - `links` and `backlinks` lead to related pages; follow them when the first page is not
   the whole story.
 - If several pages could be the one meant, list them and ask.
@@ -127,7 +129,8 @@ Reading:
 | `GET /api/dashboard` | Today at a glance: `gtd.today`, `gtd.inbox_count`, `gtd.waiting_overdue`, `gtd.stalled_projects` |
 | `GET /api/review` | Everything the weekly review needs, in one call (see below) |
 | `GET /api/tasks?state=inbox` | Tasks by state, as `{"tasks": [...]}`; `state=next_actions` gives the Next Actions view |
-| `GET /api/tasks/<id>` | One task and the pages it links to |
+| `GET /api/tasks/<id>` | One task and the pages it links to. `working: true` means it has been started and not paused |
+| `GET /api/tasks/<id>/logs` | The task's work log, oldest first, as `{"working": ..., "logs": [...]}` |
 | `GET /api/projects?status=active` | Projects (`active`, `someday`, `done`, `dropped`) |
 | `GET /api/projects/stalled` | Active projects with no next action |
 | `GET /api/projects/<id>` | A project, its tasks and linked pages |
@@ -143,8 +146,39 @@ exception):
 | `POST /api/tasks/<id>/file` | File an inbox item as a wiki page: `{title, body, tags}` |
 | `POST /api/tasks` | New task: `{title, note, state}`. To put it in a project, `PATCH` it with `project_id` afterwards |
 | `POST /api/projects` / `PATCH /api/projects/<id>` | `{title, outcome, status}` |
+| `POST /api/tasks/<id>/logs` | Append to the work log: `{body}` for a note, `{kind: "start"}` / `{kind: "pause"}` with an optional `body` comment |
+| `PATCH /api/task-logs/<id>` | Rewrite an entry: `{body, version}` |
+| `DELETE /api/task-logs/<id>` | Remove an entry |
 
 A task or project `409` works like a page one: re-read, redo, confirm.
+
+### Log work on a task
+
+Each task keeps a **work log**: timestamped Markdown entries recording what was tried,
+what was found and what was decided. It is where the running record of the work goes;
+the task's `note` stays a one-line reminder. For "log what I did on X", "作業ログに残して"
+and the like — including at the end of a work session on something that has a task:
+
+1. Find the task: `GET /api/tasks?state=next_actions`, or search with `kind=task`. If
+   more than one could be meant, ask.
+2. Draft the entry for the user reading it weeks later: what was done, what was found
+   (error messages, numbers, commands), what was decided and why, what is left. Link
+   pages with `[[Page title]]`. Do not repeat what earlier entries already say
+   (`GET /api/tasks/<id>/logs`).
+3. **Show the text and wait for the go-ahead**, as for other GTD writes.
+4. Append it:
+
+   ```sh
+   jq -n --rawfile body entry.md '{body: $body}' |
+     curl -s -X POST http://127.0.0.1:7777/api/tasks/<id>/logs \
+       -H 'Content-Type: application/json' --data-binary @-
+   ```
+
+Start and pause mark when the user was actually working on a task. Write them only when
+the user says they are starting or stopping; that request is the go-ahead. A start on a
+task already started, or a pause on one that is not, changes nothing and answers
+`created: false`. Completing or dropping a task ends the work by itself — no pause is
+needed. Editing an entry takes the `version` you read; a `409` works like a page one.
 
 ### Clarify the inbox
 
@@ -169,11 +203,12 @@ not an hour; keep it short and do not turn it into a weekly review.
 ```sh
 curl -s http://127.0.0.1:7777/api/dashboard | jq '.gtd | {inbox_count, today, waiting_overdue}'
 curl -s 'http://127.0.0.1:7777/api/tasks?state=next_actions' |
-  jq '[.tasks[] | {id, title, context_name, project_title, deadline_on, energy, time_estimate}]'
+  jq '[.tasks[] | {id, title, context_name, project_title, deadline_on, energy, time_estimate, working}]'
 ```
 
 1. **Today** — `today` holds what is due or scheduled for today or earlier. Lead with
-   these, overdue deadlines first. Scheduled tasks show up in Next Actions by themselves
+   these, overdue deadlines first. Mention any next action with `working: true`: it was
+   started and never paused, so it is either still in progress or a pause was missed. Scheduled tasks show up in Next Actions by themselves
    once their day comes; they need no state change.
 2. **Inbox** — if `inbox_count` is not zero, offer to clarify it (as below). If the user
    has no time now, just say how many are waiting and move on.

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 	"unicode"
 
 	filestore "github.com/wakamenod/enghi/internal/files"
@@ -85,6 +86,24 @@ func Run(ctx context.Context, db *store.DB, blobs *filestore.Store, dir string) 
 
 	used := map[string]int{}
 	written := map[string]string{} // hash -> extension, so nothing is written twice
+	// rewriteFiles writes out the images a body references and rewrites them as
+	// paths relative to wiki/ or gtd/, which sit side by side.
+	rewriteFiles := func(body string) (string, error) {
+		if blobs == nil {
+			return body, nil
+		}
+		var werr error
+		body = fileRefRe.ReplaceAllStringFunc(body, func(m string) string {
+			hash := fileRefRe.FindStringSubmatch(m)[1]
+			ext, err := writeBlob(ctx, blobs, filesDir, hash, written)
+			if err != nil {
+				werr = err
+				return m
+			}
+			return "../files/" + hash + ext
+		})
+		return body, werr
+	}
 	for rows.Next() {
 		var id int64
 		var slug, title, body, created, updated string
@@ -110,20 +129,8 @@ func Run(ctx context.Context, db *store.DB, blobs *filestore.Store, dir string) 
 
 		// Write out the images referenced by the body and rewrite them as relative
 		// paths
-		if blobs != nil {
-			var werr error
-			body = fileRefRe.ReplaceAllStringFunc(body, func(m string) string {
-				hash := fileRefRe.FindStringSubmatch(m)[1]
-				ext, err := writeBlob(ctx, blobs, filesDir, hash, written)
-				if err != nil {
-					werr = err
-					return m
-				}
-				return "../files/" + hash + ext
-			})
-			if werr != nil {
-				return nil, werr
-			}
+		if body, err = rewriteFiles(body); err != nil {
+			return nil, err
 		}
 
 		var b strings.Builder
@@ -161,15 +168,15 @@ func Run(ctx context.Context, db *store.DB, blobs *filestore.Store, dir string) 
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	res.Images = len(written)
-	res.Files += len(written)
 
 	// The GTD side. The files are created even when empty, so the shape of an
 	// export stays fixed.
 	for name, fn := range map[string]func(context.Context, *store.DB) (string, error){
 		"projects.md": exportProjects,
-		"tasks.md":    exportTasks,
-		"areas.md":    exportAreas,
+		"tasks.md": func(ctx context.Context, db *store.DB) (string, error) {
+			return exportTasks(ctx, db, rewriteFiles)
+		},
+		"areas.md": exportAreas,
 	} {
 		content, err := fn(ctx, db)
 		if err != nil {
@@ -180,6 +187,9 @@ func Run(ctx context.Context, db *store.DB, blobs *filestore.Store, dir string) 
 		}
 		res.Files++
 	}
+	// Counted last: work log entries reference images too
+	res.Images = len(written)
+	res.Files += len(written)
 	return res, nil
 }
 
@@ -310,11 +320,16 @@ func writeTasksOfProject(ctx context.Context, db *store.DB, b *strings.Builder, 
 	return rows.Err()
 }
 
-func exportTasks(ctx context.Context, db *store.DB) (string, error) {
+// exportTasks lists every task, each followed by its work log.
+func exportTasks(ctx context.Context, db *store.DB, rewriteFiles func(string) (string, error)) (string, error) {
+	logs, err := taskLogs(ctx, db)
+	if err != nil {
+		return "", err
+	}
 	var b strings.Builder
 	b.WriteString("# Tasks\n\n")
 	rows, err := db.QueryContext(ctx,
-		`SELECT t.title, t.state, COALESCE(c.name,''), COALESCE(t.scheduled_on,''),
+		`SELECT t.id, t.title, t.state, COALESCE(c.name,''), COALESCE(t.scheduled_on,''),
 		        COALESCE(t.deadline_on,''), COALESCE(t.waiting_for,''), COALESCE(t.recurrence,'')
 		   FROM tasks t LEFT JOIN contexts c ON c.id = t.context_id
 		  ORDER BY t.state, t.sort_order, t.id`)
@@ -323,8 +338,9 @@ func exportTasks(ctx context.Context, db *store.DB) (string, error) {
 	}
 	defer rows.Close()
 	for rows.Next() {
+		var id int64
 		var title, state, ctxName, sched, dead, waiting, rec string
-		if err := rows.Scan(&title, &state, &ctxName, &sched, &dead, &waiting, &rec); err != nil {
+		if err := rows.Scan(&id, &title, &state, &ctxName, &sched, &dead, &waiting, &rec); err != nil {
 			return "", err
 		}
 		mark := " "
@@ -341,8 +357,66 @@ func exportTasks(ctx context.Context, db *store.DB) (string, error) {
 			}
 		}
 		b.WriteString("\n")
+		for _, l := range logs[id] {
+			body, err := rewriteFiles(l.body)
+			if err != nil {
+				return "", err
+			}
+			writeLogEntry(&b, l.kind, l.createdAt, body)
+		}
 	}
 	return b.String(), rows.Err()
+}
+
+type logEntry struct{ kind, body, createdAt string }
+
+// taskLogs reads every work log entry, oldest first, keyed by task.
+func taskLogs(ctx context.Context, db *store.DB) (map[int64][]logEntry, error) {
+	rows, err := db.QueryContext(ctx,
+		`SELECT task_id, kind, body, created_at FROM task_logs ORDER BY task_id, created_at, id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int64][]logEntry{}
+	for rows.Next() {
+		var id int64
+		var l logEntry
+		if err := rows.Scan(&id, &l.kind, &l.body, &l.createdAt); err != nil {
+			return nil, err
+		}
+		out[id] = append(out[id], l)
+	}
+	return out, rows.Err()
+}
+
+// writeLogEntry writes one entry as a nested list item under its task: the
+// local time with its offset (stored times are UTC), then the Markdown body
+// indented so that it stays inside the item, code blocks and all.
+func writeLogEntry(b *strings.Builder, kind, createdAt, body string) {
+	when := createdAt
+	if t, err := time.Parse("2006-01-02 15:04:05", createdAt); err == nil {
+		when = t.In(time.Local).Format("2006-01-02 15:04 -07:00")
+	}
+	switch kind {
+	case "start":
+		when += " started"
+	case "pause":
+		when += " paused"
+	}
+	fmt.Fprintf(b, "  - %s\n", when)
+	if body == "" {
+		return
+	}
+	b.WriteString("\n")
+	for _, line := range strings.Split(body, "\n") {
+		if line == "" {
+			b.WriteString("\n")
+			continue
+		}
+		b.WriteString("    " + line + "\n")
+	}
+	b.WriteString("\n")
 }
 
 func exportAreas(ctx context.Context, db *store.DB) (string, error) {

@@ -1,10 +1,15 @@
 package web_test
 
 import (
+	"bytes"
 	"encoding/json"
+	"image"
+	pngpkg "image/png"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -220,5 +225,56 @@ func TestSearchFindsLogEntries(t *testing.T) {
 	decode(t, do(h, req("GET", "/api/search?kind=log&q="+url.QueryEscape("リンカ"), "")), &res)
 	if len(res.Results) != 1 || res.Results[0]["kind"] != "log" || res.Results[0]["task_id"] != float64(1) {
 		t.Errorf("GET /api/search?kind=log = %+v", res.Results)
+	}
+}
+
+// Export writes each task's log under the task, with pasted images written to
+// files/ and linked relatively, as for page bodies.
+func TestExportIncludesWorkLog(t *testing.T) {
+	h, cfg := newServerWith(t, nil)
+	var png bytes.Buffer
+	if err := pngpkg.Encode(&png, image.NewRGBA(image.Rect(0, 0, 1, 1))); err != nil {
+		t.Fatal(err)
+	}
+	r := httptest.NewRequest("POST", "/api/files?name=shot.png", bytes.NewReader(png.Bytes()))
+	r.Host = "127.0.0.1:7777"
+	r.Header.Set("Content-Type", "image/png")
+	w := do(h, r)
+	var up struct {
+		Markdown string `json:"markdown"`
+		Hash     string `json:"hash"`
+	}
+	decode(t, w, &up)
+	if w.Code >= 400 || up.Markdown == "" {
+		t.Fatalf("upload → %d %s", w.Code, w.Body.String())
+	}
+
+	mustJSON(t, h, "POST", "/api/tasks", `{"title":"画面を直す"}`)
+	mustJSON(t, h, "POST", "/api/tasks/1/logs", `{"kind":"start"}`)
+	note, _ := json.Marshal(map[string]string{"body": "崩れ方:\n\n" + up.Markdown + "\n\n```\ncode\n```"})
+	mustJSON(t, h, "POST", "/api/tasks/1/logs", string(note))
+
+	if w := do(h, req("POST", "/api/export", `{}`)); w.Code != http.StatusOK {
+		t.Fatalf("export → %d: %s", w.Code, w.Body.String())
+	}
+	b, err := os.ReadFile(filepath.Join(cfg.ExportDir, "gtd", "tasks.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(b)
+	for _, want := range []string{
+		"- [ ] 画面を直す (inbox)\n  - ", " started\n  - ",
+		"\n    崩れ方:\n", "../files/", "\n    ```\n    code\n    ```\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("tasks.md lacks %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "(/files/") {
+		t.Errorf("an image still points at the server:\n%s", got)
+	}
+	matches, _ := filepath.Glob(filepath.Join(cfg.ExportDir, "files", "*.png"))
+	if len(matches) != 1 {
+		t.Errorf("exported images: %v", matches)
 	}
 }
