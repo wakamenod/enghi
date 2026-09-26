@@ -169,17 +169,19 @@ Every task has a **work log** at the bottom of its clarify screen: timestamped e
 
 **Start** and **Pause** mark when you were actually working on the task. While it is started, it shows a "Working" badge in the task lists, and `p` on a task in a list starts or pauses it. Working is not a state of its own: the task stays in Next Actions (or wherever it is), and completing or dropping it simply ends the work.
 
+Moving a working task anywhere else that is still open—Inbox, Later, Waiting, Scheduled or Someday—pauses it for you. The log records it as "⏸ paused (moved to Someday)." A forgotten Pause no longer leaves the task working forever. Undoing the move takes that pause back, and the task is working again. Moving it to Next leaves the work running.
+
 The log is included in search, labeled "Log"; when several entries of one task match, only its best one is shown. Entries can be edited or deleted, and deleting a Start or Pause takes back a mistaken press. There is no revision history for entries—an edit overwrites.
 
 ## Work Record — What You Did Each Day {#day}
 
-The **work record** shows one day's work. Open it with `g` `l`, or with "Today's work →" on the dashboard. It lists the tasks you finished and the tasks you worked on, each with the work-log entries you wrote that day.
+The **work record** shows one day's work. Open it with `g` `l`, or with "Today's work →" on the dashboard. It lists the tasks you finished and the tasks you worked on, each with the work-log entries you wrote that day. The rows are task rows: `j` / `k` move between them, and the task keys and the move dialog work as in any list, returning to the same day.
 
 It opens on today. To see another day, pick a date in the month calendar on the right, or press `[` and `]` for the previous and next day. Press `t` to come back to today, or type a date in the date field. Days with anything recorded have a dot in the calendar.
 
 A day has four groups:
 
-- **Done** — tasks completed that day, with the time. If you reopen a task later, it no longer appears here.
+- **Done** — tasks completed that day, with the time. If you reopen a task later, it no longer appears here. A task you worked on over several days also shows its last three entries from before that day, with their dates, under "Earlier entries." They give the context of what you finished. Long ones start folded.
 - **In progress** — tasks you had started and not paused by the end of the day. For today, these are the tasks you are working on now. For a past day, enghi works them out from the Start and Pause entries.
 - **Worked on** — any other task with a log entry written that day.
 - **Dropped** — tasks dropped that day, including skipped recurring occurrences. This group starts folded.
@@ -188,7 +190,7 @@ A day has four groups:
 
 The same data is available at `/api/day?date=YYYY-MM-DD`. It returns JSON, or Markdown with `&format=markdown`. When you ask the Claude Code skill for a daily report, it reads this to write a draft.
 
-The dashboard also lists the tasks you are working on now, and the Weekly Review links to the work record of each day of the past week.
+The dashboard also lists the tasks you are working on now, and the Weekly Review links to the work record of each of the seven days before the review—the same days its "Completed last week" list covers.
 
 ## Wiki Integration {#wiki}
 
