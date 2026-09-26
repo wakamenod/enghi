@@ -144,7 +144,7 @@ func TestCalendarPanelIsLocalOnly(t *testing.T) {
 	r := en(req("GET", "/settings", ""))
 	r.Host = "macbook.local"
 	body = do(h, r).Body.String()
-	if strings.Contains(body, `action="/ui/calendar/install"`) || !strings.Contains(body, "only available from there") {
+	if strings.Contains(body, `action="/ui/calendar/install"`) || !strings.Contains(body, "only do it from that machine") {
 		t.Error("a request through allowed_hosts is offered Add shortcut")
 	}
 	r = form("/ui/calendar/install", nil)
