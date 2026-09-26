@@ -10,7 +10,7 @@ There is only one first step: **open the GTD view and dump everything on your mi
 
 The capture field is available on every screen. Press `c` on your keyboard to open quick capture without leaving your current view.
 
-If a line contains a URL (`http://` or `https://`), it becomes the task's **URL** and is removed from the title. "Read this https://example.com/post" becomes the task "Read this", linked to that page.
+If a line contains a URL (`http://` or `https://`), enghi moves it out of the title and into the task's URL. `Read this https://example.com/post` becomes a task named "Read this" that links to the page.
 
 Capture 30 items or 50—it doesn't matter. What you end up with is your **Inbox**. Next, clarify it one item at a time.
 
@@ -31,7 +31,7 @@ Opening an Inbox item reveals two panels side by side. Use this screen to decide
 - Rewrite the **action** as a single physical activity starting with a verb. Not "expenses", but "Scan receipts and send them to accounting."
 - Choose a **state** (see the table below).
 - **Project / Context / Area** are optional. Leave them empty if none apply.
-- **URL** links the task to a web page, such as an issue or an article. A task with a URL shows 🔗 in lists; click it, or select the task and press `o`, to open the page in a new tab. Only `http://` and `https://` are accepted.
+- **URL** links the task to a web page, such as an issue or an article. Only `http://` and `https://` work. In lists, a task with a URL shows 🔗. Click it, or select the task and press `o`, to open the page in a new tab.
 - Use **Scheduled Date** for items you don't want to see until that date arrives. Use **Deadline** only for hard, immovable due dates. They are fundamentally different—assigning arbitrary deadlines strips them of their urgency.
 
 **To treat it as reference** — use the right panel:
