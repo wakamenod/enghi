@@ -266,6 +266,7 @@ func (s *Server) viewReview(w http.ResponseWriter, r *http.Request) {
 
 type clarifyData struct {
 	Task     *gtd.Task
+	Logs     []logView
 	Projects []*gtd.Project
 	Contexts []*gtd.Context
 	Areas    []*gtd.Area
@@ -285,7 +286,7 @@ func (s *Server) viewClarify(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	d := clarifyData{Task: t}
+	d := clarifyData{Task: t, Logs: s.logViews(r, id)}
 	d.Projects, _ = s.gtd.Projects(ctx, "active")
 	d.Contexts, _ = s.gtd.Contexts(ctx)
 	d.Areas, _ = s.gtd.Areas(ctx)

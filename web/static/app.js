@@ -363,6 +363,7 @@ function repeatPicker(date, recurrence, endsOn) {
 //   e            ... edit the article on screen
 //   j / k        ... move within a list; Enter opens
 //   u            ... undo the last move, while its toast is up
+//   p            ... start or pause work on the task under the cursor
 
 (function () {
   var pendingG = false;
@@ -442,6 +443,7 @@ function repeatPicker(date, recurrence, endsOn) {
       waitingFor: d.waitingFor || '', scheduledOn: d.scheduledOn || '',
       recurrence: d.recurrence || '', recurrenceEndsOn: d.recurrenceEndsOn || '',
       delegatedAt: d.delegatedAt || '', version: d.version || '',
+      working: d.working === 'true',
     };
   }
 
@@ -589,6 +591,12 @@ function repeatPicker(date, recurrence, endsOn) {
       return true;
     }
     if (ASKS[key]) { openMove(task, ASKS[key]); return true; }
+    // Start and pause share one key: whichever applies. It posts like the
+    // buttons on Clarify and comes back to this list.
+    if (key === 'p') {
+      post(base + (task.working ? '/pause' : '/start'));
+      return true;
+    }
     if (key === 't') {
       var title = window.prompt(t('keys.ask_title'), task.title);
       if (title) post(base, { title: title });
@@ -1018,13 +1026,11 @@ function refreshInbox() {
 
 // ---------------------------------------------------------------- pasting images
 //
-// Pasting or dropping an image into the editing textarea uploads it there and
-// then and inserts the Markdown at the cursor.
+// Pasting or dropping an image into a textarea marked data-paste-upload (the
+// article editor, the work log) uploads it there and then and inserts the
+// Markdown at the cursor. Bound per textarea: Clarify has several.
 
-(function () {
-  var ta = document.querySelector('textarea[name=body]');
-  if (!ta) return;
-
+document.querySelectorAll('textarea[data-paste-upload]').forEach(function (ta) {
   function insertAtCursor(text) {
     var start = ta.selectionStart, end = ta.selectionEnd;
     ta.value = ta.value.slice(0, start) + text + ta.value.slice(end);
@@ -1078,7 +1084,20 @@ function refreshInbox() {
     ta.classList.remove('dropping');
     if (ev.dataTransfer && handle(ev.dataTransfer.files)) ev.preventDefault();
   });
-})();
+});
+
+// ---------------------------------------------------------------- Ctrl/Cmd+Enter
+//
+// Submits the form of a textarea marked data-ctrl-enter (the work log), going
+// through validation like a click on its first button. A key the [[ completion
+// already took (it picks a candidate on Enter) is left alone.
+document.addEventListener('keydown', function (ev) {
+  if (ev.key !== 'Enter' || !(ev.ctrlKey || ev.metaKey) || ev.isComposing || ev.defaultPrevented) return;
+  var ta = ev.target;
+  if (!ta.matches || !ta.matches('textarea[data-ctrl-enter]') || !ta.form) return;
+  ev.preventDefault();
+  if (ta.form.requestSubmit) ta.form.requestSubmit(); else ta.form.submit();
+});
 
 // ---------------------------------------------------------------- edit preview
 (function () {
@@ -1109,10 +1128,7 @@ function refreshInbox() {
 // unresolved link is a legitimate way to say "an article I am about to write",
 // so it is never blocked (DESIGN 2.1).
 
-(function () {
-  var ta = document.querySelector('textarea[name=body]');
-  if (!ta) return;
-
+document.querySelectorAll('textarea[data-wikilink]').forEach(function (ta) {
   var box = null;     // the container for the candidates
   var items = [];     // candidates; the last one may be "insert as typed"
   var sel = 0;        // which one is selected
@@ -1260,4 +1276,4 @@ function refreshInbox() {
       close(); ev.preventDefault(); ev.stopPropagation();   // do not pass it to quick capture
     }
   });
-})();
+});

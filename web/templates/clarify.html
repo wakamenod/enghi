@@ -2,7 +2,7 @@
 {{$d := .Data}}
 {{$t := $d.Task}}
 <h1>{{$t.Title}}{{template "help" "enghi#clarify-screen"}}</h1>
-<div class="meta">state: {{$t.State}} · {{t "clarify.captured_at"}} {{shortTime $t.CreatedAt}}</div>
+<div class="meta">state: {{$t.State}} · {{t "clarify.captured_at"}} {{shortTime $t.CreatedAt}}{{if $t.Working}} · <a class="tag working" href="#log">{{t "gtd.working"}}</a>{{end}}</div>
 
 <div class="cols">
   <section class="panel">
@@ -61,7 +61,7 @@
       <label for="ftitle">{{t "clarify.page_title"}}</label>
       <input type="text" id="ftitle" name="title" value="{{$t.Title}}">
       <label for="fbody">{{t "clarify.body"}}</label>
-      <textarea id="fbody" name="body" class="short">{{$t.Note}}</textarea>
+      <textarea id="fbody" name="body" class="short" data-paste-upload data-wikilink>{{$t.Note}}</textarea>
       <label for="ftags">{{t "clarify.tags"}}</label>
       <input type="text" id="ftags" name="tags">
       <div class="actions"><button type="submit">{{t "clarify.make_page"}}</button></div>
@@ -92,4 +92,63 @@
     <button type="submit" class="danger">{{t "common.delete"}}</button>
   </form>
 </div>
+
+<section class="panel worklog" id="log">
+  <h2>{{t "log.title"}}{{template "help" "enghi#work-log"}}</h2>
+  <div class="meta">{{t "log.note"}}</div>
+  {{range $d.Logs}}
+  {{if eq .Kind "note"}}
+  <article class="log-entry" id="log-{{.ID}}">
+    <div class="log-head">
+      <a class="when" href="#log-{{.ID}}">{{shortTime .CreatedAt}}</a>
+      {{if ne .UpdatedAt .CreatedAt}}<span class="when">{{t "log.edited" (shortTime .UpdatedAt)}}</span>{{end}}
+      <span class="spacer"></span>
+      <details class="log-edit">
+        <summary>{{t "common.edit"}}</summary>
+        <form method="post" action="/ui/task-logs/{{.ID}}">
+          <input type="hidden" name="version" value="{{.Version}}">
+          <textarea name="body" class="log-body" required data-paste-upload data-wikilink data-ctrl-enter>{{.Body}}</textarea>
+          <div class="actions">
+            <button type="submit" class="primary">{{t "common.save"}}</button>
+          </div>
+        </form>
+      </details>
+      <form method="post" action="/ui/task-logs/{{.ID}}/delete" class="inline-form"
+            onsubmit="return confirm('{{t "log.delete_confirm"}}')">
+        <button type="submit" class="link danger">{{t "common.delete"}}</button>
+      </form>
+    </div>
+    <div class="prose">{{.HTML}}</div>
+  </article>
+  {{else}}
+  <div class="log-entry log-mark" id="log-{{.ID}}">
+    <div class="log-head">
+      <a class="when" href="#log-{{.ID}}">{{if eq .Kind "start"}}{{t "log.started" (shortTime .CreatedAt)}}{{else}}{{t "log.paused" (shortTime .CreatedAt)}}{{end}}</a>
+      <span class="spacer"></span>
+      <form method="post" action="/ui/task-logs/{{.ID}}/delete" class="inline-form"
+            onsubmit="return confirm('{{t "log.delete_confirm"}}')">
+        <button type="submit" class="link danger">{{t "common.delete"}}</button>
+      </form>
+    </div>
+    {{if .HTML}}<div class="prose">{{.HTML}}</div>{{end}}
+  </div>
+  {{end}}
+  {{else}}
+  <div class="empty">{{t "log.empty"}}</div>
+  {{end}}
+
+  <form method="post" action="/ui/tasks/{{$t.ID}}/logs" class="log-composer">
+    <textarea id="log-body" name="body" class="log-body" required
+              placeholder="{{t "log.placeholder"}}" data-paste-upload data-wikilink data-ctrl-enter></textarea>
+    <div class="actions">
+      <button type="submit" class="primary">{{t "common.add"}}</button>
+      {{if $t.Working}}
+      <button type="submit" formaction="/ui/tasks/{{$t.ID}}/pause" formnovalidate>{{t "log.pause"}}</button>
+      {{else if not (or (eq $t.State "done") (eq $t.State "dropped") (eq $t.State "filed"))}}
+      <button type="submit" formaction="/ui/tasks/{{$t.ID}}/start" formnovalidate>{{t "log.start"}}</button>
+      {{end}}
+      <span class="meta">{{t "log.hint"}}</span>
+    </div>
+  </form>
+</section>
 {{template "foot" .}}

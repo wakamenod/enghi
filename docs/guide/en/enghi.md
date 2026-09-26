@@ -163,6 +163,14 @@ Each new occurrence is created with a **scheduled date**, so it stays out of Nex
 
 To skip a single occurrence, select "Skip this instance" on the clarify screen. To stop the recurrence entirely, select "End recurring series". The Weekly Review lists all recurring series so you can **prune routines that are running only on inertia.**
 
+## Work Log — What You Did on a Task {#work-log}
+
+Every task has a **work log** at the bottom of its clarify screen: timestamped entries recording what you tried, what you found and what you decided. Entries are Markdown, as in articles—`[[links]]`, code blocks, and images pasted or dropped into the text box all work. `Ctrl`/`⌘`+`Enter` adds the entry.
+
+**Start** and **Pause** mark when you were actually working on the task. While it is started, it shows a "Working" badge in the task lists, and `p` on a task in a list starts or pauses it. Working is not a state of its own: the task stays in Next Actions (or wherever it is), and completing or dropping it simply ends the work.
+
+The log is included in search, labeled "Log"; when several entries of one task match, only its best one is shown. Entries can be edited or deleted, and deleting a Start or Pause takes back a mistaken press. There is no revision history for entries—an edit overwrites.
+
 ## Wiki Integration {#wiki}
 
 GTD and the wiki are independent. **The wiki works fully without touching GTD**, and vice versa.
@@ -187,6 +195,7 @@ They connect in only three places:
 | `j` / `k` | Move down / up a list |
 | `Enter` | Open the selected item; on a task, choose where to move it (so does clicking its title) |
 | `u` | Undo the last move, while its notice is shown at the bottom of the screen |
+| `p` | Start or pause work on the selected task |
 | `e` | Edit the article |
 
 ## Terminology {#glossary}

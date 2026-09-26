@@ -32,7 +32,8 @@ const taskCols = `t.id, t.title, t.note, t.state, t.project_id, t.context_id, t.
 	CASE WHEN t.state = 'waiting' AND t.delegated_at IS NOT NULL
 	     THEN CAST(julianday(` + sqlToday + `) - julianday(t.delegated_at) AS INTEGER) ELSE 0 END,
 	CASE WHEN t.deadline_on IS NOT NULL
-	     THEN CAST(julianday(t.deadline_on) - julianday(` + sqlToday + `) AS INTEGER) END`
+	     THEN CAST(julianday(t.deadline_on) - julianday(` + sqlToday + `) AS INTEGER) END,
+	` + workingExpr
 
 const taskFrom = `FROM tasks t
 	LEFT JOIN projects p ON p.id = t.project_id
@@ -45,7 +46,7 @@ func scanTask(row interface{ Scan(...any) error }) (*Task, error) {
 		&t.ScheduledOn, &t.DeadlineOn, &t.WaitingFor, &t.DelegatedAt, &t.Energy, &t.TimeEstimate,
 		&t.Priority, &t.Recurrence, &t.SeriesID, &t.RecurrenceEndsOn,
 		&t.SortOrder, &t.Version, &t.CompletedAt, &t.CreatedAt, &t.UpdatedAt,
-		&t.ProjectTitle, &t.ContextName, &t.AreaName, &t.WaitingDays, &t.DeadlineDays)
+		&t.ProjectTitle, &t.ContextName, &t.AreaName, &t.WaitingDays, &t.DeadlineDays, &t.Working)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound

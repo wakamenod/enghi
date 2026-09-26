@@ -26,6 +26,7 @@ func optID(q string) *int64 {
 
 func (s *Server) gtdErr(w http.ResponseWriter, err error) {
 	var vc *gtd.VersionConflictError
+	var lvc *gtd.LogVersionConflictError
 	switch {
 	case errors.Is(err, gtd.ErrNotFound):
 		writeErr(w, http.StatusNotFound, "not_found", "not found")
@@ -34,6 +35,12 @@ func (s *Server) gtdErr(w http.ResponseWriter, err error) {
 			"error":   "version_conflict",
 			"message": "this item was updated elsewhere",
 			"current": vc.Current,
+		})
+	case errors.As(err, &lvc):
+		writeJSON(w, http.StatusConflict, map[string]any{
+			"error":   "version_conflict",
+			"message": "this log entry was updated elsewhere",
+			"current": lvc.Current,
 		})
 	default:
 		writeErr(w, http.StatusBadRequest, "request_failed", err.Error())

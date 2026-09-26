@@ -3,11 +3,12 @@
     data-project-id="{{with .ProjectID}}{{.}}{{end}}" data-project-title="{{.ProjectTitle}}" data-context-id="{{with .ContextID}}{{.}}{{end}}"
     data-waiting-for="{{.WaitingFor}}" data-scheduled-on="{{.ScheduledOn}}"
     data-recurrence="{{.Recurrence}}" data-recurrence-ends-on="{{.RecurrenceEndsOn}}"
-    data-delegated-at="{{.DelegatedAt}}" data-version="{{.Version}}">
+    data-delegated-at="{{.DelegatedAt}}" data-version="{{.Version}}" data-working="{{.Working}}">
   <form method="post" action="/ui/tasks/{{.ID}}/complete" class="inline-form">
     <button type="submit" class="check" title="{{t "gtd.complete"}}">✓</button>
   </form>
   <a class="task-title" href="/gtd/clarify/{{.ID}}">{{.Title}}</a>
+  {{if .Working}}<a class="tag working" href="/gtd/clarify/{{.ID}}#log">{{t "gtd.working"}}</a>{{end}}
   {{if .Recurrence}}<span class="tag" title="{{t "gtd.recurring" .Recurrence}}">↻ {{.Recurrence}}</span>{{end}}
   {{if .ProjectTitle}}<a class="tag" href="/gtd/project/{{.ProjectID}}">{{.ProjectTitle}}</a>{{end}}
   {{if .ContextName}}<a class="tag" href="/gtd/next?context={{.ContextName}}">{{.ContextName}}</a>{{end}}
