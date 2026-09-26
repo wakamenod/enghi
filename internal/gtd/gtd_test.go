@@ -629,3 +629,76 @@ func TestReviewChecklist(t *testing.T) {
 		t.Fatalf("a new review was created although one was unfinished: %d -> %d", r.ID, again.ID)
 	}
 }
+
+// ListCounts uses the conditions of the lists themselves: a scheduled task that
+// is due counts under Next too, a future one only under Scheduled, and closed
+// tasks, inactive projects and archived areas count nowhere.
+func TestListCounts(t *testing.T) {
+	s, _, _ := newSvc(t)
+	ctx := context.Background()
+	move := func(title, state, scheduledOn string) *gtd.Task {
+		tk := capture(t, s, title)
+		p := gtd.TaskPatch{State: str(state)}
+		if scheduledOn != "" {
+			p.ScheduledOn = str(scheduledOn)
+		}
+		return patch(t, s, tk.ID, p)
+	}
+	day := func(offset int) string { return gtd.FormatDate(gtd.Today().AddDate(0, 0, offset)) }
+
+	capture(t, s, "inbox 1")
+	capture(t, s, "inbox 2")
+	move("next", gtd.StateNext, "")
+	move("waiting", gtd.StateWaiting, "")
+	move("due yesterday", gtd.StateScheduled, day(-1))
+	move("due today", gtd.StateScheduled, day(0))
+	move("tomorrow", gtd.StateScheduled, day(1))
+	move("someday", gtd.StateSomeday, "")
+	move("done", gtd.StateDone, "")
+	move("dropped", gtd.StateDropped, "")
+	if _, err := s.Complete(ctx, move("completed", gtd.StateNext, "").ID, false); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, st := range []string{"active", "active", "someday", "done", "dropped"} {
+		if _, err := s.CreateProject(ctx, gtd.ProjectInput{Title: "p " + st, Status: st}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := s.CreateArea(ctx, gtd.AreaInput{Name: "kept"}); err != nil {
+		t.Fatal(err)
+	}
+	old, err := s.CreateArea(ctx, gtd.AreaInput{Name: "archived"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	yes := true
+	if _, err := s.PatchArea(ctx, old.ID, gtd.AreaInput{Name: old.Name, Archived: &yes}); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := s.ListCounts(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := gtd.ListCounts{Inbox: 2, Next: 3, Waiting: 1, Scheduled: 3, Someday: 1, Projects: 2, Areas: 1}
+	if *got != want {
+		t.Errorf("ListCounts = %+v, want %+v", *got, want)
+	}
+
+	// Each count matches the length of its list
+	lens := map[string][2]int{}
+	next, _ := s.NextActions(ctx, nil)
+	lens["next"] = [2]int{got.Next, len(next)}
+	sch, _ := s.Scheduled(ctx)
+	lens["scheduled"] = [2]int{got.Scheduled, len(sch)}
+	projects, _ := s.Projects(ctx, "active")
+	lens["projects"] = [2]int{got.Projects, len(projects)}
+	areas, _ := s.Areas(ctx)
+	lens["areas"] = [2]int{got.Areas, len(areas)}
+	for name, l := range lens {
+		if l[0] != l[1] {
+			t.Errorf("%s: count %d, list has %d", name, l[0], l[1])
+		}
+	}
+}

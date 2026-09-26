@@ -75,6 +75,57 @@ func TestAllScreensRenderCompletely(t *testing.T) {
 	}
 }
 
+// GET /api/lists returns every count, Areas included whatever the settings,
+// and /gtd shows the same numbers.
+func TestListCountsViaAPI(t *testing.T) {
+	h := newServer(t)
+	w := do(h, req("GET", "/api/lists", ""))
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /api/lists → %d: %s", w.Code, w.Body.String())
+	}
+	if got, want := strings.TrimSpace(w.Body.String()),
+		`{"inbox":0,"next":0,"waiting":0,"scheduled":0,"someday":0,"projects":0,"areas":0}`; got != want {
+		t.Errorf("empty database: %s, want %s", got, want)
+	}
+
+	mustJSON(t, h, "POST", "/api/areas", `{"name":"経理"}`)
+	mustJSON(t, h, "POST", "/api/projects", `{"title":"オフィス移転","outcome":"移転完了"}`)
+	mustJSON(t, h, "POST", "/api/tasks", `{"title":"Inbox に残すもの"}`)
+	mustJSON(t, h, "POST", "/api/tasks", `{"title":"電話する"}`)
+	mustJSON(t, h, "PATCH", "/api/tasks/2", `{"state":"next"}`)
+	mustJSON(t, h, "POST", "/api/tasks", `{"title":"ゴミ出し"}`)
+	mustJSON(t, h, "PATCH", "/api/tasks/3", `{"state":"scheduled","scheduled_on":"2020-01-01"}`)
+	mustJSON(t, h, "POST", "/api/tasks", `{"title":"返事待ち"}`)
+	mustJSON(t, h, "PATCH", "/api/tasks/4", `{"state":"waiting","waiting_for":"田中さん"}`)
+	mustJSON(t, h, "POST", "/api/tasks", `{"title":"いつか"}`)
+	mustJSON(t, h, "PATCH", "/api/tasks/5", `{"state":"someday"}`)
+	mustJSON(t, h, "POST", "/api/tasks", `{"title":"済み"}`)
+	mustJSON(t, h, "POST", "/api/tasks/6/complete", `{}`)
+
+	w = do(h, req("GET", "/api/lists", ""))
+	var got map[string]int
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("%v: %s", err, w.Body.String())
+	}
+	want := map[string]int{"inbox": 1, "next": 2, "waiting": 1, "scheduled": 1,
+		"someday": 1, "projects": 1, "areas": 1}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Errorf("GET /api/lists = %v, want %v", got, want)
+	}
+
+	// The list panel on /gtd shows the same numbers, in the same order
+	body := do(h, req("GET", "/gtd", "")).Body.String()
+	var shown []string
+	for _, m := range regexp.MustCompile(`href="/gtd/(inbox|next|waiting|scheduled|someday|projects)">[^<]*</a><span class="when">(\d+)<`).
+		FindAllStringSubmatch(body, -1) {
+		shown = append(shown, m[1]+"="+m[2])
+	}
+	if got, want := strings.Join(shown, " "),
+		"inbox=1 next=2 waiting=1 scheduled=1 someday=1 projects=1"; got != want {
+		t.Errorf("/gtd shows %q, want %q", got, want)
+	}
+}
+
 // 2.6: completing generates the next instance as scheduled, through the API.
 func TestCompleteRecurringViaAPI(t *testing.T) {
 	h := newServer(t)

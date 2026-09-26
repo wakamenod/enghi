@@ -119,6 +119,40 @@ func (s *Service) Someday(ctx context.Context) ([]*Task, error) {
 	return s.tasks(ctx, `WHERE t.state = 'someday' ORDER BY t.updated_at DESC`)
 }
 
+// ListCounts are the sizes of the lists on the GTD top page.
+type ListCounts struct {
+	Inbox     int `json:"inbox"`
+	Next      int `json:"next"`
+	Waiting   int `json:"waiting"`
+	Scheduled int `json:"scheduled"`
+	Someday   int `json:"someday"`
+	Projects  int `json:"projects"`
+	Areas     int `json:"areas"`
+}
+
+// ListCounts counts every list in one query.
+//
+// **Each count uses exactly the condition of its list**, so a count never
+// disagrees with the list it links to. A scheduled task that is due counts
+// under both Next and Scheduled, as it appears in both lists.
+func (s *Service) ListCounts(ctx context.Context) (*ListCounts, error) {
+	var c ListCounts
+	err := s.db.QueryRowContext(ctx, `SELECT
+		COALESCE(SUM(CASE WHEN t.state = 'inbox' THEN 1 ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN `+nextActionsWhere+` THEN 1 ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN t.state = 'waiting' THEN 1 ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN t.state = 'scheduled' THEN 1 ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN t.state = 'someday' THEN 1 ELSE 0 END), 0),
+		(SELECT count(*) FROM projects WHERE status = 'active'),
+		(SELECT count(*) FROM areas WHERE archived = 0)
+		FROM tasks t`).Scan(&c.Inbox, &c.Next, &c.Waiting, &c.Scheduled, &c.Someday,
+		&c.Projects, &c.Areas)
+	if err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
 // TasksOfProject are the tasks under a project.
 func (s *Service) TasksOfProject(ctx context.Context, projectID int64) ([]*Task, error) {
 	return s.tasks(ctx, `WHERE t.project_id = ? ORDER BY
