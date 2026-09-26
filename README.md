@@ -184,15 +184,16 @@ non-leap year) clamp to the last day of that month.
 
 ## Calendar (macOS)
 
-enghi can show your calendar events, read-only: today's schedule on the dashboard and
-each day's events on its work record. That includes Google calendars added to the macOS
-Calendar app under Internet Accounts. A Shortcuts shortcut reads them, since Shortcuts
-holds the calendar permission, and enghi runs it every 30 minutes. In **Settings →
-Calendar**, click **Add shortcut**, run it once in Shortcuts to allow calendar access,
-then turn the sync on. **Make a task** on an event creates a task named with the event's
-time, scheduled for its day. The guide (`/guide/enghi#calendar`) covers building the
-shortcut by hand and troubleshooting. Other tools can send events on any system with
-`PUT /api/calendar/events`.
+enghi can show your calendar events without changing them: today's schedule on the
+dashboard, and each day's events in its work record. Google calendars you add to the
+macOS Calendar app under Internet Accounts show up too. A Shortcuts shortcut reads the
+events, because Shortcuts holds the calendar permission, and enghi runs it every 30
+minutes. To set it up, click **Add shortcut** in **Settings → Calendar**, run the
+shortcut once in Shortcuts to allow calendar access, and turn on the sync. **Make a
+task** on an event creates a task named with the event's time and scheduled for its
+day. The guide (`/guide/enghi#calendar`) explains how to build the shortcut by hand
+and what to do when something goes wrong. On any system, other tools can send events
+with `PUT /api/calendar/events`.
 
 ## Keyboard Shortcuts (Web UI)
 
