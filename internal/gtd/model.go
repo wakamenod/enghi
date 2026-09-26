@@ -96,6 +96,10 @@ type Task struct {
 
 	// WaitingDays is the days since delegated_at when state='waiting'.
 	WaitingDays int `json:"waiting_days"`
+	// Working reports whether the task is being worked on: its latest
+	// start/pause log entry is a start and it is still open. Derived by the
+	// query, never stored (task_log.go).
+	Working bool `json:"working"`
 }
 
 // Recurring reports whether this is a recurring task.
