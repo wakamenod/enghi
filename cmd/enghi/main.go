@@ -158,6 +158,7 @@ func cmdServe(args []string) error {
 	if err != nil {
 		return err
 	}
+	srv.Version = versionString()
 
 	// Take a backup once a day while resident.
 	// The trigger is "there is no file for today" rather than a fixed time, so a

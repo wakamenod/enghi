@@ -41,6 +41,10 @@ type Server struct {
 	// there are languages.
 	tmpl map[i18n.Lang]*template.Template
 	mux  *http.ServeMux
+
+	// Version is the running build, shown on the settings screen and in
+	// /api/status. Set it after New; it lives in package main.
+	Version string
 }
 
 // New assembles the server. files is the store for images and the like, a

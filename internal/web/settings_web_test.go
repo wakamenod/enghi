@@ -1,6 +1,7 @@
 package web_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -137,5 +138,28 @@ func TestInstallSkillIsLocalOnly(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(cfg.SkillsDir, "enghi")); !os.IsNotExist(err) {
 		t.Errorf("something was written: %v", err)
+	}
+}
+
+// testVersion is what the test server reports as its build.
+const testVersion = "v0.3.3-2-g127f1d4"
+
+// The settings screen and /api/status show the running build as it is, so a
+// development build (with a hash) can be told from a release.
+func TestVersionIsShown(t *testing.T) {
+	h := newServer(t)
+	body := do(h, en(req("GET", "/settings", ""))).Body.String()
+	if !strings.Contains(body, "<code>"+testVersion+"</code>") {
+		t.Errorf("the settings screen does not show the version %q", testVersion)
+	}
+	var st struct {
+		Version string `json:"version"`
+	}
+	w := do(h, req("GET", "/api/status", ""))
+	if err := json.NewDecoder(w.Body).Decode(&st); err != nil {
+		t.Fatal(err)
+	}
+	if st.Version != testVersion {
+		t.Errorf("/api/status version = %q, want %q", st.Version, testVersion)
 	}
 }

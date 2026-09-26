@@ -40,15 +40,23 @@ func vcsRevision() string {
 	return rev
 }
 
-func cmdVersion([]string) error {
-	v := version
+// versionString is the version as shown to people: `enghi version`, the
+// settings screen and /api/status. A make build carries the commit hash in it
+// (git describe); a release build is the bare tag.
+func versionString() string {
+	return displayVersion(version, vcsRevision())
+}
+
+func displayVersion(v, rev string) string {
 	// When ldflags filled it in, the commit is already there; do not repeat it.
-	if v == "dev" {
-		if rev := vcsRevision(); rev != "" {
-			v += " (" + rev + ")"
-		}
+	if v == "dev" && rev != "" {
+		v += " (" + rev + ")"
 	}
-	fmt.Printf("enghi %s %s/%s %s\n", v, runtime.GOOS, runtime.GOARCH, runtime.Version())
+	return v
+}
+
+func cmdVersion([]string) error {
+	fmt.Printf("enghi %s %s/%s %s\n", versionString(), runtime.GOOS, runtime.GOARCH, runtime.Version())
 	return nil
 }
 
