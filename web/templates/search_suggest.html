@@ -1,5 +1,5 @@
 {{range .Results}}
-<a href="{{if eq .Kind "page"}}/wiki/{{.Slug}}{{else}}/search?q={{$.Query}}{{end}}">
+<a href="{{if eq .Kind "page"}}/wiki/{{.Slug}}{{else if eq .Kind "log"}}/gtd/clarify/{{.TaskID}}#log-{{.ID}}{{else}}/search?q={{$.Query}}{{end}}">
   <div class="t"><span class="badge {{.Kind}}">{{kindLabel .Kind}}</span> {{.Title}}</div>
   {{if .Snippet}}<div class="s">{{snippet .Snippet}}</div>{{end}}
 </a>

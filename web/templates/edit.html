@@ -12,7 +12,7 @@
   <input type="text" id="tags" name="tags" value="{{$d.TagText}}">
 
   <label for="body">{{t "edit.body" "[[...]]"}}</label>
-  <textarea id="body" name="body" spellcheck="false">{{$d.Page.Body}}</textarea>
+  <textarea id="body" name="body" spellcheck="false" data-paste-upload data-wikilink>{{$d.Page.Body}}</textarea>
 
   <div class="actions">
     <button type="submit" class="primary">{{t "common.save"}}</button>

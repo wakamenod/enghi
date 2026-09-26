@@ -35,6 +35,9 @@ func TestAllScreensRenderCompletely(t *testing.T) {
 	mustJSON(t, h, "POST", "/api/tasks", `{"title":"いつかやる"}`)
 	mustJSON(t, h, "PATCH", "/api/tasks/4", `{"state":"someday"}`)
 	mustJSON(t, h, "POST", "/api/tasks", `{"title":"Inbox に残すもの"}`)
+	mustJSON(t, h, "POST", "/api/tasks/1/logs", `{"kind":"start"}`)
+	mustJSON(t, h, "POST", "/api/tasks/5/logs", `{"body":"**調べた**こと [[参考資料]]"}`)
+	mustJSON(t, h, "POST", "/api/tasks/5/logs", `{"kind":"start","body":"着手"}`)
 
 	screens := []string{
 		"/", "/wiki", "/wiki/参考資料", "/wiki/参考資料/edit", "/wiki/参考資料/history",
@@ -194,6 +197,9 @@ func TestEnglishScreensHaveNoJapanese(t *testing.T) {
 	mustJSON(t, h, "POST", "/api/areas", `{"name":"Finances"}`)
 	mustJSON(t, h, "POST", "/api/projects", `{"title":"Office move","outcome":"Moved in"}`)
 	mustJSON(t, h, "POST", "/api/tasks", `{"title":"Call the agent"}`)
+	mustJSON(t, h, "POST", "/api/tasks/1/logs", `{"body":"Tried the *office* line first"}`)
+	mustJSON(t, h, "POST", "/api/tasks/1/logs", `{"kind":"start"}`)
+	mustJSON(t, h, "POST", "/api/tasks/1/logs", `{"kind":"pause","body":"lunch"}`)
 
 	japanese := regexp.MustCompile(`[ぁ-んァ-ヶ一-龠]`)
 	screens := []string{
@@ -201,6 +207,7 @@ func TestEnglishScreensHaveNoJapanese(t *testing.T) {
 		"/wiki/new", "/tags", "/search?q=Article", "/gtd", "/gtd/inbox", "/gtd/next",
 		"/gtd/waiting", "/gtd/scheduled", "/gtd/someday", "/gtd/projects",
 		"/gtd/project/1", "/gtd/areas", "/gtd/area/1", "/gtd/review", "/gtd/clarify/1",
+		"/search?q=office",
 	}
 	for _, path := range screens {
 		r := req("GET", path, "")

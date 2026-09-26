@@ -35,6 +35,7 @@ func init() {
 		"kind.page":              "Article",
 		"kind.project":           "Project",
 		"kind.task":              "Task",
+		"kind.log":               "Log",
 		"kind.area":              "Area",
 
 		// ---- dashboard
@@ -202,6 +203,7 @@ func init() {
 		"gtd.deadline":            "Due %s",
 		"gtd.scheduled_on":        "Scheduled %s",
 		"gtd.recurring":           "Recurring: %s",
+		"gtd.working":             "Working",
 		"gtd.complete":            "Done",
 		"gtd.unprocessed":         "%d unprocessed",
 		"gtd.contexts_empty":      "None yet. Try starting with @phone, @home, or @errands.",
@@ -272,6 +274,20 @@ func init() {
 		"clarify.end_series_confirm": "End this recurring series? No future tasks will be created.",
 		"clarify.delete_confirm":     "Delete this item?",
 		"clarify.captured_at":        "Captured",
+
+		// ---- the work log on a task
+		"log.title":            "Work log",
+		"log.note":             "What you tried, found and decided, in order. Markdown, [[links]] and pasted images work as in articles.",
+		"log.empty":            "Nothing logged yet.",
+		"log.placeholder":      "What did you try, find or decide?",
+		"log.hint":             "Ctrl/⌘+Enter to add · paste or drop images",
+		"log.start":            "Start",
+		"log.pause":            "Pause",
+		"log.started":          "▶ started %s",
+		"log.paused":           "⏸ paused %s",
+		"log.edited":           "edited %s",
+		"log.delete_confirm":   "Delete this entry?",
+		"log.version_conflict": "This entry was changed elsewhere. Go back, copy your text, then reload.",
 
 		// ---- weekly review
 		"review.title":           "Weekly Review",

@@ -35,6 +35,7 @@ func init() {
 		"kind.page":              "記事",
 		"kind.project":           "Project",
 		"kind.task":              "Task",
+		"kind.log":               "ログ",
 		"kind.area":              "Area",
 
 		// ---- dashboard
@@ -202,6 +203,7 @@ func init() {
 		"gtd.deadline":            "締切 %s",
 		"gtd.scheduled_on":        "予定 %s",
 		"gtd.recurring":           "定期タスク: %s",
+		"gtd.working":             "作業中",
 		"gtd.complete":            "完了",
 		"gtd.unprocessed":         "未処理 %d",
 		"gtd.contexts_empty":      "まだありません。@電話 @自宅 @買い物 あたりから始めると十分です。",
@@ -272,6 +274,20 @@ func init() {
 		"clarify.end_series_confirm": "この系列全体を終了します。以降のタスクは生成されなくなります。よろしいですか？",
 		"clarify.delete_confirm":     "この項目を削除します。よろしいですか？",
 		"clarify.captured_at":        "登録日時",
+
+		// ---- the work log on a task
+		"log.title":            "作業ログ",
+		"log.note":             "試したこと・分かったこと・決めたことを順に残します。記事と同じく Markdown、[[リンク]]、画像の貼り付けが使えます。",
+		"log.empty":            "まだ記録はありません。",
+		"log.placeholder":      "何を試し、何が分かり、何を決めたか",
+		"log.hint":             "Ctrl/⌘+Enter で追加 · 画像は貼り付けかドロップ",
+		"log.start":            "開始",
+		"log.pause":            "中断",
+		"log.started":          "▶ 開始 %s",
+		"log.paused":           "⏸ 中断 %s",
+		"log.edited":           "編集 %s",
+		"log.delete_confirm":   "この記録を削除します。よろしいですか？",
+		"log.version_conflict": "この記録は別の場所で更新されています。戻って入力内容を控えてから再読み込みしてください。",
 
 		// ---- Weekly Review
 		"review.title":           "Weekly Review",
