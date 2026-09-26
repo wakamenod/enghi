@@ -34,6 +34,9 @@ type GTDSummary struct {
 	StalledProjects []*gtd.Project `json:"stalled_projects"`
 	// 5. Waiting-for items delegated more than a few days ago (7 by default)
 	WaitingOverdue []*gtd.Task `json:"waiting_overdue"`
+	// The tasks being worked on now: started and not paused, oldest start
+	// first. The day page (/gtd/day) has the rest of today.
+	Working []*gtd.Task `json:"working"`
 
 	Enabled bool `json:"enabled"` // whether there is any GTD data at all
 }
@@ -131,6 +134,14 @@ func (s *Server) dashboardData(ctx context.Context) (*Dashboard, error) {
 	}
 	if d.GTD.WaitingOverdue, err = s.gtd.WaitingOverdue(ctx, 7); err != nil {
 		return nil, err
+	}
+	working, err := s.gtd.Working(ctx)
+	if err != nil {
+		return nil, err
+	}
+	d.GTD.Working = make([]*gtd.Task, 0, len(working))
+	for _, w := range working {
+		d.GTD.Working = append(d.GTD.Working, w.Task)
 	}
 	return d, nil
 }

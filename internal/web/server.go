@@ -123,6 +123,8 @@ func (s *Server) routes() {
 	m.HandleFunc("GET /gtd/area/{id}", s.viewArea)
 	m.HandleFunc("GET /gtd/review", s.viewReview)
 	m.HandleFunc("GET /gtd/clarify/{id}", s.viewClarify)
+	m.HandleFunc("GET /gtd/day", s.viewDay)
+	m.HandleFunc("GET /gtd/day/{date}", s.viewDay)
 	m.HandleFunc("GET /settings", s.viewSettings)
 	m.HandleFunc("GET /guide", s.viewGuideIndex)
 	m.HandleFunc("GET /guide/{topic}", s.viewGuide)
@@ -210,6 +212,8 @@ func (s *Server) routes() {
 	m.HandleFunc("POST /api/contexts", s.apiCreateContext)
 	m.HandleFunc("GET /api/review", s.apiReview)
 	m.HandleFunc("GET /api/series", s.apiSeries)
+	m.HandleFunc("GET /api/day", s.apiDay)
+	m.HandleFunc("GET /api/days", s.apiDays)
 
 	// ---- static files, with an ETag and ?v= from the content hash (static.go)
 	m.HandleFunc("GET /static/", serveStatic)
@@ -335,6 +339,7 @@ func jsStrings(lang i18n.Lang) string {
 		"repeat.ends_on", "repeat.pick_day",
 		"repeat.wd.sun", "repeat.wd.mon", "repeat.wd.tue", "repeat.wd.wed",
 		"repeat.wd.thu", "repeat.wd.fri", "repeat.wd.sat",
+		"day.copied", "day.copy_manual",
 	}
 	m := make(map[string]string, len(keys))
 	for _, k := range keys {

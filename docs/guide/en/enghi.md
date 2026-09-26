@@ -171,6 +171,21 @@ Every task has a **work log** at the bottom of its clarify screen: timestamped e
 
 The log is included in search, labeled "Log"; when several entries of one task match, only its best one is shown. Entries can be edited or deleted, and deleting a Start or Pause takes back a mistaken press. There is no revision history for entries—an edit overwrites.
 
+## Work Record — What a Day Held {#day}
+
+The **work record** (`g` `l`, or "Today's work →" on the dashboard) shows one day: what you finished and what you worked on, with that day's work-log entries under each task. It opens on today; pick another day from the month calendar on the right, with `[` and `]` (previous and next day), `t` (back to today) or the date field. Days with anything recorded have a dot.
+
+A day is grouped four ways:
+
+- **Done** — tasks completed that day, with the time. A task reopened later no longer counts.
+- **In progress** — tasks started and not paused at the end of the day. For today, these are the tasks working now; for a past day, it is worked out from the Start and Pause marks.
+- **Worked on** — anything else with a log entry written that day.
+- **Dropped** — tasks dropped that day, including skipped recurring occurrences. Folded by default.
+
+"Copy as Markdown" copies the day as plain Markdown for a report or a chat message. Where the browser cannot copy (the Emacs view, for one), the text appears selected for you to copy by hand. The same data is at `/api/day?date=YYYY-MM-DD` (JSON, or Markdown with `&format=markdown`); the Claude Code skill uses it to draft a daily report on request.
+
+The dashboard lists the tasks you are working on now, and the Weekly Review links to each day of the past week.
+
 ## Wiki Integration {#wiki}
 
 GTD and the wiki are independent. **The wiki works fully without touching GTD**, and vice versa.
@@ -192,11 +207,14 @@ They connect in only three places:
 | `g` `n` | Next Actions |
 | `g` `p` | Projects |
 | `g` `w` | Articles |
+| `g` `l` | Work record (today) |
 | `j` / `k` | Move down / up a list |
 | `Enter` | Open the selected item; on a task, choose where to move it (so does clicking its title) |
 | `u` | Undo the last move, while its notice is shown at the bottom of the screen |
 | `p` | Start or pause work on the selected task |
 | `e` | Edit the article |
+| `[` / `]` | Work record: previous / next day |
+| `t` | Work record: back to today (on a selected task, rename it) |
 
 ## Terminology {#glossary}
 

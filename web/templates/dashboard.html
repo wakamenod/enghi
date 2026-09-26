@@ -16,6 +16,7 @@
       {{end}}
       · <a href="/gtd/next">Next</a>
       · <a href="/gtd/review">Weekly Review</a>
+      · <a href="/gtd/day">{{t "dash.day_link"}}</a>
       {{if $.Set.Contexts}}{{range $d.GTD.Contexts}} · <a href="/gtd/next?context={{.Name}}">{{.Name}} {{.Count}}</a>{{end}}{{end}}
     </div>
 
@@ -82,6 +83,21 @@
       </div>
 
       <div>
+        {{/* Started and not paused. Shown only when there is any */}}
+        {{if $d.GTD.Working}}
+        <div class="col-block">
+          <div class="subhead">{{t "dash.working"}}</div>
+          <ul class="rows">
+            {{range $d.GTD.Working}}
+            <li><a href="/gtd/clarify/{{.ID}}">{{.Title}}</a>
+                {{if .ProjectTitle}}<span class="tag">{{.ProjectTitle}}</span>{{end}}
+                <a class="tag working" href="/gtd/clarify/{{.ID}}#log">{{t "gtd.working"}}</a></li>
+            {{end}}
+          </ul>
+          <div class="meta"><a href="/gtd/day">{{t "dash.day_link"}}</a></div>
+        </div>
+        {{end}}
+
         <div class="col-block">
           <div class="subhead">{{t "dash.stalled"}}</div>
           {{if $d.GTD.StalledProjects}}

@@ -49,6 +49,7 @@ func TestAllScreensRenderCompletely(t *testing.T) {
 		"/gtd/waiting", "/gtd/scheduled", "/gtd/someday",
 		"/gtd/projects", "/gtd/projects?status=active", "/gtd/project/1",
 		"/gtd/areas", "/gtd/area/1", "/gtd/review", "/gtd/clarify/5",
+		"/gtd/day", "/gtd/day/2020-01-01", "/gtd/day?date=2020-02-29",
 		"/guide", "/guide/gtd", "/guide/enghi", "/settings",
 	}
 	for _, path := range screens {
@@ -271,7 +272,7 @@ func TestEnglishScreensHaveNoJapanese(t *testing.T) {
 		"/wiki/new", "/tags", "/search?q=Article", "/gtd", "/gtd/inbox", "/gtd/next",
 		"/gtd/waiting", "/gtd/scheduled", "/gtd/someday", "/gtd/projects",
 		"/gtd/project/1", "/gtd/areas", "/gtd/area/1", "/gtd/review", "/gtd/clarify/1",
-		"/search?q=office",
+		"/search?q=office", "/gtd/day", "/gtd/day/2020-01-01",
 	}
 	for _, path := range screens {
 		r := req("GET", path, "")
