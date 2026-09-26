@@ -68,6 +68,17 @@ func (s *Server) apiListTasks(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"tasks": tasks})
 }
 
+// apiLists is GET /api/lists: the count of every list on the GTD top page, in
+// one call. Every field is always present; showing Areas is the client's choice.
+func (s *Server) apiLists(w http.ResponseWriter, r *http.Request) {
+	c, err := s.gtd.ListCounts(ctxOf(r))
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, c)
+}
+
 // apiCreateTask is capture. **{title} alone must be enough** (DESIGN 4.2).
 func (s *Server) apiCreateTask(w http.ResponseWriter, r *http.Request) {
 	var in gtd.CaptureInput

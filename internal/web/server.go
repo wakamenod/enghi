@@ -205,6 +205,7 @@ func (s *Server) routes() {
 	m.HandleFunc("DELETE /api/files/{hash}", s.apiDeleteFile)
 	m.HandleFunc("GET /files/{hash}", s.serveFile)
 
+	m.HandleFunc("GET /api/lists", s.apiLists)
 	m.HandleFunc("GET /api/tasks", s.apiListTasks)
 	m.HandleFunc("POST /api/tasks", s.apiCreateTask)
 	m.HandleFunc("GET /api/tasks/{id}", s.apiGetTask)

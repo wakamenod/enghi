@@ -14,38 +14,22 @@ import (
 // ---------------------------------------------------------------- screens
 
 type gtdTopData struct {
-	InboxCount int
-	NextCount  int
-	WaitingCnt int
-	SchedCount int
-	SomedayCnt int
-	Projects   []*gtd.Project
-	Stalled    []*gtd.Project
-	Contexts   []*gtd.Context
-	Areas      []*gtd.Area
+	Counts   gtd.ListCounts // the same numbers as GET /api/lists
+	Projects []*gtd.Project
+	Stalled  []*gtd.Project
+	Contexts []*gtd.Context
+	Areas    []*gtd.Area
 }
 
 func (s *Server) viewGTDTop(w http.ResponseWriter, r *http.Request) {
 	ctx := ctxOf(r)
 	d := gtdTopData{}
-	inbox, err := s.gtd.Inbox(ctx)
+	counts, err := s.gtd.ListCounts(ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	d.InboxCount = len(inbox)
-	if next, err := s.gtd.NextActions(ctx, nil); err == nil {
-		d.NextCount = len(next)
-	}
-	if waiting, err := s.gtd.Waiting(ctx); err == nil {
-		d.WaitingCnt = len(waiting)
-	}
-	if sch, err := s.gtd.Scheduled(ctx); err == nil {
-		d.SchedCount = len(sch)
-	}
-	if sm, err := s.gtd.Someday(ctx); err == nil {
-		d.SomedayCnt = len(sm)
-	}
+	d.Counts = *counts
 	d.Projects, _ = s.gtd.Projects(ctx, "active")
 	d.Stalled, _ = s.gtd.StalledProjects(ctx)
 	d.Contexts, _ = s.gtd.Contexts(ctx)
