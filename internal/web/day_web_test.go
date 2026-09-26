@@ -2,6 +2,7 @@ package web_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -362,3 +363,45 @@ func TestAutoPauseOnMove(t *testing.T) {
 	}
 }
 
+// The review's look back links the same days its completions come from: the
+// seven days before today.
+func TestReviewPastDaysMatchCompletions(t *testing.T) {
+	h, db := newServerDB(t)
+	today := time.Now()
+	for i, ago := range []int{0, 1, 7, 8} {
+		mustJSON(t, h, "POST", "/api/tasks", `{"title":"t"}`)
+		id := fmt.Sprint(i + 1)
+		mustJSON(t, h, "POST", "/api/tasks/"+id+"/complete", `{}`)
+		// Noon local on that day, as UTC
+		d := today.AddDate(0, 0, -ago)
+		noon := time.Date(d.Year(), d.Month(), d.Day(), 12, 0, 0, 0, time.Local).UTC().Format("2006-01-02 15:04:05")
+		if _, err := db.Exec(`UPDATE tasks SET completed_at = ?, title = ? WHERE id = ?`, noon, "ago "+fmt.Sprint(ago), id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var rv struct {
+		Completed []struct{ Title string } `json:"completed_last_week"`
+	}
+	decode(t, do(h, req("GET", "/api/review", "")), &rv)
+	var titles []string
+	for _, c := range rv.Completed {
+		titles = append(titles, c.Title)
+	}
+	if strings.Join(titles, ",") != "ago 1,ago 7" {
+		t.Errorf("completed_last_week = %v, want ago 1 and ago 7", titles)
+	}
+
+	page := do(h, req("GET", "/gtd/review", "")).Body.String()
+	links := regexp.MustCompile(`<a href="/gtd/day/(\d{4}-\d\d-\d\d)">`).FindAllStringSubmatch(page, -1)
+	var got []string
+	for _, m := range links {
+		got = append(got, m[1])
+	}
+	var want []string
+	for i := 7; i >= 1; i-- {
+		want = append(want, today.AddDate(0, 0, -i).Format("2006-01-02"))
+	}
+	if strings.Join(got, " ") != strings.Join(want, " ") {
+		t.Errorf("day links = %v, want %v", got, want)
+	}
+}

@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"time"
 
 	"github.com/wakamenod/enghi/internal/gtd"
 	"github.com/wakamenod/enghi/internal/i18n"
@@ -79,12 +80,12 @@ func (s *Server) reviewData(ctx context.Context, lang i18n.Lang) (*ReviewData, e
 	}
 
 	today := gtd.Today()
-	lastWeek := gtd.FormatDate(today.AddDate(0, 0, -7))
-	if d.CompletedLastWeek, err = s.gtd.CompletedBetween(ctx, lastWeek, gtd.FormatDate(today)); err != nil {
+	past := reviewPastDays(today)
+	if d.CompletedLastWeek, err = s.gtd.CompletedBetween(ctx,
+		gtd.FormatDate(past[0]), gtd.FormatDate(past[len(past)-1])); err != nil {
 		return nil, err
 	}
-	for i := 7; i >= 0; i-- {
-		day := today.AddDate(0, 0, -i)
+	for _, day := range past {
 		d.PastDays = append(d.PastDays, reviewDay{Date: gtd.FormatDate(day),
 			Label: day.Format("01/02") + " " + i18n.T(lang, dayWeekdayKeys[day.Weekday()])})
 	}
@@ -108,4 +109,16 @@ func (s *Server) reviewData(ctx context.Context, lang i18n.Lang) (*ReviewData, e
 		return nil, err
 	}
 	return d, nil
+}
+
+// reviewPastDays are the days the look back covers, oldest first: the seven
+// days before today. **The completions listed and the links to each day's
+// record both come from here**, so they always cover the same days. Today is
+// not in it; it is still going, and the day page and dashboard show it.
+func reviewPastDays(today time.Time) []time.Time {
+	out := make([]time.Time, 0, 7)
+	for i := 7; i >= 1; i-- {
+		out = append(out, today.AddDate(0, 0, -i))
+	}
+	return out
 }
