@@ -21,9 +21,11 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 
+	"github.com/wakamenod/enghi/internal/calendar"
 	"github.com/wakamenod/enghi/internal/config"
 	"github.com/wakamenod/enghi/internal/export"
 	filestore "github.com/wakamenod/enghi/internal/files"
@@ -176,6 +178,12 @@ func cmdServe(args []string) error {
 				log.Print(msg)
 			})
 	}
+
+	// Calendar events: run the Shortcuts shortcut at start-up and every
+	// calendar_sync_interval, while it is on in the settings. macOS only.
+	calCtx, stopCal := context.WithCancel(context.Background())
+	defer stopCal()
+	go srv.UseShortcuts(calendar.ShortcutsRunner{}, runtime.GOOS == "darwin").Daemon(calCtx)
 
 	// **Never bind to 0.0.0.0**, even if the configuration asks for it
 	// (DESIGN 4.4). config.validate() rejects it first; this is the second guard.

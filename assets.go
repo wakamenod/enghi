@@ -29,3 +29,10 @@ var GuideFS embed.FS
 //
 //go:embed skills/enghi
 var SkillFS embed.FS
+
+// ShortcutFile is the signed enghi-events shortcut, which the settings screen
+// hands to Shortcuts ("Add shortcut"). packaging/shortcuts/build.py makes it;
+// re-sign it at every release, since the signature expires.
+//
+//go:embed shortcuts/enghi-events.shortcut
+var ShortcutFile []byte

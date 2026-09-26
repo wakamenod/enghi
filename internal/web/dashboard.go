@@ -2,7 +2,9 @@ package web
 
 import (
 	"context"
+	"time"
 
+	"github.com/wakamenod/enghi/internal/calendar"
 	"github.com/wakamenod/enghi/internal/gtd"
 	"github.com/wakamenod/enghi/internal/wiki"
 )
@@ -11,8 +13,12 @@ import (
 // GTD on top, the wiki below. **Without GTD in use, the top half is simply
 // empty.**
 type Dashboard struct {
-	GTD  GTDSummary  `json:"gtd"`
-	Wiki WikiSummary `json:"wiki"`
+	// Today's calendar events, all-day ones first, hidden calendars left out
+	Events []*calendar.Event `json:"events"`
+	GTD    GTDSummary        `json:"gtd"`
+	Wiki   WikiSummary       `json:"wiki"`
+	// Timeline is Events as the screen shows them
+	Timeline *timeline `json:"-"`
 }
 
 // GTDSummary is the top half (DESIGN 5). **Without GTD in use it is simply
@@ -76,6 +82,13 @@ type WikiSummary struct {
 // dashboardData gathers every aggregate in one go.
 func (s *Server) dashboardData(ctx context.Context) (*Dashboard, error) {
 	d := &Dashboard{}
+
+	// Today's schedule, above everything in the GTD half
+	now := time.Now()
+	var err error
+	if d.Timeline, d.Events, err = s.dayTimeline(ctx, now); err != nil {
+		return nil, err
+	}
 
 	total, err := s.pages.CountPages(ctx)
 	if err != nil {

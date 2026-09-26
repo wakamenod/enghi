@@ -13,6 +13,7 @@ import (
 	"time"
 
 	enghi "github.com/wakamenod/enghi"
+	"github.com/wakamenod/enghi/internal/calendar"
 	"github.com/wakamenod/enghi/internal/config"
 	filestore "github.com/wakamenod/enghi/internal/files"
 	"github.com/wakamenod/enghi/internal/gtd"
@@ -32,6 +33,8 @@ type Server struct {
 	files  *filestore.Store
 	search *search.Service
 	set    *settings.Service
+	cal    *calendar.Service
+	sync   *calendar.Syncer
 	hub    *Hub
 	// One template set per language. **Template functions are bound at parse
 	// time and cannot be swapped per request**, so we build as many sets as
@@ -59,10 +62,13 @@ func New(cfg config.Config, db *store.DB, files *filestore.Store) (*Server, erro
 		files:  files,
 		search: search.New(db),
 		set:    settings.New(db),
+		cal:    calendar.New(db),
 		hub:    NewHub(),
 		tmpl:   tmpl,
 		mux:    http.NewServeMux(),
 	}
+	// No runner until UseShortcuts: the sync does nothing, the rest works
+	s.sync = calendar.NewSyncer(s.cal, s.set, nil, cfg.CalendarShortcut, cfg.CalendarSyncInterval, false)
 	s.routes()
 	return s, nil
 }
@@ -161,6 +167,10 @@ func (s *Server) routes() {
 	m.HandleFunc("POST /ui/settings", s.uiUpdateSettings)
 	m.HandleFunc("POST /ui/backup", s.uiBackup)
 	m.HandleFunc("POST /ui/install-skill", s.uiInstallSkill)
+	m.HandleFunc("POST /ui/calendar", s.uiCalendarSettings)
+	m.HandleFunc("POST /ui/calendar/sync", s.uiCalendarSync)
+	m.HandleFunc("POST /ui/calendar/install", s.uiCalendarInstall)
+	m.HandleFunc("POST /ui/calendar/events/{id}/task", s.uiEventTask)
 	m.HandleFunc("GET /ui/lang", s.handleSetLang)
 	m.HandleFunc("GET /ui/search", s.uiSearchFragment) // incremental search, per keystroke
 	m.HandleFunc("POST /ui/preview", s.uiPreview)      // preview on the edit screen
@@ -216,6 +226,11 @@ func (s *Server) routes() {
 	m.HandleFunc("GET /api/series", s.apiSeries)
 	m.HandleFunc("GET /api/day", s.apiDay)
 	m.HandleFunc("GET /api/days", s.apiDays)
+	m.HandleFunc("GET /api/calendar/events", s.apiCalendarEvents)
+	m.HandleFunc("PUT /api/calendar/events", s.apiPutCalendarEvents)
+	m.HandleFunc("POST /api/calendar/events/{id}/task", s.apiEventTask)
+	m.HandleFunc("GET /api/calendar/status", s.apiCalendarStatus)
+	m.HandleFunc("POST /api/calendar/sync", s.apiCalendarSync)
 
 	// ---- static files, with an ETag and ?v= from the content hash (static.go)
 	m.HandleFunc("GET /static/", serveStatic)

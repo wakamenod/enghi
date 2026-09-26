@@ -19,6 +19,63 @@
   </form>
 </section>
 
+<section class="panel" id="calendar">
+  {{$c := $d.Calendar}}
+  <h2>{{t "cal.settings"}}</h2>
+  <div class="meta">{{t "cal.settings_note"}}</div>
+  {{if not $c.Status.Supported}}
+  <div class="meta">{{t "cal.macos_only"}}</div>
+  {{else}}
+  <div class="meta">{{t "cal.shortcut"}} <code>{{$c.Status.Shortcut}}</code> —
+    {{if $c.Installed}}{{t "cal.installed"}}{{else}}{{t "cal.not_installed"}}{{end}}</div>
+  {{if $d.Local}}
+  <form method="post" action="/ui/calendar/install" class="actions">
+    <button type="submit"{{if not $c.Installed}} class="primary"{{end}}>{{if $c.Installed}}{{t "cal.reinstall"}}{{else}}{{t "cal.install"}}{{end}}</button>
+    <span class="meta">{{t "cal.install_note"}}</span>
+  </form>
+  {{else}}
+  <div class="meta">{{t "cal.local_only"}}</div>
+  {{end}}
+  <div class="meta"><a href="/guide/enghi#calendar-manual">{{t "cal.manual_link"}}</a></div>
+
+  <form method="post" action="/ui/calendar" class="cal-form">
+    <label class="check">
+      <input type="checkbox" name="enabled" value="1" {{if $c.Status.Enabled}}checked{{end}}>
+      <span><strong>{{t "cal.enable"}}</strong> — {{t "cal.enable_note" $c.Status.Interval}}</span>
+    </label>
+    {{if $c.Calendars}}
+    <div class="subhead">{{t "cal.show_calendars"}}</div>
+    {{range $c.Calendars}}
+    <input type="hidden" name="known" value="{{.Name}}">
+    <label class="check">
+      <input type="checkbox" name="show" value="{{.Name}}" {{if not .Hidden}}checked{{end}}>
+      <span>{{if .Name}}{{.Name}}{{else}}{{t "common.none"}}{{end}}</span>
+    </label>
+    {{end}}
+    <div class="meta">{{t "cal.hidden_note"}}</div>
+    {{end}}
+    <div class="actions"><button type="submit" class="primary">{{t "common.save"}}</button></div>
+  </form>
+
+  <div class="subhead cal-status-head">{{t "cal.status"}}</div>
+  <div class="meta">
+    {{if $c.LastRun}}{{t "cal.last_run" $c.LastRun}}{{else}}{{t "cal.never"}}{{end}}
+    {{if $c.LastSuccess}} · {{t "cal.last_success" $c.LastSuccess $c.Status.Count}}{{end}}
+    {{if $c.Status.Skipped}} · {{t "cal.skipped" $c.Status.Skipped}}{{end}}
+  </div>
+  {{if $c.Status.Error}}
+  <div class="notice">
+    {{t "cal.error" $c.Status.Error}}<br>
+    {{if $c.Status.Missing}}{{t "cal.missing_hint"}}{{else}}{{t "cal.permission_hint"}}{{end}}
+  </div>
+  {{end}}
+  <form method="post" action="/ui/calendar/sync" class="actions">
+    <button type="submit">{{t "cal.sync_now"}}</button>
+    {{if not $c.Status.Enabled}}<span class="meta">{{t "cal.sync_off_note"}}</span>{{end}}
+  </form>
+  {{end}}
+</section>
+
 <section class="panel">
   <h2>{{t "settings.export"}}</h2>
   <div class="meta">{{t "settings.export_note"}}</div>
