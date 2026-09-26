@@ -242,7 +242,7 @@ If **Add shortcut** doesn't work, you can build the same shortcut in the Shortcu
 7. Still inside the loop, add **Text** that holds only the **Dictionary** variable. A dictionary turned into text is one line of JSON.
 8. After **End Repeat**, add **Combine Text** on **Repeat Results**, with **New Lines**.
 9. Add **Stop and Output** with **Combined Text**.
-10. Run it once and allow calendar access. In Terminal, `shortcuts run enghi-events` should print one JSON object per event.
+10. Run it once and allow calendar access. In Terminal, `shortcuts run enghi-events < /dev/null` should print one JSON object per event. When its standard input isn't a terminal, `shortcuts run` waits for that input to end. If it seems to hang when run from a script or a pipe, add `< /dev/null`.
 
 ## Wiki Integration {#wiki}
 

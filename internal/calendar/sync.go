@@ -45,6 +45,10 @@ func (ShortcutsRunner) Run(ctx context.Context, name string) ([]byte, error) {
 	defer cancel()
 	var stdout, stderr bytes.Buffer
 	cmd := exec.CommandContext(ctx, shortcutsBin, "run", name)
+	// `shortcuts run` reads a stdin that isn't a terminal to EOF as the
+	// shortcut's input, whatever the shortcut accepts. Nil already means
+	// /dev/null; keep it empty on purpose.
+	cmd.Stdin = strings.NewReader("")
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	if err := cmd.Run(); err != nil {
 		if msg := strings.TrimSpace(stderr.String()); msg != "" {
