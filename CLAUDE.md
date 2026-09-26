@@ -28,3 +28,16 @@ git tag v0.1.0 && git push origin v0.1.0
 
 Then update `url` and `sha256` in `packaging/homebrew/enghi.rb`, and copy the result into
 `Formula/enghi.rb` in `wakamenod/homebrew-tap`.
+
+**Before tagging, re-sign the calendar shortcut** and commit it. The signature embeds an
+Apple certificate that expires about a year after signing (the current one on
+2027-10-20), and an expired one no longer imports. Signing needs a Mac signed into
+iCloud and contacts Apple:
+
+```sh
+python3 packaging/shortcuts/build.py   # writes and signs shortcuts/enghi-events.shortcut
+```
+
+The shortcut's window must match `WindowPastDays` / `WindowFutureDays` in
+`internal/calendar/calendar.go`. After changing the shortcut, import it once and check
+`shortcuts run enghi-events`: Shortcuts silently accepts filters it then ignores.

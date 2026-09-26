@@ -133,6 +133,7 @@ Reading:
 | `GET /api/tasks/<id>/logs` | The task's work log, oldest first, as `{"working": ..., "logs": [...]}` |
 | `GET /api/day?date=YYYY-MM-DD` | One day's work record (today by default); see "The daily report" |
 | `GET /api/days?month=YYYY-MM` | Per-day counts for a month, `{"days": {"2026-09-26": {"done", "dropped", "logs"}}}`; days with nothing are absent |
+| `GET /api/calendar/events?from=YYYY-MM-DD&to=YYYY-MM-DD` | Calendar events (meetings and the like) overlapping those days, both inclusive, today by default: `{"events": [{title, start, end, all_day, calendar, location, task_id}]}`, all-day ones first. `start`/`end` are local ISO 8601; `end` is exclusive, so an all-day event ends at the next midnight. Read-only: enghi never writes to the calendar. Empty unless the user set up the calendar sync |
 | `GET /api/projects?status=active` | Projects (`active`, `someday`, `done`, `dropped`) |
 | `GET /api/projects/stalled` | Active projects with no next action |
 | `GET /api/projects/<id>` | A project, its tasks and linked pages |
@@ -205,7 +206,7 @@ For "what should I do today", a morning check-in and the like. It takes a few mi
 not an hour; keep it short and do not turn it into a weekly review.
 
 ```sh
-curl -s http://127.0.0.1:7777/api/dashboard | jq '.gtd | {inbox_count, today, upcoming, waiting_overdue}'
+curl -s http://127.0.0.1:7777/api/dashboard | jq '{events: [.events[] | {title, start, end, all_day}]} + (.gtd | {inbox_count, today, upcoming, waiting_overdue})'
 curl -s 'http://127.0.0.1:7777/api/tasks?state=next_actions' |
   jq '[.tasks[] | {id, title, context_name, project_title, deadline_on, energy, time_estimate, working}]'
 ```
@@ -222,7 +223,9 @@ curl -s 'http://127.0.0.1:7777/api/tasks?state=next_actions' |
    to capture a follow-up.
 4. **Pick for today** — ask how much time they have and where they are, then suggest a
    few next actions that fit: deadlines in the next few days first, then by context,
-   `energy` and `time_estimate`. Group the list by `context_name`.
+   `energy` and `time_estimate`. Group the list by `context_name`. `events` are today's
+   calendar events; the free time lies between them, so mention the next meeting and
+   plan around it.
 
 enghi has no "today" list, so the picks stay in the conversation; do not change tasks to
 record them. Completing, moving or rewriting tasks follows the usual rule: propose, then
@@ -240,7 +243,8 @@ curl -s 'http://127.0.0.1:7777/api/day?date=2026-09-26' | jq '{date, weekday,
   done:    [.done[]    | {title: .task.title, project: .task.project_title, completed_at, logs, earlier_logs}],
   working: [.working[] | {title: .task.title, project: .task.project_title, since, logs}],
   worked:  [.worked[]  | {title: .task.title, project: .task.project_title, logs}],
-  dropped: [.dropped[] | {title: .task.title, completed_at}]}'
+  dropped: [.dropped[] | {title: .task.title, completed_at}],
+  events:  [.events[]  | {title, start, end, all_day, calendar}]}'
 ```
 
 Leave out `date` for today. A day is the user's **local** calendar day.
@@ -258,6 +262,9 @@ Leave out `date` for today. A day is the user's **local** calendar day.
   in local time with the offset** (`2026-09-26T14:05:00+09:00`); `timezone` names the zone.
   The embedded `task` object keeps the API's usual UTC `YYYY-MM-DD HH:MM:SS` fields; do
   not mix the two when quoting times.
+- `events` are the day's calendar events — meetings and the like, all-day ones first —
+  also for a past day (enghi keeps them). They say what the day was spent on besides the
+  tasks. Empty when the user has not set up the calendar sync.
 - `format=markdown` gives the same day as plain Markdown (what the page's copy button
   copies), if the user wants the raw record rather than a report.
 
@@ -267,6 +274,8 @@ Leave out `date` for today. A day is the user's **local** calendar day.
      context when the day's own `logs` say little. Do not report earlier entries as
      that day's work.
    - **In progress** — what is under way and where it stands, from the latest log entries.
+   - **Meetings** — one line naming the day's `events`, if there were any and they matter
+     to the report; skip all-day markers such as holidays.
    - **Findings and decisions** — anything notable in the log bodies: causes found,
      numbers, choices made and why. Quote sparingly; summarise.
    - **Next** — what comes next, from the last entries of in-progress tasks and the

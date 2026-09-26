@@ -51,6 +51,9 @@ backup_keep    = 7       # Generations to keep
 backup_enabled = true
 
 skills_dir     = "~/.claude/skills"   # Where install-skill writes the Claude Code skill
+
+calendar_shortcut      = "enghi-events"   # macOS: the Shortcuts shortcut that reads the calendar
+calendar_sync_interval = "30m"            # how often it runs while the sync is on
 ```
 
 ## Commands
@@ -178,6 +181,18 @@ Completing (or skipping) a task generates **only the next single instance**, so 
 always at most one open instance per series. Generated instances always start in the
 `scheduled` state. Dates that do not exist (a 31st in a short month, Feb 29 in a
 non-leap year) clamp to the last day of that month.
+
+## Calendar (macOS)
+
+enghi can show your calendar events, read-only: today's schedule on the dashboard and
+each day's events on its work record. That includes Google calendars added to the macOS
+Calendar app under Internet Accounts. A Shortcuts shortcut reads them, since Shortcuts
+holds the calendar permission, and enghi runs it every 30 minutes. In **Settings →
+Calendar**, click **Add shortcut**, run it once in Shortcuts to allow calendar access,
+then turn the sync on. **Make a task** on an event creates a task named with the event's
+time, scheduled for its day. The guide (`/guide/enghi#calendar`) covers building the
+shortcut by hand and troubleshooting. Other tools can send events on any system with
+`PUT /api/calendar/events`.
 
 ## Keyboard Shortcuts (Web UI)
 
