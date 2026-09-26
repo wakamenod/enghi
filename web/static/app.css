@@ -829,6 +829,17 @@ ul.rows.day-tasks li.cur { background: var(--bg-hover); }
 }
 .day-logs { flex-basis: 100%; padding-left: var(--sp-4); border-left: 1px solid var(--border); margin: var(--sp-1) 0 var(--sp-1) var(--sp-1); }
 .day-logs .log-entry { padding: var(--sp-2) 0; }
+/* The row rules (ul.rows li, ul.rows a) are descendant selectors and would
+   reach the lists and links in an entry's prose; put those back */
+ul.rows .day-logs li {
+  display: list-item; position: static; padding: 0; border-radius: 0;
+  line-height: inherit; gap: 0;
+}
+ul.rows .day-logs li:hover { background: none; }
+ul.rows .day-logs li + li::before { content: none; }
+ul.rows .day-logs .prose a { text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; }
+/* Inside a row, .when would be pushed right like the row's own */
+.day-logs .log-head .when { margin-left: 0; }
 .day-logs .log-mark { padding: 2px 0; }
 .day-logs .prose { font-size: var(--fs-5); }
 

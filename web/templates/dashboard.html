@@ -90,8 +90,7 @@
           <ul class="rows">
             {{range $d.GTD.Working}}
             <li><a href="/gtd/clarify/{{.ID}}">{{.Title}}</a>
-                {{if .ProjectTitle}}<span class="tag">{{.ProjectTitle}}</span>{{end}}
-                <a class="tag working" href="/gtd/clarify/{{.ID}}#log">{{t "gtd.working"}}</a></li>
+                {{if .ProjectTitle}}<span class="tag">{{.ProjectTitle}}</span>{{end}}</li>
             {{end}}
           </ul>
           <div class="meta"><a href="/gtd/day">{{t "dash.day_link"}}</a></div>
