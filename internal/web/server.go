@@ -90,9 +90,13 @@ func parseTemplates(lang i18n.Lang) (*template.Template, error) {
 		"kindLabel": func(kind string) string { return i18n.T(lang, "kind."+kind) },
 		// markLabel is the head of a start/pause mark, as "⏸ paused 10:00".
 		"markLabel": func(kind, movedTo, when string) string { return markLabel(lang, kind, movedTo, when) },
-		"lang":      func() string { return string(lang) },
-		"langs":     func() []i18n.Lang { return i18n.All },
-		"langName":  func(l i18n.Lang) string { return i18n.Name[l] },
+		// sinceClock / elapsed are a working task's start and how long ago it
+		// was (dashboard.go)
+		"sinceClock": func(since string) string { return sinceClock(since, time.Now()) },
+		"elapsed":    func(since string) string { return elapsed(lang, since, time.Now()) },
+		"lang":       func() string { return string(lang) },
+		"langs":      func() []i18n.Lang { return i18n.All },
+		"langName":   func(l i18n.Lang) string { return i18n.Name[l] },
 		// asset appends the content hash to a static file URL (static.go)
 		"asset": assetURL,
 	}
@@ -357,6 +361,7 @@ func jsStrings(lang i18n.Lang) string {
 		"repeat.wd.sun", "repeat.wd.mon", "repeat.wd.tue", "repeat.wd.wed",
 		"repeat.wd.thu", "repeat.wd.fri", "repeat.wd.sat",
 		"day.copied", "day.copy_manual",
+		"dur.m", "dur.hm", "dur.dh",
 	}
 	m := make(map[string]string, len(keys))
 	for _, k := range keys {

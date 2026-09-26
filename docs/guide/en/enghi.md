@@ -190,7 +190,7 @@ A day has four groups:
 
 The same data is available at `/api/day?date=YYYY-MM-DD`. It returns JSON, or Markdown with `&format=markdown`. When you ask the Claude Code skill for a daily report, it reads this to write a draft.
 
-The dashboard also lists the tasks you are working on now, and the Weekly Review links to the work record of each of the seven days before the review—the same days its "Completed last week" list covers.
+The dashboard also lists the tasks you are working on now, each with when you started it and how long ago ("since 10:42 (2h 5m)", with the date in front if you started on an earlier day), so a Pause you forgot stands out. The Weekly Review links to the work record of each of the seven days before the review—the same days its "Completed last week" list covers.
 
 ## Calendar Events (macOS) {#calendar}
 

@@ -362,6 +362,9 @@ func init() {
 		"day.earlier":         "それ以前の記録",
 		"day.keys":            "[ / ] 前の日 / 次の日 · t 今日 · 行では j / k とタスクのキー",
 		"dash.working":        "作業中",
+		"dur.m":               "%d分",
+		"dur.hm":              "%d時間%d分",
+		"dur.dh":              "%d日%d時間",
 		"dash.day_link":       "今日の作業 →",
 		"review.by_day":       "日ごとの記録",
 

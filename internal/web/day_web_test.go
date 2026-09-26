@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
+	"os/exec"
 	"regexp"
 	"strings"
 	"testing"
@@ -212,20 +214,100 @@ func TestDayPageNavigation(t *testing.T) {
 	}
 }
 
-// The dashboard lists what is being worked on now.
+// The dashboard lists what is being worked on now: each item is the plain task
+// as before, plus since.
 func TestDashboardWorking(t *testing.T) {
 	h := newServer(t)
 	dayFixture(t, h)
 	var d struct {
 		GTD struct {
-			Working []struct {
-				ID int64 `json:"id"`
-			} `json:"working"`
+			Working []map[string]json.RawMessage `json:"working"`
 		} `json:"gtd"`
 	}
-	json.Unmarshal(do(h, req("GET", "/api/dashboard", "")).Body.Bytes(), &d)
-	if len(d.GTD.Working) != 1 || d.GTD.Working[0].ID != 2 {
-		t.Errorf("working = %+v", d.GTD.Working)
+	decode(t, do(h, req("GET", "/api/dashboard", "")), &d)
+	var one struct {
+		Task map[string]json.RawMessage `json:"task"`
+	}
+	decode(t, do(h, req("GET", "/api/tasks/2", "")), &one)
+	if len(d.GTD.Working) != 1 {
+		t.Fatalf("working = %+v", d.GTD.Working)
+	}
+	wk := d.GTD.Working[0]
+	for k, v := range one.Task {
+		if k == "updated_at" {
+			continue
+		}
+		if string(wk[k]) != string(v) {
+			t.Errorf("working %s = %s, the task has %s", k, wk[k], v)
+		}
+	}
+	var since string
+	json.Unmarshal(wk["since"], &since)
+	if !regexp.MustCompile(`^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(Z|[+-]\d\d:\d\d)$`).MatchString(since) {
+		t.Errorf("since = %q", wk["since"])
+	}
+	st, err := time.Parse(time.RFC3339, since)
+	_, off := st.Zone()
+	_, local := st.In(time.Local).Zone()
+	if err != nil || time.Since(st) > time.Minute || off != local {
+		t.Errorf("since %q is not now in the local zone", since)
+	}
+}
+
+// The dashboard shows when each working task was started and how long ago;
+// with the date when the start was on an earlier local day.
+func TestDashboardWorkingSince(t *testing.T) {
+	h, db := newServerDB(t)
+	dayFixture(t, h)
+	page := func(lang string) string {
+		r := req("GET", "/", "")
+		r.Header.Set("Accept-Language", lang)
+		return do(h, r).Body.String()
+	}
+	span := `<span class="when">since %s \(<span data-since="[^"]+">%s</span>\)</span>`
+	if re := fmt.Sprintf(span, `\d\d:\d\d`, `0m`); !regexp.MustCompile(re).MatchString(page("en")) {
+		t.Errorf("today's start: the page does not match %q", re)
+	}
+	if !regexp.MustCompile(`<span class="when">\d\d:\d\d から \(<span data-since="[^"]+">0分</span>\)</span>`).MatchString(page("ja")) {
+		t.Error("today's start in Japanese is missing")
+	}
+
+	// 49 hours back is always an earlier local day, DST or not
+	if _, err := db.Exec(`UPDATE task_logs SET created_at = datetime(created_at, '-49 hours') WHERE task_id = 2`); err != nil {
+		t.Fatal(err)
+	}
+	if re := fmt.Sprintf(span, `\d\d/\d\d \d\d:\d\d`, `2d 1h`); !regexp.MustCompile(re).MatchString(page("en")) {
+		t.Errorf("an earlier start: the page does not match %q", re)
+	}
+
+	// Earlier today in local time keeps the time alone. Just after local
+	// midnight there is no such time; skip then.
+	now := time.Now()
+	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
+	if now.Sub(midnight) < 2*time.Minute {
+		return
+	}
+	at := midnight.Add(time.Minute).UTC().Format("2006-01-02 15:04:05")
+	if _, err := db.Exec(`UPDATE task_logs SET created_at = ? WHERE task_id = 2`, at); err != nil {
+		t.Fatal(err)
+	}
+	if re := fmt.Sprintf(span, `00:01`, `\d+[hm][^<]*`); !regexp.MustCompile(re).MatchString(page("en")) {
+		t.Errorf("a start at 00:01 today: the page does not match %q", re)
+	}
+}
+
+// The local-day tests above are run again in two zones: at any moment one of
+// UTC+14 and UTC-12 is on a different date from UTC (as in gtd_test.go).
+func TestWorkingSinceFollowsLocalCalendar(t *testing.T) {
+	if os.Getenv("ENGHI_TZ_CHILD") != "" {
+		t.Skip("already running in a child")
+	}
+	for _, tz := range []string{"Etc/GMT-14", "Etc/GMT+12"} {
+		cmd := exec.Command(os.Args[0], "-test.run=^TestDashboardWorking.*$", "-test.count=1")
+		cmd.Env = append(os.Environ(), "TZ="+tz, "ENGHI_TZ_CHILD=1")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Errorf("TZ=%s: %v\n%s", tz, err, out)
+		}
 	}
 }
 
