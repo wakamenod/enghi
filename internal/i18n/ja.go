@@ -322,7 +322,7 @@ func init() {
 		"day.md.pause":       "⏸ 中断",
 		"day.md.pause_moved": "⏸ 中断（%s へ移動）",
 		"day.earlier":        "それ以前の記録",
-		"day.keys":           "[ / ] 前の日 / 次の日 · t 今日",
+		"day.keys":           "[ / ] 前の日 / 次の日 · t 今日 · 行では j / k とタスクのキー",
 		"dash.working":       "作業中",
 		"dash.day_link":      "今日の作業 →",
 		"review.by_day":      "日ごとの記録",

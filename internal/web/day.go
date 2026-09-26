@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/wakamenod/enghi/internal/gtd"
 	"github.com/wakamenod/enghi/internal/i18n"
@@ -88,7 +89,7 @@ func localZoneName() string {
 
 type dayLogRow struct {
 	*gtd.TaskLog
-	Time string
+	Time string // HH:MM; an earlier entry has its date in front
 	HTML template.HTML
 }
 
@@ -97,6 +98,23 @@ type dayRow struct {
 	Time  string // completion time for done/dropped
 	Since string // start of the open work, for working
 	Logs  []dayLogRow
+	// Earlier are a done task's entries from before the day. They start folded
+	// when they are long, so the day's own record stays in view.
+	Earlier     []dayLogRow
+	EarlierOpen bool
+}
+
+// earlierFoldRunes is how much earlier text is shown unfolded.
+const earlierFoldRunes = 400
+
+// stamp is a stored timestamp as local "YYYY-MM-DD HH:MM", for an entry from
+// another day.
+func stamp(ts string) string {
+	t := gtd.LocalTime(ts)
+	if t.IsZero() {
+		return ts
+	}
+	return t.Format("2006-01-02 15:04")
 }
 
 type calDay struct {
@@ -146,19 +164,29 @@ func (s *Server) dayRows(r *http.Request, day time.Time, ts []*gtd.DayTask) []da
 			row.Since = clock(t.Since, day)
 		}
 		for _, l := range t.Logs {
-			v := dayLogRow{TaskLog: l, Time: clock(l.CreatedAt, day)}
-			if l.Body != "" {
-				if html, err := s.renderBody(r, l.Body); err == nil {
-					v.HTML = html
-				} else {
-					v.HTML = template.HTML("<pre>" + template.HTMLEscapeString(l.Body) + "</pre>")
-				}
-			}
-			row.Logs = append(row.Logs, v)
+			row.Logs = append(row.Logs, s.dayLogRow(r, l, clock(l.CreatedAt, day)))
 		}
+		n := 0
+		for _, l := range t.EarlierLogs {
+			row.Earlier = append(row.Earlier, s.dayLogRow(r, l, stamp(l.CreatedAt)))
+			n += utf8.RuneCountInString(l.Body)
+		}
+		row.EarlierOpen = n <= earlierFoldRunes
 		out = append(out, row)
 	}
 	return out
+}
+
+func (s *Server) dayLogRow(r *http.Request, l *gtd.TaskLog, when string) dayLogRow {
+	v := dayLogRow{TaskLog: l, Time: when}
+	if l.Body != "" {
+		if html, err := s.renderBody(r, l.Body); err == nil {
+			v.HTML = html
+		} else {
+			v.HTML = template.HTML("<pre>" + template.HTMLEscapeString(l.Body) + "</pre>")
+		}
+	}
+	return v
 }
 
 func (s *Server) viewDay(w http.ResponseWriter, r *http.Request) {
@@ -246,16 +274,21 @@ func buildCalendar(lang i18n.Lang, month, selected, today time.Time, act map[str
 type dayLogJSON struct {
 	ID        int64  `json:"id"`
 	Kind      string `json:"kind"`
-	Body      string `json:"body"` // raw Markdown
+	Body      string `json:"body"`               // raw Markdown
+	MovedTo   string `json:"moved_to,omitempty"` // on an automatic pause
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
 }
 
+// dayTaskJSON is one task of a group. logs are the entries written that day;
+// earlier_logs, present on done items only, are the last few written before
+// it (gtd.EarlierLogCount), oldest first.
 type dayTaskJSON struct {
-	Task        *gtd.Task    `json:"task"`
-	CompletedAt string       `json:"completed_at,omitempty"`
-	Since       string       `json:"since,omitempty"`
-	Logs        []dayLogJSON `json:"logs"`
+	Task        *gtd.Task     `json:"task"`
+	CompletedAt string        `json:"completed_at,omitempty"`
+	Since       string        `json:"since,omitempty"`
+	Logs        []dayLogJSON  `json:"logs"`
+	EarlierLogs *[]dayLogJSON `json:"earlier_logs,omitempty"`
 }
 
 // dayJSON is GET /api/day. The day's own times (completed_at, since and each
@@ -274,19 +307,29 @@ type dayJSON struct {
 	Dropped []dayTaskJSON `json:"dropped"`
 }
 
-func dayTasksJSON(ts []*gtd.DayTask) []dayTaskJSON {
+func dayLogsJSON(ls []*gtd.TaskLog) []dayLogJSON {
+	out := make([]dayLogJSON, 0, len(ls))
+	for _, l := range ls {
+		out = append(out, dayLogJSON{ID: l.ID, Kind: l.Kind, Body: l.Body, MovedTo: l.MovedTo,
+			CreatedAt: isoLocal(l.CreatedAt), UpdatedAt: isoLocal(l.UpdatedAt)})
+	}
+	return out
+}
+
+// dayTasksJSON is a group; earlier says whether it carries earlier_logs.
+func dayTasksJSON(ts []*gtd.DayTask, earlier bool) []dayTaskJSON {
 	out := make([]dayTaskJSON, 0, len(ts))
 	for _, t := range ts {
-		j := dayTaskJSON{Task: t.Task, Logs: []dayLogJSON{}}
+		j := dayTaskJSON{Task: t.Task, Logs: dayLogsJSON(t.Logs)}
 		if t.CompletedAt != "" {
 			j.CompletedAt = isoLocal(t.CompletedAt)
 		}
 		if t.Since != "" {
 			j.Since = isoLocal(t.Since)
 		}
-		for _, l := range t.Logs {
-			j.Logs = append(j.Logs, dayLogJSON{ID: l.ID, Kind: l.Kind, Body: l.Body,
-				CreatedAt: isoLocal(l.CreatedAt), UpdatedAt: isoLocal(l.UpdatedAt)})
+		if earlier {
+			e := dayLogsJSON(t.EarlierLogs)
+			j.EarlierLogs = &e
 		}
 		out = append(out, j)
 	}
@@ -321,10 +364,10 @@ func (s *Server) apiDay(w http.ResponseWriter, r *http.Request) {
 		Weekday:   day.Weekday().String()[:3],
 		Timezone:  localZoneName(),
 		UTCOffset: day.Format("-07:00"),
-		Done:      dayTasksJSON(rec.Done),
-		Working:   dayTasksJSON(rec.Working),
-		Worked:    dayTasksJSON(rec.Worked),
-		Dropped:   dayTasksJSON(rec.Dropped),
+		Done:      dayTasksJSON(rec.Done, true),
+		Working:   dayTasksJSON(rec.Working, false),
+		Worked:    dayTasksJSON(rec.Worked, false),
+		Dropped:   dayTasksJSON(rec.Dropped, false),
 	})
 }
 
@@ -352,11 +395,42 @@ func (s *Server) apiDays(w http.ResponseWriter, r *http.Request) {
 // ---------------------------------------------------------------- Markdown
 
 // dayMarkdown is the day as plain Markdown, for pasting elsewhere: a heading
-// per group, a bullet per task, the day's entries indented under it. **Keep
-// the shape stable**; people paste it into reports and tools read it.
+// per group, a bullet per task, the day's entries indented under it. A done
+// task's entries from before the day follow as a labelled sub-list, each with
+// its date. **Keep the shape stable**; people paste it into reports and tools
+// read it.
 func dayMarkdown(lang i18n.Lang, day time.Time, rec *gtd.DayRecord) string {
 	tr := func(key string, args ...any) string { return i18n.T(lang, key, args...) }
 	var b strings.Builder
+	// entry writes one log entry as a list item at indent: the time, the mark
+	// if it is one, then the body, set off by a dash after a mark
+	entry := func(indent, when string, l *gtd.TaskLog) {
+		b.WriteString(indent + "- " + when)
+		sep := " "
+		switch {
+		case l.Kind == gtd.LogStart:
+			b.WriteString(" " + tr("day.md.start"))
+			sep = " — "
+		case l.Kind == gtd.LogPause && l.MovedTo != "":
+			b.WriteString(" " + tr("day.md.pause_moved", tr("move.choice."+l.MovedTo)))
+			sep = " — "
+		case l.Kind == gtd.LogPause:
+			b.WriteString(" " + tr("day.md.pause"))
+			sep = " — "
+		}
+		for i, ln := range strings.Split(l.Body, "\n") {
+			switch {
+			case i == 0 && ln == "":
+			case i == 0:
+				b.WriteString(sep + ln)
+			case strings.TrimSpace(ln) == "":
+				b.WriteString("\n")
+			default:
+				b.WriteString("\n" + indent + "  " + ln)
+			}
+		}
+		b.WriteString("\n")
+	}
 	b.WriteString("# " + tr("day.title") + " " + rec.Date + " (" + weekdayLabel(lang, day) + ")\n")
 	if rec.Empty() {
 		b.WriteString("\n" + tr("day.empty") + "\n")
@@ -375,25 +449,13 @@ func dayMarkdown(lang i18n.Lang, day time.Time, rec *gtd.DayRecord) string {
 			}
 			b.WriteString("- " + line(t, name) + "\n")
 			for _, l := range t.Logs {
-				b.WriteString("  - " + clock(l.CreatedAt, day))
-				switch l.Kind {
-				case gtd.LogStart:
-					b.WriteString(" " + tr("day.md.start"))
-				case gtd.LogPause:
-					b.WriteString(" " + tr("day.md.pause"))
+				entry("  ", clock(l.CreatedAt, day), l)
+			}
+			if len(t.EarlierLogs) > 0 {
+				b.WriteString("  - " + tr("day.earlier") + "\n")
+				for _, l := range t.EarlierLogs {
+					entry("    ", stamp(l.CreatedAt), l)
 				}
-				for i, ln := range strings.Split(l.Body, "\n") {
-					switch {
-					case i == 0 && ln == "":
-					case i == 0:
-						b.WriteString(" " + ln)
-					case strings.TrimSpace(ln) == "":
-						b.WriteString("\n")
-					default:
-						b.WriteString("\n    " + ln)
-					}
-				}
-				b.WriteString("\n")
 			}
 		}
 	}

@@ -2,6 +2,7 @@ package gtd_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"time"
 
@@ -248,3 +249,58 @@ func TestDayMoveOutOfNextEndsWorking(t *testing.T) {
 	}
 }
 
+// A done task carries its last entries from before the day, oldest first,
+// apart from the day's own. Bare marks do not take a slot.
+func TestDayDoneEarlierLogs(t *testing.T) {
+	s, _, db := newSvc(t)
+	ctx := context.Background()
+	tk := capture(t, s, "数日かけて終えた")
+	other := capture(t, s, "その日に始めて終えた")
+	write := func(id int64, kind, body string, offset, hour int) {
+		l, _ := addLog(t, s, id, kind, body)
+		mustExec(t, db, `UPDATE task_logs SET created_at = ? WHERE id = ?`, at(offset, hour, 0), l.ID)
+	}
+	write(tk.ID, gtd.LogNote, "最初の調査", -3, 10)
+	write(tk.ID, gtd.LogStart, "", -2, 9)
+	write(tk.ID, gtd.LogNote, "原因が分かった", -2, 11)
+	write(tk.ID, gtd.LogNote, "直し方を決めた", -1, 15)
+	write(tk.ID, gtd.LogPause, "続きは明日", -1, 18)
+	write(tk.ID, gtd.LogNote, "直して確認した", 0, 10)
+	write(other.ID, gtd.LogNote, "当日のメモ", 0, 9)
+	for _, id := range []int64{tk.ID, other.ID} {
+		if _, err := s.Complete(ctx, id, false); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mustExec(t, db, `UPDATE tasks SET completed_at = ?`, at(0, 12, 0))
+
+	d := day(t, s, 0)
+	if len(d.Done) != 2 {
+		t.Fatalf("done = %v", ids(d.Done))
+	}
+	var got, none *gtd.DayTask
+	for _, dt := range d.Done {
+		if dt.Task.ID == tk.ID {
+			got = dt
+		} else {
+			none = dt
+		}
+	}
+	var bodies []string
+	for _, l := range got.EarlierLogs {
+		bodies = append(bodies, l.Body)
+	}
+	want := []string{"原因が分かった", "直し方を決めた", "続きは明日"}
+	if !slices.Equal(bodies, want) {
+		t.Errorf("earlier = %q, want %q", bodies, want)
+	}
+	if len(got.Logs) != 1 || got.Logs[0].Body != "直して確認した" {
+		t.Errorf("logs = %+v, want the day's entry alone", got.Logs)
+	}
+	if len(none.EarlierLogs) != 0 {
+		t.Errorf("a task begun that day has earlier entries: %+v", none.EarlierLogs)
+	}
+	if gtd.EarlierLogCount != len(want) {
+		t.Errorf("EarlierLogCount = %d; update the test", gtd.EarlierLogCount)
+	}
+}

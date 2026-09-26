@@ -31,6 +31,20 @@ func newServer(t *testing.T) http.Handler {
 // It returns the configuration used.
 func newServerWith(t *testing.T, edit func(*config.Config)) (http.Handler, config.Config) {
 	t.Helper()
+	h, cfg, _ := newServerFull(t, edit)
+	return h, cfg
+}
+
+// newServerDB is newServer that also hands back the database, for a test that
+// has to backdate rows.
+func newServerDB(t *testing.T) (http.Handler, *store.DB) {
+	t.Helper()
+	h, _, db := newServerFull(t, nil)
+	return h, db
+}
+
+func newServerFull(t *testing.T, edit func(*config.Config)) (http.Handler, config.Config, *store.DB) {
+	t.Helper()
 	dir := t.TempDir()
 	db, err := store.Open(filepath.Join(dir, "test.db"))
 	if err != nil {
@@ -54,7 +68,7 @@ func newServerWith(t *testing.T, edit func(*config.Config)) (http.Handler, confi
 	if err != nil {
 		t.Fatal(err)
 	}
-	return srv.Handler(), cfg
+	return srv.Handler(), cfg, db
 }
 
 // req sets the correct local headers by default.

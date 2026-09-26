@@ -322,7 +322,7 @@ func init() {
 		"day.md.pause":       "⏸ Paused",
 		"day.md.pause_moved": "⏸ Paused (moved to %s)",
 		"day.earlier":        "Earlier entries",
-		"day.keys":           "[ / ] previous / next day · t today",
+		"day.keys":           "[ / ] previous / next day · t today · j / k and the task keys on the rows",
 		"dash.working":       "Working now",
 		"dash.day_link":      "Today's work →",
 		"review.by_day":      "By day",

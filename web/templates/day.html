@@ -82,30 +82,43 @@
 </div>
 {{template "foot" .}}
 
-{{/* One task on the day, with that day's entries of its log under it */}}
+{{/* One task on the day, with that day's entries of its log under it. The
+     row is a task row like task_row's, so j/k, the single keys and the move
+     modal work here too; each posts return_to, which lands back on this day. */}}
 {{define "day_task"}}
-<li>
+{{with .Task}}<li {{template "task_attrs" .}}>{{end}}
   {{if .Time}}<span class="day-time">{{.Time}}</span>{{end}}
-  <a class="day-title" href="/gtd/clarify/{{.Task.ID}}">{{.Task.Title}}</a>
+  <a class="task-title day-title" href="/gtd/clarify/{{.Task.ID}}">{{.Task.Title}}</a>
   {{if .Task.Working}}<a class="tag working" href="/gtd/clarify/{{.Task.ID}}#log">{{t "gtd.working"}}</a>{{end}}
   {{if .Task.ProjectTitle}}<a class="tag" href="/gtd/project/{{.Task.ProjectID}}">{{.Task.ProjectTitle}}</a>{{end}}
   <span class="when">{{if .Since}}{{t "day.since" .Since}}{{end}}{{if and .Since .Logs}} · {{end}}{{if .Logs}}{{t "day.entries" (len .Logs)}}{{end}}</span>
-  {{if .Logs}}
+  {{if or .Logs .Earlier}}
   <div class="day-logs">
-    {{range .Logs}}
-    {{if eq .Kind "note"}}
-    <div class="log-entry">
-      <div class="log-head"><a class="when" href="/gtd/clarify/{{.TaskID}}#log-{{.ID}}">{{.Time}}</a></div>
-      <div class="prose">{{.HTML}}</div>
-    </div>
-    {{else}}
-    <div class="log-entry log-mark">
-      <div class="log-head"><a class="when" href="/gtd/clarify/{{.TaskID}}#log-{{.ID}}">{{if eq .Kind "start"}}{{t "log.started" .Time}}{{else}}{{t "log.paused" .Time}}{{end}}</a></div>
-      {{if .HTML}}<div class="prose">{{.HTML}}</div>{{end}}
-    </div>
-    {{end}}
+    {{range .Logs}}{{template "day_log" .}}{{end}}
+    {{/* A done task's entries from before the day: context, kept secondary */}}
+    {{with .Earlier}}
+    <details class="day-earlier"{{if $.EarlierOpen}} open{{end}}>
+      <summary>{{t "day.earlier"}} <span class="count">{{len .}}</span></summary>
+      {{range .}}{{template "day_log" .}}{{end}}
+    </details>
     {{end}}
   </div>
   {{end}}
 </li>
+{{end}}
+
+{{define "day_log"}}
+{{if eq .Kind "note"}}
+<div class="log-entry">
+  <div class="log-head"><a class="when" href="/gtd/clarify/{{.TaskID}}#log-{{.ID}}">{{.Time}}</a></div>
+  <div class="prose">{{.HTML}}</div>
+</div>
+{{else}}
+<div class="log-entry log-mark">
+  <div class="log-head">
+    <a class="when" href="/gtd/clarify/{{.TaskID}}#log-{{.ID}}">{{markLabel .Kind .MovedTo .Time}}</a>
+    {{if .HTML}}<span class="log-sep">—</span><div class="prose log-comment">{{.HTML}}</div>{{end}}
+  </div>
+</div>
+{{end}}
 {{end}}

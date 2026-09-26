@@ -361,7 +361,8 @@ function repeatPicker(date, recurrence, endsOn) {
 //   /            ... focus the search box
 //   g d/w/i/n/p  ... dashboard / wiki / inbox / next / projects
 //   g l          ... the day page (today's work record)
-//   [ / ] / t    ... on the day page: previous / next day / today
+//   [ / ] / t    ... on the day page: previous / next day / today (t renames
+//                    instead when the cursor is on a task row)
 //   e            ... edit the article on screen
 //   j / k        ... move within a list; Enter opens
 //   u            ... undo the last move, while its toast is up
@@ -432,6 +433,7 @@ function repeatPicker(date, recurrence, endsOn) {
   // These need a value or a confirmation first, so they open the second step
   // of the move modal instead of posting at once.
   var ASKS = { l: 'later', w: 'waiting', s: 'scheduled', x: 'dropped' };
+  var CLOSED = ['done', 'dropped', 'filed'];
 
   function taskOf(li) {
     if (!li || !li.getAttribute('data-task-id')) return null;
@@ -596,6 +598,9 @@ function repeatPicker(date, recurrence, endsOn) {
       return true;
     }
     if (ASKS[key]) { openMove(task, ASKS[key]); return true; }
+    // A closed task (the day page lists them) cannot be started, and completing
+    // it again would move its completion to now; moving it is still fine
+    if (CLOSED.indexOf(task.state) >= 0 && (key === 'p' || PATHS[key])) return false;
     // Start and pause share one key: whichever applies. It posts like the
     // buttons on Clarify and comes back to this list.
     if (key === 'p') {
