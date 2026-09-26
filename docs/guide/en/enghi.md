@@ -171,20 +171,24 @@ Every task has a **work log** at the bottom of its clarify screen: timestamped e
 
 The log is included in search, labeled "Log"; when several entries of one task match, only its best one is shown. Entries can be edited or deleted, and deleting a Start or Pause takes back a mistaken press. There is no revision history for entries—an edit overwrites.
 
-## Work Record — What a Day Held {#day}
+## Work Record — What You Did Each Day {#day}
 
-The **work record** (`g` `l`, or "Today's work →" on the dashboard) shows one day: what you finished and what you worked on, with that day's work-log entries under each task. It opens on today; pick another day from the month calendar on the right, with `[` and `]` (previous and next day), `t` (back to today) or the date field. Days with anything recorded have a dot.
+The **work record** shows one day's work. Open it with `g` `l`, or with "Today's work →" on the dashboard. It lists the tasks you finished and the tasks you worked on, each with the work-log entries you wrote that day.
 
-A day is grouped four ways:
+It opens on today. To see another day, pick a date in the month calendar on the right, or press `[` and `]` for the previous and next day. Press `t` to come back to today, or type a date in the date field. Days with anything recorded have a dot in the calendar.
 
-- **Done** — tasks completed that day, with the time. A task reopened later no longer counts.
-- **In progress** — tasks started and not paused at the end of the day. For today, these are the tasks working now; for a past day, it is worked out from the Start and Pause marks.
-- **Worked on** — anything else with a log entry written that day.
-- **Dropped** — tasks dropped that day, including skipped recurring occurrences. Folded by default.
+A day has four groups:
 
-"Copy as Markdown" copies the day as plain Markdown for a report or a chat message. Where the browser cannot copy (the Emacs view, for one), the text appears selected for you to copy by hand. The same data is at `/api/day?date=YYYY-MM-DD` (JSON, or Markdown with `&format=markdown`); the Claude Code skill uses it to draft a daily report on request.
+- **Done** — tasks completed that day, with the time. If you reopen a task later, it no longer appears here.
+- **In progress** — tasks you had started and not paused by the end of the day. For today, these are the tasks you are working on now. For a past day, enghi works them out from the Start and Pause entries.
+- **Worked on** — any other task with a log entry written that day.
+- **Dropped** — tasks dropped that day, including skipped recurring occurrences. This group starts folded.
 
-The dashboard lists the tasks you are working on now, and the Weekly Review links to each day of the past week.
+"Copy as Markdown" copies the day as plain Markdown, ready to paste into a report or a chat. Where the browser can't copy, such as inside Emacs, the text appears selected so you can copy it by hand.
+
+The same data is available at `/api/day?date=YYYY-MM-DD`. It returns JSON, or Markdown with `&format=markdown`. When you ask the Claude Code skill for a daily report, it reads this to write a draft.
+
+The dashboard also lists the tasks you are working on now, and the Weekly Review links to the work record of each day of the past week.
 
 ## Wiki Integration {#wiki}
 
@@ -207,14 +211,14 @@ They connect in only three places:
 | `g` `n` | Next Actions |
 | `g` `p` | Projects |
 | `g` `w` | Articles |
-| `g` `l` | Work record (today) |
+| `g` `l` | Today's work record |
 | `j` / `k` | Move down / up a list |
 | `Enter` | Open the selected item; on a task, choose where to move it (so does clicking its title) |
 | `u` | Undo the last move, while its notice is shown at the bottom of the screen |
 | `p` | Start or pause work on the selected task |
 | `e` | Edit the article |
 | `[` / `]` | Work record: previous / next day |
-| `t` | Work record: back to today (on a selected task, rename it) |
+| `t` | Work record: back to today. With a task selected, rename it |
 
 ## Terminology {#glossary}
 
