@@ -192,6 +192,58 @@ The same data is available at `/api/day?date=YYYY-MM-DD`. It returns JSON, or Ma
 
 The dashboard also lists the tasks you are working on now, and the Weekly Review links to the work record of each of the seven days before the review—the same days its "Completed last week" list covers.
 
+## Calendar Events (macOS) {#calendar}
+
+enghi can show your calendar events, read-only: today's schedule at the top of the dashboard, and each day's events at the top of its work record. This works for the calendars in the macOS Calendar app, **including Google calendars added under System Settings → Internet Accounts**.
+
+The events come in through a Shortcuts shortcut named `enghi-events`. Shortcuts holds the permission to read your calendars, so an update of enghi never asks for it again. enghi runs the shortcut every 30 minutes and stores the events from yesterday through the next 14 days. Events of earlier days stay stored, so the work record of a past day still shows what was on the calendar.
+
+To set it up:
+
+1. If you use Google Calendar, add the account in System Settings → Internet Accounts and turn Calendars on. Check that its events appear in the Calendar app.
+2. In Settings → Calendar, click **Add shortcut**. Shortcuts opens and asks whether to add `enghi-events`; click **Add Shortcut**.
+3. Open the shortcut in Shortcuts and run it once. If it asks for access to your calendars, allow it.
+4. Back in Settings, turn on **Sync the calendar** and save. The first sync runs right away.
+
+The timeline lists all-day events first, then timed events in order, each with its calendar's name. On today, a "now" line sits after the events that have started, and ended events are dimmed. Both follow the clock without a reload. Under **Calendars to show** you can hide calendars you don't want on screen. They are still synced, so showing one again brings its events straight back.
+
+**Make a task** on an event creates a task named with the event's time, such as "15:00–16:00 Planning meeting", scheduled for the event's day. It appears in Next Actions on that day. An all-day event's task has no time in its name. After that, the event shows a "task" link to it.
+
+Other tools can send events too, even on other systems. `PUT /api/calendar/events?source=NAME&from=YYYY-MM-DD&to=YYYY-MM-DD` takes a JSON array of events in the same shape the shortcut prints:
+
+```json
+[{"title": "Planning", "start": "2026-09-28T15:00:00+09:00", "end": "2026-09-28T16:00:00+09:00", "calendar": "Work", "location": "Room A"}]
+```
+
+It replaces that source's events starting in those days. `start` and `end` may also be plain dates (`2026-09-28`) for an all-day event, `end` being the last day. `GET /api/calendar/events?from=&to=` returns the stored events, without hidden calendars.
+
+**Troubleshooting**
+
+- *"The shortcut is not installed."* Add it again from Settings. If you gave it another name, set `calendar_shortcut` in the config file to match.
+- *The sync fails with a message from Shortcuts.* Usually the calendar permission was never granted. Run the shortcut once in the Shortcuts app and allow access, then click **Sync now**.
+- *No events, and no error.* The shortcut found nothing. An empty result is not an error. Check that the events show in the Calendar app, and that their calendar is checked under Calendars to show.
+- *Adding the shortcut fails.* Build it by hand, as described in the next section.
+
+## Building the Calendar Shortcut by Hand {#calendar-manual}
+
+If **Add shortcut** doesn't work, you can build the same shortcut yourself in the Shortcuts app. Labels may differ slightly between macOS versions.
+
+1. Create a new shortcut and name it exactly `enghi-events`.
+2. Add **Find Calendar Events**. Click **Add Filter** and set it to **Start Date** · **is in the last** · **2** · **days**. Leave the sort at **Start Date**, **Oldest First**.
+3. Add **Add to Variable**, with the Calendar Events as input and the variable name `events`.
+4. Add a second **Find Calendar Events** with the filter **Start Date** · **is in the next** · **14** · **days**, then another **Add to Variable** into `events`. **Don't put both conditions in one action** with "Any": that finds nothing.
+5. Add **Repeat with Each**, over the `events` variable.
+6. Inside the loop, add **Dictionary** with five Text items:
+   - `title`: the **Repeat Item** variable.
+   - `start`: **Repeat Item**. Click it and choose **Start Date**, then set **Date Format** to **ISO 8601** with **Include Time** on.
+   - `end`: the same, with **End Date**.
+   - `calendar`: **Repeat Item**, set to **Calendar**.
+   - `location`: **Repeat Item**, set to **Location**.
+7. Still inside the loop, add **Text** containing only the **Dictionary** variable. As text, a dictionary becomes one line of JSON.
+8. After **End Repeat**, add **Combine Text** on the **Repeat Results**, with **New Lines**.
+9. Add **Stop and Output** with the **Combined Text**.
+10. Run it once and allow calendar access. In Terminal, `shortcuts run enghi-events` should print one JSON object per event.
+
 ## Wiki Integration {#wiki}
 
 GTD and the wiki are independent. **The wiki works fully without touching GTD**, and vice versa.
