@@ -66,6 +66,7 @@ type Task struct {
 	ID    int64  `json:"id"`
 	Title string `json:"title"`
 	Note  string `json:"note"`
+	URL   string `json:"url,omitempty"`
 	State string `json:"state"`
 
 	ProjectID    *int64 `json:"project_id,omitempty"`

@@ -258,6 +258,7 @@ func init() {
 		"clarify.as_action_note":     "Next Actions に載せるのは、今すぐ物理的に実行できる単一の行動だけです。",
 		"clarify.action_label":       "Next Action（動詞で始める）",
 		"clarify.note":               "メモ",
+		"clarify.url":                "URL",
 		"clarify.state":              "状態",
 		"clarify.state_help":         "使い分けを見る",
 		"clarify.project":            "Project",

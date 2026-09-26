@@ -23,7 +23,7 @@ func New(db *store.DB) *Service { return &Service{db: db} }
 // up (until 09:00 in Japan).
 const sqlToday = `date('now','localtime')`
 
-const taskCols = `t.id, t.title, t.note, t.state, t.project_id, t.context_id, t.area_id,
+const taskCols = `t.id, t.title, t.note, t.url, t.state, t.project_id, t.context_id, t.area_id,
 	COALESCE(t.scheduled_on,''), COALESCE(t.deadline_on,''), COALESCE(t.waiting_for,''),
 	COALESCE(t.delegated_at,''), COALESCE(t.energy,''), t.time_estimate, t.priority,
 	COALESCE(t.recurrence,''), t.series_id, COALESCE(t.recurrence_ends_on,''),
@@ -42,7 +42,7 @@ const taskFrom = `FROM tasks t
 
 func scanTask(row interface{ Scan(...any) error }) (*Task, error) {
 	var t Task
-	err := row.Scan(&t.ID, &t.Title, &t.Note, &t.State, &t.ProjectID, &t.ContextID, &t.AreaID,
+	err := row.Scan(&t.ID, &t.Title, &t.Note, &t.URL, &t.State, &t.ProjectID, &t.ContextID, &t.AreaID,
 		&t.ScheduledOn, &t.DeadlineOn, &t.WaitingFor, &t.DelegatedAt, &t.Energy, &t.TimeEstimate,
 		&t.Priority, &t.Recurrence, &t.SeriesID, &t.RecurrenceEndsOn,
 		&t.SortOrder, &t.Version, &t.CompletedAt, &t.CreatedAt, &t.UpdatedAt,

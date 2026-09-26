@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/url"
+	"regexp"
 	"strings"
 )
 
@@ -13,6 +15,7 @@ import (
 type CaptureInput struct {
 	Title string `json:"title"`
 	Note  string `json:"note,omitempty"`
+	URL   string `json:"url,omitempty"`
 	State string `json:"state,omitempty"` // inbox when omitted
 }
 
@@ -23,6 +26,13 @@ func (s *Service) Capture(ctx context.Context, in CaptureInput) (*Task, error) {
 	if title == "" {
 		return nil, errors.New("the title is empty")
 	}
+	link, err := normalizeURL(in.URL)
+	if err != nil {
+		return nil, err
+	}
+	if link == "" {
+		title, link = splitURL(title)
+	}
 	state := in.State
 	if state == "" {
 		state = StateInbox
@@ -31,7 +41,7 @@ func (s *Service) Capture(ctx context.Context, in CaptureInput) (*Task, error) {
 		return nil, fmt.Errorf("invalid state: %q", state)
 	}
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO tasks(title, note, state) VALUES (?, ?, ?)`, title, in.Note, state)
+		`INSERT INTO tasks(title, note, url, state) VALUES (?, ?, ?, ?)`, title, in.Note, link, state)
 	if err != nil {
 		return nil, err
 	}
@@ -42,10 +52,50 @@ func (s *Service) Capture(ctx context.Context, in CaptureInput) (*Task, error) {
 	return s.Task(ctx, id)
 }
 
+// titleURL is a URL written into a title. ASCII only, so it stops where
+// Japanese text runs straight on from it ("https://example.com/aを読む").
+var titleURL = regexp.MustCompile(`https?://[!-~]+`)
+
+// splitURL takes the first URL out of a captured title, so pasting
+// "記事を読む https://…" into capture gives a task with a link. A title that
+// is nothing but the URL keeps it, since a task needs a title.
+func splitURL(title string) (string, string) {
+	loc := titleURL.FindStringIndex(title)
+	if loc == nil {
+		return title, ""
+	}
+	raw := strings.TrimRight(title[loc[0]:loc[1]], ".,;:!?")
+	link, err := normalizeURL(raw)
+	if err != nil || link == "" {
+		return title, ""
+	}
+	rest := strings.TrimSpace(strings.TrimSpace(title[:loc[0]]) + " " +
+		strings.TrimSpace(title[loc[1]:]))
+	if rest == "" {
+		return title, link
+	}
+	return rest, link
+}
+
+// normalizeURL checks a task's URL. Only http(s): the `o' key hands it to the
+// browser, and a javascript: URL there would run in this app.
+func normalizeURL(s string) (string, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "", nil
+	}
+	u, err := url.Parse(s)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return "", fmt.Errorf("the URL must start with http:// or https://: %q", s)
+	}
+	return s, nil
+}
+
 // TaskPatch is PATCH /api/tasks/:id. nil fields are left alone.
 type TaskPatch struct {
 	Title            *string `json:"title,omitempty"`
 	Note             *string `json:"note,omitempty"`
+	URL              *string `json:"url,omitempty"`
 	State            *string `json:"state,omitempty"`
 	ProjectID        *int64  `json:"project_id,omitempty"`
 	ContextID        *int64  `json:"context_id,omitempty"`
@@ -129,6 +179,13 @@ func (s *Service) Patch(ctx context.Context, id int64, p TaskPatch) (*Task, erro
 		}
 		if p.Note != nil {
 			b.Set("note", *p.Note)
+		}
+		if p.URL != nil {
+			link, err := normalizeURL(*p.URL)
+			if err != nil {
+				return err
+			}
+			b.Set("url", link)
 		}
 		if p.State != nil {
 			if !validStates[*p.State] {

@@ -52,6 +52,8 @@ jq -n --arg title "..." --arg note "..." '{title: $title, note: $note}' |
 - `note`: what the user will need to pick it up again later — the repository, branch,
   file and line, the error message, the command that failed. A capture made mid-task is
   useless if it only makes sense in the moment.
+- `url` (optional): a web page the task is about — an issue, a pull request, an article.
+  http(s) only. A URL written in the title is moved here automatically.
 - Report back in one line with the task id. Do not interrupt the work in progress
   further than that.
 
@@ -147,7 +149,7 @@ exception):
 | `PATCH /api/tasks/<id>` | Change fields or move a task: `{"state": "next", "version": N}`. Send only the fields that change, plus the `version` you read |
 | `POST /api/tasks/<id>/complete` | Complete a task, body `{}` |
 | `POST /api/tasks/<id>/file` | File an inbox item as a wiki page: `{title, body, tags}` |
-| `POST /api/tasks` | New task: `{title, note, state}`. To put it in a project, `PATCH` it with `project_id` afterwards |
+| `POST /api/tasks` | New task: `{title, note, url, state}`. To put it in a project, `PATCH` it with `project_id` afterwards |
 | `POST /api/projects` / `PATCH /api/projects/<id>` | `{title, outcome, status}` |
 | `POST /api/tasks/<id>/logs` | Append to the work log: `{body}` for a note, `{kind: "start"}` / `{kind: "pause"}` with an optional `body` comment |
 | `PATCH /api/task-logs/<id>` | Rewrite an entry: `{body, version}` |
