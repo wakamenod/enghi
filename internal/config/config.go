@@ -38,6 +38,9 @@ type Config struct {
 	// RevisionCompactMinutes: overwrite the previous revision when it is newer
 	// than this many minutes (DESIGN 4.2)
 	RevisionCompactMinutes int `toml:"revision_compact_minutes"`
+	// DeadlineWarningDays: how many days ahead a deadline shows up on the
+	// dashboard, like org-deadline-warning-days
+	DeadlineWarningDays int `toml:"deadline_warning_days"`
 
 	// Backups. Taken once a day while resident, with VACUUM INTO.
 	BackupDir     string `toml:"backup_dir"`
@@ -117,6 +120,9 @@ func withDefaults(c Config) Config {
 	if c.BackupKeep == 0 {
 		c.BackupKeep = 7
 	}
+	if c.DeadlineWarningDays == 0 {
+		c.DeadlineWarningDays = 7
+	}
 	c.FilesDBPath = expand(c.FilesDBPath)
 	c.ExportDir = expand(c.ExportDir)
 	c.BackupDir = expand(c.BackupDir)
@@ -152,6 +158,9 @@ func (c Config) validate() error {
 	case "127.0.0.1", "localhost", "::1":
 	default:
 		return fmt.Errorf("host %q is not allowed: enghi binds to loopback only (DESIGN 4.4)", c.Host)
+	}
+	if c.DeadlineWarningDays < 0 {
+		return fmt.Errorf("deadline_warning_days %d: must be positive", c.DeadlineWarningDays)
 	}
 	for _, h := range c.AllowedHosts {
 		// Hand-written config, so surrounding spaces are fine. A space inside is

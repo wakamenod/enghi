@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/wakamenod/enghi/internal/gtd"
@@ -341,6 +342,76 @@ func TestTodayIncludesDeadlineOfToday(t *testing.T) {
 	}
 }
 
+// Deadlines ahead (org-deadline-warning-days) and overdue ones. Each task
+// appears in one of Today and UpcomingDeadlines at most.
+func TestUpcomingDeadlines(t *testing.T) {
+	s, _, _ := newSvc(t)
+	ctx := context.Background()
+	due := func(title string, days int) *gtd.Task {
+		tk := capture(t, s, title)
+		return patch(t, s, tk.ID, gtd.TaskPatch{State: str(gtd.StateNext),
+			DeadlineOn: str(gtd.FormatDate(gtd.Today().AddDate(0, 0, days)))})
+	}
+	yesterday := due("yesterday", -1)
+	today := due("today", 0)
+	tomorrow := due("tomorrow", 1)
+	edge := due("in a week", 7)
+	due("too far", 8)
+	done := due("done already", 2)
+	if _, err := s.Complete(ctx, done.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	someday := due("someday", 3)
+	patch(t, s, someday.ID, gtd.TaskPatch{State: str(gtd.StateSomeday)})
+	// Scheduled for today, so it is in Today already; not repeated below.
+	sched := due("scheduled today", 4)
+	patch(t, s, sched.ID, gtd.TaskPatch{State: str(gtd.StateScheduled),
+		ScheduledOn: str(gtd.FormatDate(gtd.Today()))})
+	// A past scheduled date alone is not overdue.
+	late := capture(t, s, "scheduled yesterday")
+	late = patch(t, s, late.ID, gtd.TaskPatch{State: str(gtd.StateScheduled),
+		ScheduledOn: str(gtd.FormatDate(gtd.Today().AddDate(0, 0, -1)))})
+
+	ids := func(list []*gtd.Task) []int64 {
+		out := []int64{}
+		for _, tk := range list {
+			out = append(out, tk.ID)
+		}
+		return out
+	}
+
+	up, err := s.UpcomingDeadlines(ctx, 7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := ids(up), []int64{tomorrow.ID, edge.ID}; !slices.Equal(got, want) {
+		t.Errorf("upcoming = %v, want %v (tomorrow, today+7)", got, want)
+	}
+	if len(up) == 2 && (up[0].DaysLeft() != 1 || up[1].DaysLeft() != 7) {
+		t.Errorf("days left = %d, %d; want 1, 7", up[0].DaysLeft(), up[1].DaysLeft())
+	}
+
+	td, err := s.Today(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	overdue := map[int64]int{}
+	for _, tk := range td {
+		if tk.Overdue() {
+			overdue[tk.ID] = tk.DaysOverdue()
+		}
+	}
+	got, want := ids(td), []int64{yesterday.ID, today.ID, late.ID, sched.ID}
+	slices.Sort(got)
+	slices.Sort(want)
+	if !slices.Equal(got, want) {
+		t.Errorf("today = %v, want %v", got, want)
+	}
+	if len(overdue) != 1 || overdue[yesterday.ID] != 1 {
+		t.Errorf("overdue = %v, want only yesterday's deadline, 1 day", overdue)
+	}
+}
+
 // "Today" is the local calendar day, in SQL as in Go. The tests above are run
 // again in two zones: at any moment one of UTC+14 and UTC-12 is on a different
 // date from UTC, so a query that uses the UTC date fails whatever the time.
@@ -349,7 +420,7 @@ func TestDatesFollowLocalCalendar(t *testing.T) {
 		t.Skip("already running in a child")
 	}
 	const tests = `^(TestScheduledTaskAppearsInNextActionsWhenDue|TestWaitingGetsDelegatedAt|` +
-		`TestTodayIncludesDeadlineOfToday|TestSomedayDueReview)$`
+		`TestTodayIncludesDeadlineOfToday|TestSomedayDueReview|TestUpcomingDeadlines)$`
 	for _, tz := range []string{"Etc/GMT-14", "Etc/GMT+12"} {
 		cmd := exec.Command(os.Args[0], "-test.run="+tests, "-test.count=1")
 		cmd.Env = append(os.Environ(), "TZ="+tz, "ENGHI_TZ_CHILD=1")

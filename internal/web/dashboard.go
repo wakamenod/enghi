@@ -20,8 +20,14 @@ type Dashboard struct {
 type GTDSummary struct {
 	// 1. Inbox count, emphasized only when it is not zero
 	InboxCount int `json:"inbox_count"`
-	// 2. Today's next actions (deadline_on <= today or scheduled_on <= today)
+	// 2. Today's next actions (deadline_on <= today or scheduled_on <= today).
+	// Overdue ones stay in this list; each task's deadline_days is negative
+	// when its deadline has passed.
 	Today []*gtd.Task `json:"today"`
+	// 2b. Deadlines coming up within deadline_warning_days (tomorrow onwards),
+	// sorted by deadline. Nothing already in Today appears here.
+	Upcoming    []*gtd.Task `json:"upcoming"`
+	WarningDays int         `json:"deadline_warning_days"` // the window of Upcoming
 	// 3. Next-action counts per context
 	Contexts []*gtd.Context `json:"contexts"`
 	// 4. **Stalled projects, those without a next action** - DESIGN 2.4
@@ -30,6 +36,29 @@ type GTDSummary struct {
 	WaitingOverdue []*gtd.Task `json:"waiting_overdue"`
 
 	Enabled bool `json:"enabled"` // whether there is any GTD data at all
+}
+
+// Overdue are the Today tasks whose deadline has passed, shown first as their
+// own group.
+func (g GTDSummary) Overdue() []*gtd.Task {
+	out := []*gtd.Task{}
+	for _, t := range g.Today {
+		if t.Overdue() {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// DueToday is the rest of Today.
+func (g GTDSummary) DueToday() []*gtd.Task {
+	out := []*gtd.Task{}
+	for _, t := range g.Today {
+		if !t.Overdue() {
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 // WikiSummary is the lower half.
@@ -88,6 +117,10 @@ func (s *Server) dashboardData(ctx context.Context) (*Dashboard, error) {
 	d.GTD.InboxCount = len(inbox)
 
 	if d.GTD.Today, err = s.gtd.Today(ctx); err != nil {
+		return nil, err
+	}
+	d.GTD.WarningDays = s.cfg.DeadlineWarningDays
+	if d.GTD.Upcoming, err = s.gtd.UpcomingDeadlines(ctx, s.cfg.DeadlineWarningDays); err != nil {
 		return nil, err
 	}
 	if d.GTD.Contexts, err = s.gtd.Contexts(ctx); err != nil {

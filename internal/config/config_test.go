@@ -57,6 +57,23 @@ func TestDefaults(t *testing.T) {
 	if c.BackupKeep != 7 || !c.BackupOn() {
 		t.Fatalf("wrong backup defaults: keep=%d on=%v", c.BackupKeep, c.BackupOn())
 	}
+	if c.DeadlineWarningDays != 7 {
+		t.Fatalf("deadline_warning_days = %d, want 7", c.DeadlineWarningDays)
+	}
+}
+
+// deadline_warning_days is read from the file; a negative window is an error.
+func TestDeadlineWarningDays(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	os.WriteFile(path, []byte(`deadline_warning_days = 14`), 0o600)
+	if c, err := config.Load(path); err != nil || c.DeadlineWarningDays != 14 {
+		t.Fatalf("deadline_warning_days = %d, err %v; want 14", c.DeadlineWarningDays, err)
+	}
+	os.WriteFile(path, []byte(`deadline_warning_days = -1`), 0o600)
+	if _, err := config.Load(path); err == nil {
+		t.Fatal("a negative deadline_warning_days was accepted")
+	}
 }
 
 // Nothing but loopback may be bound (DESIGN 4.4).
