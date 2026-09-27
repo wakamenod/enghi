@@ -1,6 +1,6 @@
 ---
 name: enghi
-description: Use the user's local enghi wiki and GTD system. Use when the user wants to capture something for later ("add to my inbox", "remind me to", "後でやる", "Inbox に入れて"), save notes or a design decision as a wiki page ("write this up in the wiki", "wiki にまとめて", "メモしておいて"), look up something they wrote before ("my notes on X", "前に書いた○○のメモ"), keep a work log on a task ("log what I did on X", "作業ログに残して"), write a daily report from what was done ("write today's report", "日報を書いて", "今日やったこと"), or get help with GTD: planning the day ("what should I do today", "今日やること", "朝の確認"), clarifying the inbox, the weekly review ("週次レビュー"), stalled projects, next actions, waiting-for items.
+description: Use the user's local enghi wiki and GTD system. Use when the user wants to capture something for later ("add to my inbox", "remind me to", "後でやる", "Inbox に入れて"), save notes or a design decision as a wiki page ("write this up in the wiki", "wiki にまとめて", "メモしておいて"), look up something they wrote before ("my notes on X", "前に書いた○○のメモ"), keep a work log on a task ("log what I did on X", "作業ログに残して"), attach a screenshot or file to a page or log ("add this screenshot to the page", "画像を貼って"), write a daily report from what was done ("write today's report", "日報を書いて", "今日やったこと"), or get help with GTD: planning the day ("what should I do today", "今日やること", "朝の確認"), clarifying the inbox, the weekly review ("週次レビュー"), stalled projects, next actions, waiting-for items.
 ---
 
 # enghi
@@ -16,7 +16,8 @@ write only as described below.**
 ## Calling the API
 
 - A `POST` must carry `-H 'Content-Type: application/json'`, or the server answers 415.
-  Send it on `PUT` and `PATCH` too.
+  Send it on `PUT` and `PATCH` too. The one exception is a file upload (see "Attach an
+  image or a file").
 - **Never splice text into a JSON string by hand.** Titles and Markdown bodies contain
   quotes, backslashes and newlines. Build the body with `jq -n` and pipe it in:
 
@@ -92,6 +93,46 @@ A `409` with `"error": "title_conflict"` means that title is taken; the response
    holds the newer page. Redo the change on top of it and confirm again. **Never
    overwrite the newer version.**
 
+## Attach an image or a file
+
+For "add this screenshot to the page", "画像を貼って", "attach this PDF to the log" and the
+like. An image or PDF goes into an article or a work log entry as a Markdown link to a
+file stored in enghi.
+
+1. **Only a file on disk can be uploaded.** An image pasted into the chat cannot; ask the
+   user for the file's path.
+2. Pick the media type from the extension:
+
+   | Extension | `Content-Type` |
+   |---|---|
+   | `.png` | `image/png` |
+   | `.jpg`, `.jpeg` | `image/jpeg` |
+   | `.gif` | `image/gif` |
+   | `.webp` | `image/webp` |
+   | `.avif` | `image/avif` |
+   | `.pdf` | `application/pdf` |
+
+   Nothing else is accepted, **SVG included**. For any other type, do not send the
+   file; tell the user it cannot be attached. The limit is 32 MiB per file.
+3. Draft the article or log entry with the image in place and **show it to the user
+   before uploading**, as for any other write. The upload itself only stores the file,
+   but it is still a write to the user's database.
+4. Upload it. The body is the file's raw bytes, not JSON:
+
+   ```sh
+   NAME=$(jq -rn --arg s "$(basename "$FILE")" '$s|@uri')
+   curl -s -X POST "http://127.0.0.1:7777/api/files?name=$NAME" \
+     -H 'Content-Type: image/png' --data-binary @"$FILE" | jq -r .markdown
+   ```
+
+   A `201` returns `{"file": {...}, "markdown": "..."}`. `markdown` is ready to paste:
+   `![name](/files/<hash>)` for an image, `[name](/files/<hash>)` for a PDF. The same
+   content uploaded twice gives the same URL. A `415` means the type is not accepted,
+   a `413` that the file is too large.
+5. Put `markdown` into the body and save it the usual way: "Update an existing page"
+   for an article (with the `version` you read), "Log work on a task" for a work log
+   entry. Report as usual.
+
 ## Look something up
 
 For "my notes on X", "what did I write about Y":
@@ -152,6 +193,7 @@ exception):
 | `POST /api/tasks/<id>/file` | File an inbox item as a wiki page: `{title, body, tags}` |
 | `POST /api/tasks` | New task: `{title, note, url, state}`. To put it in a project, `PATCH` it with `project_id` afterwards |
 | `POST /api/projects` / `PATCH /api/projects/<id>` | `{title, outcome, status}` |
+| `POST /api/files?name=<name>` | Upload an image or PDF: raw bytes, `Content-Type` set to its media type. Returns `markdown` to paste into a body; see "Attach an image or a file" |
 | `POST /api/tasks/<id>/logs` | Append to the work log: `{body}` for a note, `{kind: "start"}` / `{kind: "pause"}` with an optional `body` comment |
 | `PATCH /api/task-logs/<id>` | Rewrite an entry: `{body, version}` |
 | `DELETE /api/task-logs/<id>` | Remove an entry |
