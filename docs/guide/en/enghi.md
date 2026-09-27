@@ -257,7 +257,7 @@ They connect in only three places:
 - Projects and Areas can each hold **one dedicated article**
 - Writing `[[Article name]]` in any article creates a link (even if the target doesn't exist yet)
 
-A code block that starts with ```` ```mermaid ```` is shown as a [Mermaid](https://mermaid.js.org/) diagram. The source is folded away below the diagram. Click the Mermaid label to see it. This works in articles, project and area notes, work logs, and the edit preview.
+A code block that starts with ```` ```mermaid ```` is shown as a [Mermaid](https://mermaid.js.org/) diagram. The source is folded away below the diagram. Click the Mermaid label to see it. A large diagram is shrunk to fit the page. Click it to open it over the whole window, where you can zoom with the mouse wheel or a pinch and drag it around. This works in articles, project and area notes, work logs, and the edit preview.
 
 ## Keyboard Shortcuts {#keys}
 
@@ -280,6 +280,7 @@ A code block that starts with ```` ```mermaid ```` is shown as a [Mermaid](https
 | `b` | Article screens: show or hide the tag column on the left |
 | `[` / `]` | Work record: previous / next day |
 | `t` | Work record: back to today. With a task selected, rename it |
+| `+` / `-` / `0` | Diagram viewer: zoom in / zoom out / fit the whole diagram. Arrow keys move it, `Esc` closes it |
 
 ## Terminology {#glossary}
 
