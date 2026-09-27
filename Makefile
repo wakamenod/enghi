@@ -7,7 +7,7 @@ BIN  := bin/enghi
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -X main.version=$(VERSION)
 
-.PHONY: build test vet run install clean
+.PHONY: build test vet run install clean icons
 
 build:
 	CGO_ENABLED=1 go build -tags $(TAGS) -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/enghi
@@ -26,3 +26,8 @@ install:
 
 clean:
 	rm -rf bin
+
+# Re-render the PNG and .ico icons after editing web/static/icon.svg. The
+# outputs are committed, so a normal build needs neither rsvg-convert nor this.
+icons:
+	python3 packaging/icons/build.py

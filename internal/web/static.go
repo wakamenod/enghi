@@ -55,6 +55,21 @@ func loadStaticAssets() map[string]staticAsset {
 	return out
 }
 
+// .ico is missing from Go's built-in MIME table, and the system tables that
+// fill the gap differ between machines.
+func init() {
+	_ = mime.AddExtensionType(".ico", "image/x-icon")
+}
+
+// serveFavicon answers /favicon.ico with the embedded icon (packaging/icons
+// makes it from icon.svg). It has no ?v=, so it is revalidated by ETag.
+func serveFavicon(w http.ResponseWriter, r *http.Request) {
+	r = r.Clone(r.Context())
+	r.URL.Path = "/static/favicon.ico"
+	r.URL.RawQuery = ""
+	serveStatic(w, r)
+}
+
 // assetURL appends the content hash to a static file's URL. Templates use it as
 // {{asset "/static/app.css"}}. An unknown path is returned unchanged.
 func assetURL(p string) string {
