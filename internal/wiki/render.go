@@ -87,17 +87,17 @@ func queryEscape(s string) string {
 }
 
 // mermaidRenderer draws ```mermaid fenced blocks as a diagram with its source
-// folded underneath; every other fenced block goes to goldmark's own renderer
-// unchanged. The diagram itself is drawn in the browser (app.js,
+// folded underneath; every other fenced block goes to the highlighter
+// (newCodeRenderer). The diagram itself is drawn in the browser (app.js,
 // renderMermaid). The <details> is emitted open and the JS closes it only once
 // the diagram is drawn, so without JS, or on a syntax error, the source stays
 // visible and the block is never empty.
 type mermaidRenderer struct{ fallback renderer.NodeRendererFunc }
 
-func newMermaidRenderer(opts ...html.Option) *mermaidRenderer {
+func newMermaidRenderer() *mermaidRenderer {
 	m := &mermaidRenderer{}
-	// Borrow the stock fenced-code function from a default html renderer
-	html.NewRenderer(opts...).RegisterFuncs(registerFunc(func(k ast.NodeKind, f renderer.NodeRendererFunc) {
+	// Borrow the fenced-code function from the highlighter
+	newCodeRenderer().RegisterFuncs(registerFunc(func(k ast.NodeKind, f renderer.NodeRendererFunc) {
 		if k == ast.KindFencedCodeBlock {
 			m.fallback = f
 		}
@@ -224,9 +224,10 @@ type Renderer struct{ md goldmark.Markdown }
 // (paragraphs join into one line). Export writes the source out verbatim, so
 // the difference is only in how it is displayed.
 //
-// A ```mermaid block becomes a diagram (see mermaidRenderer), a table is
-// wrapped in a scrolling box (see tableRenderer), and a paragraph of images
-// alone is marked (see imageParagraphs).
+// A ```mermaid block becomes a diagram (see mermaidRenderer), any other fenced
+// block is highlighted (see newCodeRenderer), a table is wrapped in a
+// scrolling box (see tableRenderer), and a paragraph of images alone is marked
+// (see imageParagraphs).
 func NewRenderer(resolve Resolver) *Renderer {
 	md := goldmark.New(
 		goldmark.WithExtensions(extension.GFM),
@@ -238,7 +239,7 @@ func NewRenderer(resolve Resolver) *Renderer {
 		goldmark.WithRendererOptions(
 			html.WithHardWraps(),
 			renderer.WithNodeRenderers(
-				util.Prioritized(newMermaidRenderer(html.WithHardWraps()), 100),
+				util.Prioritized(newMermaidRenderer(), 100),
 				util.Prioritized(newTableRenderer(), 100),
 			),
 		),

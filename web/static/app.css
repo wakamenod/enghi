@@ -54,6 +54,17 @@
   --accent-fg: light-dark(#ffffff, #16171a);
   --warn:      light-dark(#8a6a3d, #b8956a);
 
+  /* Code highlighting (chroma classes, see below). Muted, so a block reads as
+     text with hints rather than a second accent. */
+  --code-keyword: light-dark(#6b4f8a, #b9a2d0);
+  --code-string:  light-dark(#4f7043, #a3bd8e);
+  --code-number:  light-dark(#94602a, #d0a26e);
+  --code-func:    light-dark(#2f6582, #8fb4cc);
+  --code-type:    light-dark(#2f7069, #85c0b8);
+  --code-tag:     light-dark(#8a4a3d, #d49a8c);
+  --code-ins-bg:  light-dark(#e2ebd9, #1e2a1c);
+  --code-del-bg:  light-dark(#f2dfda, #2f1d1b);
+
   accent-color: var(--accent);   /* native controls such as checkboxes */
 
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
@@ -302,6 +313,22 @@ p.prose,
   font-size: 13px; line-height: 1.7;
 }
 .prose pre code { background: none; padding: 0; font-size: inherit; }
+/* Token classes from chroma (render.go, newCodeRenderer). Anything not listed
+   - punctuation, plain names, whitespace, lexer errors (.err, common in
+   half-written JSON) - keeps the text colour. */
+.chroma :is(.k, .kd, .kn, .kp, .kr, .kc, .ow, .nd) { color: var(--code-keyword); }
+.chroma :is(.s, .sa, .sb, .sc, .dl, .sd, .s1, .s2, .sh, .si, .sx, .sr, .ss) { color: var(--code-string); }
+.chroma :is(.m, .mb, .mf, .mh, .mi, .il, .mo, .se, .no, .bp) { color: var(--code-number); }
+.chroma :is(.nf, .fm, .na, .nb) { color: var(--code-func); }
+.chroma :is(.kt, .nc, .nn, .ne) { color: var(--code-type); }
+.chroma :is(.nt, .nv, .vc, .vg, .vi) { color: var(--code-tag); }
+.chroma :is(.c, .ch, .cm, .c1, .cs, .cp, .cpf) { color: var(--fg-muted); font-style: italic; }
+.chroma .o { color: var(--fg-muted); }
+.chroma .gi { background: var(--code-ins-bg); }
+.chroma .gd { background: var(--code-del-bg); }
+.chroma :is(.gh, .gu) { color: var(--fg-muted); font-weight: 600; }
+.chroma .ge { font-style: italic; }
+.chroma .gs { font-weight: 600; }
 /* A ```mermaid block (render.go, app.js renderMermaid): the diagram centered
    and shrunk to the column (app.js sets the button's width), and the source
    folded into one quiet line below it. The summary stays a plain word, like

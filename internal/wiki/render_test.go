@@ -44,8 +44,9 @@ func TestRenderMermaid(t *testing.T) {
 	}
 }
 
-// Every other code block renders exactly as goldmark's stock renderer does.
-func TestRenderNonMermaidCodeUnchanged(t *testing.T) {
+// A code block with no language, or one chroma does not know, renders exactly
+// as goldmark's stock renderer does.
+func TestRenderPlainCodeUnchanged(t *testing.T) {
 	stock := goldmark.New(
 		goldmark.WithExtensions(extension.GFM),
 		goldmark.WithRendererOptions(html.WithHardWraps()),
@@ -53,8 +54,8 @@ func TestRenderNonMermaidCodeUnchanged(t *testing.T) {
 	r := wiki.NewRenderer(noResolve)
 	cases := map[string]string{
 		"plain fence":    "```\nplain <b> & text\n```",
-		"go fence":       "```go\nfunc main() { _ = a < b && c }\n```",
-		"tilde fence":    "~~~ python extra\nprint('x')\n~~~",
+		"unknown lang":   "```nosuchlang\nfunc main() { _ = a < b && c }\n```",
+		"tilde fence":    "~~~ nosuchlang extra\nprint('x')\n~~~",
 		"mermaid-ish":    "```mermaidjs\ngraph TD\n```",
 		"Mermaid case":   "```Mermaid\ngraph TD\n```",
 		"indented block": "para\n\n    indented <code>\n    second line",
@@ -72,6 +73,54 @@ func TestRenderNonMermaidCodeUnchanged(t *testing.T) {
 		if got != want.String() {
 			t.Errorf("%s: output changed\n got: %q\nwant: %q", name, got, want.String())
 		}
+	}
+}
+
+// A block in a known language gets class-only token spans (the colours are in
+// app.css) inside the stock <pre><code class="language-xxx"> wrapper.
+func TestRenderHighlight(t *testing.T) {
+	r := wiki.NewRenderer(noResolve)
+	cases := []struct{ src, want string }{
+		{"```sql\nSELECT * FROM t WHERE a < 1;\n```",
+			`<pre class="chroma"><code class="language-sql"><span class="k">SELECT</span>`},
+		{"```json\n{\"a\": true}\n```",
+			`<pre class="chroma"><code class="language-json"><span class="p">{</span><span class="nt">&#34;a&#34;</span>`},
+		{"~~~ go extra\nfunc main() {}\n~~~",
+			`<pre class="chroma"><code class="language-go"><span class="kd">func</span>`},
+	}
+	for _, c := range cases {
+		got, err := r.Render(c.src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(got, c.want) || strings.Contains(got, "style=") {
+			t.Errorf("%q not highlighted as expected:\n got: %s\nwant: %s", c.src, got, c.want)
+		}
+	}
+	for _, lang := range []string{"bash", "sh", "yaml", "js", "ts", "python", "diff"} {
+		got, err := r.Render("```" + lang + "\nx = 1\n```")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.HasPrefix(got, `<pre class="chroma"><code class="language-`+lang+`">`) {
+			t.Errorf("%s: not highlighted: %s", lang, got)
+		}
+	}
+	// Fence attributes (line numbers, highlighted lines) are ignored: the block
+	// is plain highlighted code in the usual wrapper, with no table inside.
+	got, err := r.Render("```go {linenos=table hl_lines=[1]}\nfunc a() {}\nfunc b() {}\n```")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `<pre class="chroma"><code class="language-go"><span class="kd">func</span>`
+	if !strings.HasPrefix(got, want) || strings.Contains(got, "<table") ||
+		strings.Contains(got, "<div") || strings.Contains(got, `class="hl"`) {
+		t.Errorf("fence attributes changed the markup:\n%s", got)
+	}
+	// The source is escaped whether or not it is highlighted.
+	got, _ = r.Render("```html\n<script>alert(1)</script>\n```")
+	if strings.Contains(got, "<script>") {
+		t.Errorf("the source was not escaped:\n%s", got)
 	}
 }
 
