@@ -74,3 +74,26 @@ func TestRenderNonMermaidCodeUnchanged(t *testing.T) {
 		}
 	}
 }
+
+// A paragraph of images alone is marked so the page can let it out of the
+// measure; an image inside a sentence leaves the paragraph a plain <p>.
+func TestRenderImageParagraphs(t *testing.T) {
+	r := wiki.NewRenderer(noResolve)
+	for src, want := range map[string]bool{
+		"![a](a.png)":                        true,
+		"![a](a.png)\n![b](b.png)":           true,
+		"[![a](a.png)](https://example.com)": true,
+		"Click the ![gear](gear.png) icon":   false,
+		"![a](a.png) caption":                false,
+		"[![a](a.png) text](https://x.test)": false,
+		"plain text":                         false,
+	} {
+		got, err := r.Render(src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if marked := strings.HasPrefix(got, `<p class="images">`); marked != want {
+			t.Errorf("%q: marked=%v, want %v\n%s", src, marked, want, got)
+		}
+	}
+}

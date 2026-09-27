@@ -132,6 +132,50 @@ func (m *mermaidRenderer) render(w util.BufWriter, source []byte, node ast.Node,
 	return ast.WalkSkipChildren, nil
 }
 
+// imageParagraphs marks a paragraph that holds nothing but images (each maybe
+// wrapped in a link) with class="images". The page's measure caps running text
+// at about 74 characters; an image alone should be free of it, but an inline
+// icon in a sentence must not lift the cap from the whole paragraph, and CSS
+// cannot tell the two apart, since it does not see text nodes.
+type imageParagraphs struct{}
+
+func (imageParagraphs) Transform(doc *ast.Document, reader text.Reader, pc parser.Context) {
+	source := reader.Source()
+	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering || n.Kind() != ast.KindParagraph {
+			return ast.WalkContinue, nil
+		}
+		if onlyImages(n, source) {
+			n.SetAttributeString("class", []byte("images"))
+		}
+		return ast.WalkSkipChildren, nil
+	})
+}
+
+// onlyImages reports whether n has at least one image and otherwise only
+// whitespace (the line breaks between images stacked one per line).
+func onlyImages(n ast.Node, source []byte) bool {
+	found := false
+	for c := n.FirstChild(); c != nil; c = c.NextSibling() {
+		switch c.Kind() {
+		case ast.KindImage:
+			found = true
+		case ast.KindLink:
+			if c.ChildCount() != 1 || c.FirstChild().Kind() != ast.KindImage {
+				return false
+			}
+			found = true
+		case ast.KindText:
+			if len(bytes.TrimSpace(c.(*ast.Text).Segment.Value(source))) > 0 {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+	return found
+}
+
 // Renderer turns Markdown into HTML.
 type Renderer struct{ md goldmark.Markdown }
 
@@ -147,13 +191,15 @@ type Renderer struct{ md goldmark.Markdown }
 // (paragraphs join into one line). Export writes the source out verbatim, so
 // the difference is only in how it is displayed.
 //
-// A ```mermaid block becomes a diagram (see mermaidRenderer).
+// A ```mermaid block becomes a diagram (see mermaidRenderer), and a paragraph
+// of images alone is marked (see imageParagraphs).
 func NewRenderer(resolve Resolver) *Renderer {
 	md := goldmark.New(
 		goldmark.WithExtensions(extension.GFM),
 		goldmark.WithParserOptions(
 			parser.WithAutoHeadingID(),
 			parser.WithInlineParsers(util.Prioritized(&wikilinkParser{resolve: resolve}, 150)),
+			parser.WithASTTransformers(util.Prioritized(imageParagraphs{}, 100)),
 		),
 		goldmark.WithRendererOptions(
 			html.WithHardWraps(),

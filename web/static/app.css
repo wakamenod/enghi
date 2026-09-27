@@ -258,10 +258,11 @@ h1 + .meta { margin-top: calc(-1 * var(--sp-1)); }
 .prose { font-size: 16px; line-height: var(--lh-prose); }
 /* **The measure caps the text, not the article.** Code, tables and diagrams
    cannot wrap, and inside 74ch they scrolled sideways all the time. So the cap
-   sits on the running text and those blocks take the full column. A lone image
-   counts as a block. */
+   sits on the running text and those blocks take the full column. A paragraph
+   of images alone counts as a block; the renderer marks it p.images, since CSS
+   cannot tell it from a sentence with an inline icon. */
 p.prose,
-.prose > :not(pre, table, figure, p:has(> img:only-child)) { max-width: var(--measure); }
+.prose > :not(pre, table, figure, p.images) { max-width: var(--measure); }
 .prose p { text-wrap: pretty; }
 /* **Break long unbroken strings.** Japanese wraps anywhere, so this never
    surfaced, but a single URL or long identifier pushes the content off screen
@@ -784,8 +785,10 @@ svg.dg text.end-t { fill: var(--accent-fg); }
 :root:not([data-side="open"]) .wrap.with-side { display: flow-root; }
 :root:not([data-side="open"]) .side { display: none; }
 .wrap.with-side { position: relative; }
-/* Quiet, like the rest of the chrome: it sits in the h1's top margin and moves
-   nothing when the column opens */
+/* Quiet, like the rest of the chrome: it sits in the top margin and moves
+   nothing when the column opens. Whatever comes first gets the h1's margin,
+   so an error notice at the top is not drawn under the toggle either. */
+.side-main > :first-child { margin-top: var(--sp-6); }
 .side-toggle {
   /* above the column, which is sticky and so painted later */
   position: absolute; top: var(--sp-1); left: var(--sp-5); z-index: 1;
