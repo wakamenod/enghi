@@ -603,3 +603,38 @@ func TestAllowedHostsEmptyByDefault(t *testing.T) {
 		t.Fatalf("something other than loopback was accepted by default: %d", w.Code)
 	}
 }
+
+// Every page links the SVG icon and the touch icon, and /favicon.ico answers
+// for the clients that never read <link rel="icon">.
+func TestIconsAreServed(t *testing.T) {
+	h := newServer(t)
+	body := do(h, req("GET", "/wiki", "")).Body.String()
+	for _, c := range []struct{ rel, file, ct string }{
+		{"icon", "icon.svg", "image/svg+xml"},
+		{"apple-touch-icon", "apple-touch-icon.png", "image/png"},
+	} {
+		m := regexp.MustCompile(`<link rel="` + c.rel + `"[^>]* href="(/static/` + regexp.QuoteMeta(c.file) + `\?v=[a-f0-9]{8})"`).FindStringSubmatch(body)
+		if m == nil {
+			t.Fatalf("no <link rel=%q> to %s with ?v=", c.rel, c.file)
+		}
+		w := do(h, req("GET", m[1], ""))
+		if w.Code != http.StatusOK {
+			t.Fatalf("%s -> %d", c.file, w.Code)
+		}
+		if ct := w.Header().Get("Content-Type"); !strings.HasPrefix(ct, c.ct) {
+			t.Fatalf("%s Content-Type = %q, want %s", c.file, ct, c.ct)
+		}
+	}
+
+	w := do(h, req("GET", "/favicon.ico", ""))
+	if w.Code != http.StatusOK {
+		t.Fatalf("/favicon.ico -> %d", w.Code)
+	}
+	if ct := w.Header().Get("Content-Type"); ct != "image/x-icon" {
+		t.Fatalf("/favicon.ico Content-Type = %q", ct)
+	}
+	// ICONDIR: reserved 0, type 1 (icon)
+	if b := w.Body.Bytes(); len(b) < 6 || b[0] != 0 || b[1] != 0 || b[2] != 1 || b[3] != 0 {
+		t.Fatalf("/favicon.ico is not an .ico file")
+	}
+}
