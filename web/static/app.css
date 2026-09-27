@@ -255,7 +255,13 @@ h3 { font-size: var(--fs-6); font-weight: 600; margin: var(--sp-5) 0 var(--sp-2)
 /* meta right under a heading reads as part of it */
 h1 + .meta { margin-top: calc(-1 * var(--sp-1)); }
 
-.prose { max-width: var(--measure); font-size: 16px; line-height: var(--lh-prose); }
+.prose { font-size: 16px; line-height: var(--lh-prose); }
+/* **The measure caps the text, not the article.** Code, tables and diagrams
+   cannot wrap, and inside 74ch they scrolled sideways all the time. So the cap
+   sits on the running text and those blocks take the full column. A lone image
+   counts as a block. */
+p.prose,
+.prose > :not(pre, table, figure, p:has(> img:only-child)) { max-width: var(--measure); }
 .prose p { text-wrap: pretty; }
 /* **Break long unbroken strings.** Japanese wraps anywhere, so this never
    surfaced, but a single URL or long identifier pushes the content off screen
@@ -307,6 +313,19 @@ h1 + .meta { margin-top: calc(-1 * var(--sp-1)); }
   border-left: 3px solid var(--border-strong); color: var(--fg-muted);
 }
 .prose img { max-width: 100%; height: auto; border-radius: var(--r-md); }
+/* **On a wide screen an article's wide blocks reach out to the right.** The
+   left edge stays with the text, so the eye does not jump, and only the right
+   edge grows, toward the edge of the window, 1200px at most. max-content keeps
+   a short snippet as narrow as the column. The overhang is the margin beside
+   .wrap: 100vw counts a classic scrollbar, which the --sp-3 held back covers,
+   so the page itself never scrolls sideways. Only a top-level article: inside
+   a panel (a project's note, the work log) this would break out of the box. */
+@media (min-width: 1100px) {
+  :is(.wrap, .side-main, .guide) > article.prose > :is(pre, table, figure.mermaid) {
+    width: max-content; min-width: 100%;
+    max-width: min(1200px, calc(100% + (100vw - var(--wrap)) / 2 - var(--sp-3)));
+  }
+}
 .prose table { border-collapse: separate; border-spacing: 0; font-size: 14px; }
 .prose th, .prose td { border-bottom: 1px solid var(--border); padding: var(--sp-2) var(--sp-3); text-align: left; }
 .prose thead th { border-bottom: 1px solid var(--border-strong); font-weight: 600; }
@@ -758,6 +777,25 @@ svg.dg text.end-t { fill: var(--accent-fg); }
   .wrap.with-side { grid-template-columns: 1fr; }
   .side { position: static; padding-top: var(--sp-5); }
 }
+/* **The column starts closed** and data-side on <html> (set before painting,
+   base.html) opens it; the reader's choice is shared by all four screens. Closed,
+   the article starts at the left edge of .wrap. flow-root keeps the h1's top
+   margin inside main, so the toggle above it has room. */
+:root:not([data-side="open"]) .wrap.with-side { display: flow-root; }
+:root:not([data-side="open"]) .side { display: none; }
+.wrap.with-side { position: relative; }
+/* Quiet, like the rest of the chrome: it sits in the h1's top margin and moves
+   nothing when the column opens */
+.side-toggle {
+  /* above the column, which is sticky and so painted later */
+  position: absolute; top: var(--sp-1); left: var(--sp-5); z-index: 1;
+  display: flex; align-items: center; gap: var(--sp-1);
+  padding: 2px var(--sp-2); margin-left: calc(-1 * var(--sp-2));
+  background: none; border: 1px solid transparent; border-radius: var(--r-sm);
+  color: var(--fg-faint); font-size: var(--fs-2); line-height: 1.4; cursor: pointer;
+}
+.side-toggle:hover { color: var(--fg); background: var(--bg-hover); }
+:root[data-side="open"] .side-toggle { color: var(--fg-muted); }
 
 /* The settings checkboxes; the whole label is clickable */
 label.check {
@@ -836,7 +874,7 @@ textarea.log-body { min-height: 8em; }
 .day-main > section.panel:first-child, .day-main > .empty:first-child { margin-top: 0; }
 .day-main > .empty:first-child + section.panel { margin-top: var(--sp-4); }
 @media (max-width: 720px) {
-  .day-layout { grid-template-columns: 1fr; }
+  .day-layout { grid-template-columns: minmax(0, 1fr); }  /* as above: 1fr alone grows to the widest code line */
   .day-cal { order: -1; }
 }
 
@@ -848,7 +886,9 @@ ul.rows.day-tasks li.cur { background: var(--bg-hover); }
   color: var(--fg-muted); font-size: var(--fs-2); font-family: var(--mono);
   font-variant-numeric: tabular-nums;
 }
-.day-logs { flex-basis: 100%; padding-left: var(--sp-4); border-left: 1px solid var(--border); margin: var(--sp-1) 0 var(--sp-1) var(--sp-1); }
+/* min-width: 0, or a flex item grows to its longest code line and the whole
+   page scrolls sideways; the code block scrolls instead */
+.day-logs { flex-basis: 100%; min-width: 0; padding-left: var(--sp-4); border-left: 1px solid var(--border); margin: var(--sp-1) 0 var(--sp-1) var(--sp-1); }
 .day-logs .log-entry { padding: var(--sp-2) 0; }
 /* The row rules (ul.rows li, ul.rows a) are descendant selectors and would
    reach the lists and links in an entry's prose; put those back */

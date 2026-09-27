@@ -277,6 +277,7 @@ A code block that starts with ```` ```mermaid ```` is shown as a [Mermaid](https
 | `p` | Start or pause work on the selected task |
 | `o` | Open the selected task's URL in a new tab |
 | `e` | Edit the article |
+| `b` | Article screens: show or hide the tag column on the left |
 | `[` / `]` | Work record: previous / next day |
 | `t` | Work record: back to today. With a task selected, rename it |
 
