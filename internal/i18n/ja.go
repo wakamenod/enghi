@@ -354,6 +354,7 @@ func init() {
 		"day.copy":            "Markdown でコピー",
 		"day.copied":          "コピーしました。",
 		"day.copy_manual":     "ここではコピーできません。下のテキストを選択してコピーしてください。",
+		"mermaid.error":       "図を表示できませんでした（%s）",
 		"day.bad_date":        "日付は YYYY-MM-DD の形で指定してください。",
 		"day.bad_month":       "月は YYYY-MM の形で指定してください。",
 		"day.activity":        "完了 %d · 記録 %d",

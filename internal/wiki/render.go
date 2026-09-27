@@ -10,6 +10,7 @@ import (
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
+	"github.com/yuin/goldmark/renderer"
 	"github.com/yuin/goldmark/renderer/html"
 	"github.com/yuin/goldmark/text"
 	"github.com/yuin/goldmark/util"
@@ -84,6 +85,53 @@ func queryEscape(s string) string {
 	return b.String()
 }
 
+// mermaidRenderer draws ```mermaid fenced blocks as a diagram with its source
+// folded underneath; every other fenced block goes to goldmark's own renderer
+// unchanged. The diagram itself is drawn in the browser (app.js,
+// renderMermaid). The <details> is emitted open and the JS closes it only once
+// the diagram is drawn, so without JS, or on a syntax error, the source stays
+// visible and the block is never empty.
+type mermaidRenderer struct{ fallback renderer.NodeRendererFunc }
+
+func newMermaidRenderer(opts ...html.Option) *mermaidRenderer {
+	m := &mermaidRenderer{}
+	// Borrow the stock fenced-code function from a default html renderer
+	html.NewRenderer(opts...).RegisterFuncs(registerFunc(func(k ast.NodeKind, f renderer.NodeRendererFunc) {
+		if k == ast.KindFencedCodeBlock {
+			m.fallback = f
+		}
+	}))
+	return m
+}
+
+type registerFunc func(ast.NodeKind, renderer.NodeRendererFunc)
+
+func (f registerFunc) Register(k ast.NodeKind, fn renderer.NodeRendererFunc) { f(k, fn) }
+
+func (m *mermaidRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
+	reg.Register(ast.KindFencedCodeBlock, m.render)
+}
+
+func (m *mermaidRenderer) render(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	n := node.(*ast.FencedCodeBlock)
+	if string(n.Language(source)) != "mermaid" {
+		return m.fallback(w, source, node, entering)
+	}
+	if !entering {
+		return ast.WalkContinue, nil
+	}
+	_, _ = w.WriteString("<figure class=\"mermaid\">\n<div class=\"mermaid-diagram\"></div>\n" +
+		"<details class=\"mermaid-source\" open>\n<summary>Mermaid</summary>\n" +
+		"<pre><code class=\"language-mermaid\">")
+	lines := n.Lines()
+	for i := 0; i < lines.Len(); i++ {
+		line := lines.At(i)
+		html.DefaultWriter.RawWrite(w, line.Value(source))
+	}
+	_, _ = w.WriteString("</code></pre>\n</details>\n</figure>\n")
+	return ast.WalkSkipChildren, nil
+}
+
 // Renderer turns Markdown into HTML.
 type Renderer struct{ md goldmark.Markdown }
 
@@ -98,6 +146,8 @@ type Renderer struct{ md goldmark.Markdown }
 // The cost is that **exported Markdown loses those breaks in other renderers**
 // (paragraphs join into one line). Export writes the source out verbatim, so
 // the difference is only in how it is displayed.
+//
+// A ```mermaid block becomes a diagram (see mermaidRenderer).
 func NewRenderer(resolve Resolver) *Renderer {
 	md := goldmark.New(
 		goldmark.WithExtensions(extension.GFM),
@@ -107,6 +157,7 @@ func NewRenderer(resolve Resolver) *Renderer {
 		),
 		goldmark.WithRendererOptions(
 			html.WithHardWraps(),
+			renderer.WithNodeRenderers(util.Prioritized(newMermaidRenderer(html.WithHardWraps()), 100)),
 		),
 	)
 	return &Renderer{md: md}

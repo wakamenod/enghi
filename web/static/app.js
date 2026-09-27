@@ -995,6 +995,104 @@ function repeatPicker(date, recurrence, endsOn) {
   });
 })();
 
+// ---------------------------------------------------------------- Mermaid
+//
+// The server renders a ```mermaid block as figure.mermaid: an empty
+// .mermaid-diagram and the source in a <details> that starts open
+// (internal/wiki/render.go). This draws the diagram and folds the source away;
+// on an error the message goes where the diagram would be and the source stays
+// open.
+//
+// mermaid.min.js is about 3 MB, so it is not on every page: the script is
+// injected the first time a page actually has a diagram. Its fingerprinted URL
+// comes from data-mermaid-src on body.
+
+var renderMermaid = (function () {
+  var waiting = null; // callbacks queued while the script loads
+  var seq = 0;
+
+  function mermaidTheme() {
+    var t = document.documentElement.dataset.theme;
+    if (t !== 'light' && t !== 'dark') {
+      t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    return t === 'dark' ? 'dark' : 'default';
+  }
+
+  function load(done) {
+    if (window.mermaid) { done(); return; }
+    if (waiting) { waiting.push(done); return; }
+    waiting = [done];
+    var s = document.createElement('script');
+    s.src = document.body.getAttribute('data-mermaid-src');
+    s.onload = function () {
+      var q = waiting;
+      waiting = null;
+      q.forEach(function (f) { f(); });
+    };
+    // Nothing to draw with; the sources simply stay open
+    s.onerror = function () { waiting = null; };
+    document.head.appendChild(s);
+  }
+
+  function draw(fig) {
+    var diagram = fig.querySelector('.mermaid-diagram');
+    var code = fig.querySelector('.mermaid-source code');
+    var details = fig.querySelector('.mermaid-source');
+    if (!diagram || !code || !details) return;
+    var id = 'mermaid-svg-' + (++seq);
+    window.mermaid.render(id, code.textContent).then(function (res) {
+      diagram.innerHTML = res.svg;
+      if (res.bindFunctions) res.bindFunctions(diagram);
+      // Mermaid shrinks a wide diagram to the column until its text is
+      // unreadable; draw it at its natural size and let the box scroll instead.
+      var svg = diagram.querySelector('svg');
+      var vb = svg && svg.viewBox && svg.viewBox.baseVal;
+      if (vb && vb.width) {
+        svg.style.maxWidth = 'none';
+        svg.style.width = vb.width + 'px';
+      }
+      diagram.classList.remove('mermaid-error');
+      // Fold the source only the first time; a redraw (theme switch) leaves it
+      // as the reader set it.
+      if (!fig.hasAttribute('data-drawn')) {
+        fig.setAttribute('data-drawn', '');
+        details.open = false;
+      }
+    }, function (err) {
+      // On a parse error Mermaid leaves its own error graphic appended to body
+      var stray = document.getElementById('d' + id);
+      if (stray) stray.parentNode.removeChild(stray);
+      var msg = String((err && err.message) || err).split('\n')[0].replace(/:\s*$/, '');
+      diagram.textContent = t('mermaid.error', msg);
+      diagram.classList.add('mermaid-error');
+      details.open = true;
+    });
+  }
+
+  return function (root) {
+    var figs = (root || document).querySelectorAll('figure.mermaid');
+    if (!figs.length) return;
+    load(function () {
+      window.mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: mermaidTheme() });
+      for (var i = 0; i < figs.length; i++) draw(figs[i]);
+    });
+  };
+})();
+
+renderMermaid(document);
+
+// On auto the OS setting decides the palette, so follow it when it flips
+(function () {
+  if (!window.matchMedia) return;
+  var q = window.matchMedia('(prefers-color-scheme: dark)');
+  function onChange() {
+    if (!document.documentElement.dataset.theme) renderMermaid(document);
+  }
+  if (q.addEventListener) q.addEventListener('change', onChange);
+  else if (q.addListener) q.addListener(onChange);
+})();
+
 // ---------------------------------------------------------------- theme switch
 //
 // Cycles auto (follow the OS) -> light -> dark -> auto.
@@ -1032,6 +1130,8 @@ function repeatPicker(date, recurrence, endsOn) {
     apply(current());
     btn.addEventListener("click", function () {
       apply(ORDER[(ORDER.indexOf(current()) + 1) % ORDER.length]);
+      // Diagrams bake their colors into the SVG; draw them again
+      renderMermaid(document);
     });
   }
 })();
@@ -1214,7 +1314,11 @@ document.addEventListener('keydown', function (ev) {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: 'body=' + encodeURIComponent(ta.value)
     }).then(function (r) { return r.text(); })
-      .then(function (html) { pane.innerHTML = html; pane.style.display = 'block'; });
+      .then(function (html) {
+        pane.innerHTML = html;
+        pane.style.display = 'block';
+        renderMermaid(pane);
+      });
   });
 })();
 

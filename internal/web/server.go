@@ -365,7 +365,7 @@ func jsStrings(lang i18n.Lang) string {
 		"repeat.ends_on", "repeat.pick_day",
 		"repeat.wd.sun", "repeat.wd.mon", "repeat.wd.tue", "repeat.wd.wed",
 		"repeat.wd.thu", "repeat.wd.fri", "repeat.wd.sat",
-		"day.copied", "day.copy_manual",
+		"day.copied", "day.copy_manual", "mermaid.error",
 		"dur.m", "dur.hm", "dur.dh",
 	}
 	m := make(map[string]string, len(keys))

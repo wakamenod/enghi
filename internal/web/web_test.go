@@ -490,6 +490,31 @@ func TestStaticAssetsAreFingerprinted(t *testing.T) {
 	}
 }
 
+// Mermaid is bundled, and pages hand app.js its fingerprinted URL instead of
+// loading it with a <script> tag: it is ~3 MB and only a page that contains a
+// diagram fetches it.
+func TestMermaidIsServedLazily(t *testing.T) {
+	h := newServer(t)
+	body := do(h, req("GET", "/wiki", "")).Body.String()
+	m := regexp.MustCompile(`data-mermaid-src="(/static/mermaid\.min\.js\?v=[a-f0-9]{8})"`).FindStringSubmatch(body)
+	if m == nil {
+		t.Fatalf("no data-mermaid-src with ?v= in the template output")
+	}
+	if strings.Contains(body, `<script src="/static/mermaid`) {
+		t.Fatalf("mermaid.min.js is loaded on every page")
+	}
+	w := do(h, req("GET", m[1], ""))
+	if w.Code != http.StatusOK {
+		t.Fatalf("mermaid.min.js -> %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), `globalThis["mermaid"]`) {
+		t.Fatalf("mermaid.min.js is not the UMD build")
+	}
+	if cc := w.Header().Get("Cache-Control"); !strings.Contains(cc, "immutable") {
+		t.Fatalf("Cache-Control = %q", cc)
+	}
+}
+
 // Setting allowed_hosts additionally accepts that exact Host / Origin.
 // **There is no wildcard, and without the setting it stays loopback-only**
 // (DESIGN 4.4).

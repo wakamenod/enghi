@@ -257,6 +257,8 @@ They connect in only three places:
 - Projects and Areas can each hold **one dedicated article**
 - Writing `[[Article name]]` in any article creates a link (even if the target doesn't exist yet)
 
+A code block that starts with ```` ```mermaid ```` is shown as a [Mermaid](https://mermaid.js.org/) diagram. The source is folded away below the diagram. Click the Mermaid label to see it. This works in articles, project and area notes, work logs, and the edit preview.
+
 ## Keyboard Shortcuts {#keys}
 
 | Key | Action |
