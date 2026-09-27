@@ -1020,7 +1020,9 @@ var renderMermaid = (function () {
   }
 
   function load(done) {
-    if (window.mermaid) { done(); return; }
+    // A heading titled "mermaid" gets id="mermaid", and the browser exposes
+    // that element as window.mermaid; only the library itself counts.
+    if (window.mermaid && typeof window.mermaid.render === 'function') { done(); return; }
     if (waiting) { waiting.push(done); return; }
     waiting = [done];
     var s = document.createElement('script');
