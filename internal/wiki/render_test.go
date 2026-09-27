@@ -75,6 +75,32 @@ func TestRenderNonMermaidCodeUnchanged(t *testing.T) {
 	}
 }
 
+// A table is wrapped in div.table-wrap, the box that scrolls sideways; the
+// table inside renders exactly as goldmark's stock renderer does.
+func TestRenderTableWrapped(t *testing.T) {
+	stock := goldmark.New(
+		goldmark.WithExtensions(extension.GFM),
+		goldmark.WithRendererOptions(html.WithHardWraps()),
+	)
+	table := "| 名前 | 説明 |\n|:--|--:|\n| `a` | **b** <c> |\n"
+	var tbl bytes.Buffer
+	if err := stock.Convert([]byte(table), &tbl); err != nil {
+		t.Fatal(err)
+	}
+	r := wiki.NewRenderer(noResolve)
+	got, err := r.Render("前\n\n" + table + "\n後")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "<p>前</p>\n<div class=\"table-wrap\">\n" + tbl.String() + "</div>\n<p>後</p>\n"
+	if got != want {
+		t.Errorf("table not wrapped as expected\n got: %q\nwant: %q", got, want)
+	}
+	if n := strings.Count(got, "table-wrap"); n != 1 {
+		t.Errorf("want one wrapper, got %d:\n%s", n, got)
+	}
+}
+
 // A paragraph of images alone is marked so the page can let it out of the
 // measure; an image inside a sentence leaves the paragraph a plain <p>.
 func TestRenderImageParagraphs(t *testing.T) {

@@ -262,22 +262,27 @@ h1 + .meta { margin-top: calc(-1 * var(--sp-1)); }
    of images alone counts as a block; the renderer marks it p.images, since CSS
    cannot tell it from a sentence with an inline icon. */
 p.prose,
-.prose > :not(pre, table, figure, p.images) { max-width: var(--measure); }
+.prose > :not(pre, .table-wrap, figure, p.images) { max-width: var(--measure); }
 .prose p { text-wrap: pretty; }
 /* **Break long unbroken strings.** Japanese wraps anywhere, so this never
    surfaced, but a single URL or long identifier pushes the content off screen
    and brings a horizontal scrollbar with it. */
 .prose, ul.rows li, .meta, .empty, .notice { overflow-wrap: break-word; }
-/* A table still wider than its column scrolls horizontally on its own. Moving
-   inside the table reads better than the whole page sliding sideways. */
-.prose table { display: block; overflow-x: auto; max-width: 100%; width: max-content; }
-/* Cells may wrap, but only past 24em. Letting every cell wrap freely collapses
-   the table to the width of its container, one character per column, which is
-   unreadable. Never wrapping lets one long description stretch the table
-   without end. With the table at max-content, a short cell keeps the width of
-   its content and only a cell longer than 24em wraps at that width; anywhere
-   breaks a long URL inside the cell. Headings stay on one line. A browser that
-   ignores max-width on a cell falls back to the table scrolling. */
+/* A table still wider than its column scrolls horizontally in its own box
+   (div.table-wrap, added by the renderer). Moving inside the table reads better
+   than the whole page sliding sideways. */
+.prose .table-wrap { overflow-x: auto; max-width: 100%; }
+/* **The table is max-content, and a cell wraps only past 24em.** Letting every
+   cell wrap freely collapses the table to the width of its container, one
+   character per column, which is unreadable. Never wrapping lets one long
+   description stretch the table without end. So each column is as wide as its
+   content or 24em, whichever is less, and anywhere breaks a long URL inside
+   that. The table never shrinks below that to fit a narrow screen; the box
+   scrolls instead. This needs the table to be a real table: were it the
+   scrolling box itself (display: block), the table inside would shrink to the
+   box, and anywhere would let it go down to one character per column.
+   Headings stay on one line. */
+.prose table { width: max-content; }
 .prose th { white-space: nowrap; }
 .prose td { max-width: 24em; overflow-wrap: anywhere; }
 .prose h1 { font-size: var(--fs-7); margin-top: var(--sp-6); }
@@ -341,7 +346,7 @@ p.prose,
    so the page itself never scrolls sideways. Only a top-level article: inside
    a panel (a project's note, the work log) this would break out of the box. */
 @media (min-width: 1100px) {
-  :is(.wrap, .side-main, .guide) > article.prose > :is(pre, table) {
+  :is(.wrap, .side-main, .guide) > article.prose > :is(pre, .table-wrap) {
     width: max-content; min-width: 100%;
     max-width: min(1200px, calc(100% + (100vw - var(--wrap)) / 2 - var(--sp-3)));
   }
