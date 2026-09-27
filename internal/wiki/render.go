@@ -9,6 +9,7 @@ import (
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
+	extast "github.com/yuin/goldmark/extension/ast"
 	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/renderer"
 	"github.com/yuin/goldmark/renderer/html"
@@ -132,6 +133,38 @@ func (m *mermaidRenderer) render(w util.BufWriter, source []byte, node ast.Node,
 	return ast.WalkSkipChildren, nil
 }
 
+// tableRenderer wraps each GFM table in <div class="table-wrap">. The div is
+// the box that scrolls sideways, so the table itself can stay a real table at
+// max-content: its columns never shrink below their content (or 24em), and a
+// table too wide for the column scrolls instead of squeezing its words. Done
+// here rather than in JS so the page does not shift after it is drawn.
+type tableRenderer struct{ fallback renderer.NodeRendererFunc }
+
+func newTableRenderer() *tableRenderer {
+	t := &tableRenderer{}
+	// Borrow the table function from goldmark's own table renderer
+	extension.NewTableHTMLRenderer().RegisterFuncs(registerFunc(func(k ast.NodeKind, f renderer.NodeRendererFunc) {
+		if k == extast.KindTable {
+			t.fallback = f
+		}
+	}))
+	return t
+}
+
+func (t *tableRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
+	reg.Register(extast.KindTable, t.render)
+}
+
+func (t *tableRenderer) render(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	if entering {
+		_, _ = w.WriteString("<div class=\"table-wrap\">\n")
+		return t.fallback(w, source, node, entering)
+	}
+	s, err := t.fallback(w, source, node, entering)
+	_, _ = w.WriteString("</div>\n")
+	return s, err
+}
+
 // imageParagraphs marks a paragraph that holds nothing but images (each maybe
 // wrapped in a link) with class="images". The page's measure caps running text
 // at about 74 characters; an image alone should be free of it, but an inline
@@ -191,8 +224,9 @@ type Renderer struct{ md goldmark.Markdown }
 // (paragraphs join into one line). Export writes the source out verbatim, so
 // the difference is only in how it is displayed.
 //
-// A ```mermaid block becomes a diagram (see mermaidRenderer), and a paragraph
-// of images alone is marked (see imageParagraphs).
+// A ```mermaid block becomes a diagram (see mermaidRenderer), a table is
+// wrapped in a scrolling box (see tableRenderer), and a paragraph of images
+// alone is marked (see imageParagraphs).
 func NewRenderer(resolve Resolver) *Renderer {
 	md := goldmark.New(
 		goldmark.WithExtensions(extension.GFM),
@@ -203,7 +237,10 @@ func NewRenderer(resolve Resolver) *Renderer {
 		),
 		goldmark.WithRendererOptions(
 			html.WithHardWraps(),
-			renderer.WithNodeRenderers(util.Prioritized(newMermaidRenderer(html.WithHardWraps()), 100)),
+			renderer.WithNodeRenderers(
+				util.Prioritized(newMermaidRenderer(html.WithHardWraps()), 100),
+				util.Prioritized(newTableRenderer(), 100),
+			),
 		),
 	)
 	return &Renderer{md: md}
