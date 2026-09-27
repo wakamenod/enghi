@@ -1218,6 +1218,7 @@ var renderMermaid = (function () {
     function open(fig, btn) {
       if (cur) return;
       build();
+      stage.textContent = ''; // the stage only ever holds the open diagram
       adopt(fig, btn);
       dlg.showModal();
       box = stage.getBoundingClientRect();
@@ -1234,10 +1235,13 @@ var renderMermaid = (function () {
       stage.classList.remove('dragging');
       window.removeEventListener('resize', onResize);
       if (dlg.open) dlg.close();
-      // A redraw that failed took the button away; there is nothing to return to
+      // A redraw that failed took the button away; there is nothing to return
+      // the SVG to, so drop it rather than leave it over the next diagram
       if (c.btn.isConnected) {
         release(c);
         c.btn.focus();
+      } else if (c.svg.parentNode) {
+        c.svg.parentNode.removeChild(c.svg);
       }
     }
 
