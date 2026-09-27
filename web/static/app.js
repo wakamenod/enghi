@@ -731,7 +731,11 @@ function repeatPicker(date, recurrence, endsOn) {
       .catch(function () { return []; });
   }
 
-  function modalOpen() { return !!document.getElementById('move-modal'); }
+  // The diagram viewer is a <dialog>; it stops its own keys, and this catches
+  // any that slip past.
+  function modalOpen() {
+    return !!(document.getElementById('move-modal') || document.querySelector('dialog[open]'));
+  }
 
   function openMove(task, direct) {
     if (modalOpen()) return;
@@ -1010,10 +1014,250 @@ function repeatPicker(date, recurrence, endsOn) {
 // mermaid.min.js is about 3 MB, so it is not on every page: the script is
 // injected the first time a page actually has a diagram. Its fingerprinted URL
 // comes from data-mermaid-src on body.
+//
+// In the article a diagram is shrunk to fit the column and a share of the
+// window's height: there it only has to show the whole shape. Clicking it (or
+// Enter on it) opens the viewer below, where the details are read.
 
 var renderMermaid = (function () {
   var waiting = null; // callbacks queued while the script loads
   var seq = 0;
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+
+  function icon(name) {
+    var s = document.createElementNS(SVG_NS, 'svg');
+    s.setAttribute('class', 'ic ic-' + name);
+    s.setAttribute('aria-hidden', 'true');
+    s.setAttribute('focusable', 'false');
+    var u = document.createElementNS(SVG_NS, 'use');
+    u.setAttribute('href', '#i-' + name);
+    s.appendChild(u);
+    return s;
+  }
+
+  function iconButton(name, label, onClick) {
+    var b = el('button', 'mermaid-tool');
+    b.type = 'button';
+    b.title = label;
+    b.setAttribute('aria-label', label);
+    b.appendChild(icon(name));
+    b.addEventListener('click', onClick);
+    return b;
+  }
+
+  // ---- the viewer
+  //
+  // A native <dialog> over the whole window, zoomed and panned by rewriting the
+  // SVG's viewBox, so the diagram stays vector-sharp at any size. **The SVG is
+  // moved into the dialog, never cloned**: Mermaid scopes its styles with
+  // #mermaid-svg-N and points arrowheads at url(#...), and a copy would carry
+  // the same ids. Closing puts it back where it was.
+  var viewer = (function () {
+    var dlg, stage, zoomLabel;
+    var cur = null;   // what is open: its figure, button, svg and saved attributes
+    var view = null;  // x, y: the user-space point at the stage's top-left; s: px per unit
+    var fit = 1;      // the scale of "the whole diagram", which bounds zooming
+    var box = null;   // the stage's rect, measured on open and on resize
+    var pts = {};     // pointers down on the stage, by id
+
+    function build() {
+      if (dlg) return;
+      dlg = el('dialog', 'mermaid-viewer');
+      dlg.setAttribute('aria-label', t('mermaid.viewer'));
+      stage = el('div', 'mermaid-stage');
+      stage.tabIndex = -1;
+      var tools = el('div', 'mermaid-tools');
+      zoomLabel = el('span', 'mermaid-zoom');
+      tools.appendChild(iconButton('minus', t('mermaid.zoom_out'), function () { zoomBy(1 / 1.25); }));
+      tools.appendChild(zoomLabel);
+      tools.appendChild(iconButton('plus', t('mermaid.zoom_in'), function () { zoomBy(1.25); }));
+      tools.appendChild(iconButton('fit', t('mermaid.fit'), function () { fitView(); }));
+      tools.appendChild(iconButton('close', t('mermaid.close'), function () { close(); }));
+      dlg.appendChild(stage);
+      dlg.appendChild(tools);
+      document.body.appendChild(dlg);
+
+      // Esc arrives as cancel; closing by any route goes through close()
+      dlg.addEventListener('close', close);
+      // A click on the backdrop is a click on the dialog, outside its box
+      dlg.addEventListener('click', function (e) {
+        if (e.target !== dlg) return;
+        var r = dlg.getBoundingClientRect();
+        if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) close();
+      });
+      // Keys never reach the page's own shortcuts while the viewer is open
+      dlg.addEventListener('keydown', function (e) {
+        e.stopPropagation();
+        if (e.metaKey || e.ctrlKey || e.altKey) return;
+        var step = Math.min(box.width, box.height) / 8;
+        var act = {
+          'Escape': close,
+          '+': function () { zoomBy(1.25); }, '=': function () { zoomBy(1.25); },
+          '-': function () { zoomBy(1 / 1.25); }, '_': function () { zoomBy(1 / 1.25); },
+          '0': fitView,
+          'ArrowLeft': function () { panBy(step, 0); }, 'ArrowRight': function () { panBy(-step, 0); },
+          'ArrowUp': function () { panBy(0, step); }, 'ArrowDown': function () { panBy(0, -step); },
+        }[e.key];
+        if (act) { e.preventDefault(); act(); }
+      });
+
+      // A wheel zooms around the cursor; a trackpad pinch comes as ctrl+wheel
+      // with small deltas, so it gets a larger factor per unit. A sideways
+      // swipe pans instead.
+      stage.addEventListener('wheel', function (e) {
+        e.preventDefault();
+        var unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? box.height : 1;
+        if (!e.ctrlKey && Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+          panBy(-e.deltaX * unit, 0);
+          return;
+        }
+        zoomAt(e.clientX - box.left, e.clientY - box.top,
+               Math.exp(-e.deltaY * unit * (e.ctrlKey ? 0.01 : 0.002)));
+      }, { passive: false });
+
+      // One pointer drags; two (a phone) pinch and move together
+      stage.addEventListener('pointerdown', function (e) {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        stage.setPointerCapture(e.pointerId);
+        pts[e.pointerId] = { x: e.clientX, y: e.clientY };
+        stage.classList.add('dragging');
+      });
+      stage.addEventListener('pointermove', function (e) {
+        var p = pts[e.pointerId];
+        if (!p) return;
+        var ids = Object.keys(pts);
+        if (ids.length === 1) {
+          panBy(e.clientX - p.x, e.clientY - p.y);
+        } else if (ids.indexOf(String(e.pointerId)) < 2) {
+          var a = pts[ids[0]], b = pts[ids[1]];
+          var before = pair(a, b);
+          p.x = e.clientX; p.y = e.clientY;
+          var after = pair(a, b);
+          panBy(after.x - before.x, after.y - before.y);
+          if (before.d > 0) zoomAt(after.x - box.left, after.y - box.top, after.d / before.d);
+        }
+        p.x = e.clientX; p.y = e.clientY;
+      });
+      function up(e) {
+        delete pts[e.pointerId];
+        if (!Object.keys(pts).length) stage.classList.remove('dragging');
+      }
+      stage.addEventListener('pointerup', up);
+      stage.addEventListener('pointercancel', up);
+    }
+
+    function pair(a, b) {
+      return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, d: Math.hypot(a.x - b.x, a.y - b.y) };
+    }
+
+    function apply() {
+      cur.svg.setAttribute('viewBox', [view.x, view.y, box.width / view.s, box.height / view.s].join(' '));
+      zoomLabel.textContent = Math.round(view.s * 100) + '%';
+    }
+
+    // The whole diagram, with a margin. A small one is enlarged a little, not
+    // blown up to the window: 150% of its natural size at most.
+    function fitView() {
+      var b = cur.b0, pad = 24;
+      var s = Math.min((box.width - 2 * pad) / b.w, (box.height - 2 * pad) / b.h, 1.5);
+      if (!(s > 0)) s = 1;
+      fit = s;
+      view = { s: s, x: b.x + b.w / 2 - box.width / 2 / s, y: b.y + b.h / 2 - box.height / 2 / s };
+      apply();
+    }
+
+    // Zooming keeps the point under (px, py) where it is. Between half and
+    // twenty times the whole-diagram scale.
+    function zoomAt(px, py, factor) {
+      var s = Math.max(fit * 0.5, Math.min(fit * 20, view.s * factor));
+      view.x += px / view.s - px / s;
+      view.y += py / view.s - py / s;
+      view.s = s;
+      apply();
+    }
+
+    function zoomBy(factor) { zoomAt(box.width / 2, box.height / 2, factor); }
+
+    function panBy(dx, dy) {
+      view.x -= dx / view.s;
+      view.y -= dy / view.s;
+      apply();
+    }
+
+    // Keep the scale and the point at the centre when the window changes
+    function onResize() {
+      var cx = view.x + box.width / 2 / view.s, cy = view.y + box.height / 2 / view.s;
+      box = stage.getBoundingClientRect();
+      view.x = cx - box.width / 2 / view.s;
+      view.y = cy - box.height / 2 / view.s;
+      apply();
+    }
+
+    // Take svg out of its button into the stage. The button keeps its size, so
+    // the article behind does not reflow and the scroll position holds.
+    function adopt(fig, btn) {
+      var svg = btn.firstElementChild;
+      var vb = svg.viewBox.baseVal;
+      btn.style.height = btn.getBoundingClientRect().height + 'px';
+      cur = {
+        fig: fig, btn: btn, svg: svg,
+        style: svg.getAttribute('style'), viewBox: svg.getAttribute('viewBox'),
+        b0: { x: vb.x, y: vb.y, w: vb.width, h: vb.height },
+      };
+      svg.setAttribute('style', 'display:block;width:100%;height:100%;max-width:none');
+      stage.appendChild(svg);
+    }
+
+    function release(c) {
+      c.svg.setAttribute('style', c.style);
+      c.svg.setAttribute('viewBox', c.viewBox);
+      c.btn.insertBefore(c.svg, c.btn.firstChild);
+      c.btn.style.height = '';
+    }
+
+    function open(fig, btn) {
+      if (cur) return;
+      build();
+      stage.textContent = ''; // the stage only ever holds the open diagram
+      adopt(fig, btn);
+      dlg.showModal();
+      box = stage.getBoundingClientRect();
+      fitView();
+      stage.focus();
+      window.addEventListener('resize', onResize);
+    }
+
+    function close() {
+      if (!cur) return;
+      var c = cur;
+      cur = null;
+      pts = {};
+      stage.classList.remove('dragging');
+      window.removeEventListener('resize', onResize);
+      if (dlg.open) dlg.close();
+      // A redraw that failed took the button away; there is nothing to return
+      // the SVG to, so drop it rather than leave it over the next diagram
+      if (c.btn.isConnected) {
+        release(c);
+        c.btn.focus();
+      } else if (c.svg.parentNode) {
+        c.svg.parentNode.removeChild(c.svg);
+      }
+    }
+
+    // A redraw (the theme changed) replaced the figure's button. If that
+    // figure is open, swap the new SVG in and keep the current view.
+    function redrawn(fig, btn) {
+      if (!cur || cur.fig !== fig) return;
+      if (!btn) { close(); return; }
+      var old = cur.svg;
+      adopt(fig, btn);
+      old.parentNode.removeChild(old);
+      apply();
+    }
+
+    return { open: open, redrawn: redrawn };
+  })();
 
   function mermaidTheme() {
     var t = document.documentElement.dataset.theme;
@@ -1050,15 +1294,29 @@ var renderMermaid = (function () {
     window.mermaid.render(id, code.textContent).then(function (res) {
       diagram.innerHTML = res.svg;
       if (res.bindFunctions) res.bindFunctions(diagram);
-      // Mermaid shrinks a wide diagram to the column until its text is
-      // unreadable; draw it at its natural size and let the box scroll instead.
+      diagram.classList.remove('mermaid-error');
+      var btn = null;
       var svg = diagram.querySelector('svg');
       var vb = svg && svg.viewBox && svg.viewBox.baseVal;
-      if (vb && vb.width) {
+      if (vb && vb.width && vb.height) {
+        // The button is the diagram: a click anywhere on it, or Enter, opens
+        // the viewer. Its width is the smallest of the natural width, the
+        // column, and what keeps the height within 60vh; never enlarged.
+        btn = el('button', 'mermaid-open');
+        btn.type = 'button';
+        btn.title = t('mermaid.open');
+        btn.setAttribute('aria-label', t('mermaid.open'));
+        btn.style.width = 'min(' + vb.width + 'px, 100%, calc(60vh * ' + (vb.width / vb.height) + '))';
         svg.style.maxWidth = 'none';
-        svg.style.width = vb.width + 'px';
+        svg.style.width = '100%';
+        svg.style.height = 'auto';
+        svg.style.aspectRatio = vb.width + ' / ' + vb.height;
+        diagram.appendChild(btn);
+        btn.appendChild(svg);
+        btn.appendChild(icon('expand'));
+        btn.addEventListener('click', function () { viewer.open(fig, btn); });
       }
-      diagram.classList.remove('mermaid-error');
+      viewer.redrawn(fig, btn);
       // Fold the source only the first time; a redraw (theme switch) leaves it
       // as the reader set it.
       if (!fig.hasAttribute('data-drawn')) {
@@ -1073,6 +1331,7 @@ var renderMermaid = (function () {
       diagram.textContent = t('mermaid.error', msg);
       diagram.classList.add('mermaid-error');
       details.open = true;
+      viewer.redrawn(fig, null);
     });
   }
 
