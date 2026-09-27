@@ -268,13 +268,18 @@ p.prose,
    surfaced, but a single URL or long identifier pushes the content off screen
    and brings a horizontal scrollbar with it. */
 .prose, ul.rows li, .meta, .empty, .notice { overflow-wrap: break-word; }
-/* Tables cannot wrap, so the table alone scrolls horizontally. Moving inside
-   the table reads better than the whole page sliding sideways. */
+/* A table still wider than its column scrolls horizontally on its own. Moving
+   inside the table reads better than the whole page sliding sideways. */
 .prose table { display: block; overflow-x: auto; max-width: 100%; width: max-content; }
-/* The cells themselves do not wrap: wrapping collapses the table to the width
-   of its container, one character per column, which is unreadable. The table is
-   what should scroll. */
-.prose th, .prose td { white-space: nowrap; }
+/* Cells may wrap, but only past 24em. Letting every cell wrap freely collapses
+   the table to the width of its container, one character per column, which is
+   unreadable. Never wrapping lets one long description stretch the table
+   without end. With the table at max-content, a short cell keeps the width of
+   its content and only a cell longer than 24em wraps at that width; anywhere
+   breaks a long URL inside the cell. Headings stay on one line. A browser that
+   ignores max-width on a cell falls back to the table scrolling. */
+.prose th { white-space: nowrap; }
+.prose td { max-width: 24em; overflow-wrap: anywhere; }
 .prose h1 { font-size: var(--fs-7); margin-top: var(--sp-6); }
 .prose h2 {
   font-size: var(--fs-6); border-bottom: 1px solid var(--border);
