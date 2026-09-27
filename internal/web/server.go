@@ -264,6 +264,11 @@ func (s *Server) routes() {
 
 	// ---- static files, with an ETag and ?v= from the content hash (static.go)
 	m.HandleFunc("GET /static/", serveStatic)
+	// Browsers find the icon through <link rel="icon"> in base.html, but some
+	// clients (bookmark and feed tools, older browsers) ask for /favicon.ico
+	// regardless. It gets a real .ico rather than a redirect to the PNG: not
+	// every such client follows redirects, and a 404 here shows up in logs.
+	m.HandleFunc("GET /favicon.ico", serveFavicon)
 }
 
 // ---------------------------------------------------------------- shared
