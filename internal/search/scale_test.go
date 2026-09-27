@@ -13,6 +13,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/wakamenod/enghi/internal/readings"
 	"github.com/wakamenod/enghi/internal/search"
 	"github.com/wakamenod/enghi/internal/store"
 	"github.com/wakamenod/enghi/internal/wiki"
@@ -69,6 +70,12 @@ func TestSearchScale(t *testing.T) {
 				{"2 ascii", "DB"},
 				{"zero-hit 3+", "存在しない語句です"},
 				{"zero-hit 2", "鰻丼"},
+				// Romaji against the title readings (DESIGN 3.8)
+				{"romaji 2 kana", "kai"},
+				{"romaji 3 kana", "kaigi"},
+				{"romaji long", "sekkeinojissou"},
+				{"romaji zero", "nurupo"},
+				{"romaji (en)", "api"},
 			}
 			// all: the whole Search(), every kind. base: every kind but log, i.e.
 			// what Search() cost before the work log. log: kind=log alone.
@@ -223,6 +230,14 @@ func buildCorpus(t *testing.T, pages, logs, tasks, min, max int) *store.DB {
 	if err != nil {
 		t.Fatal(err)
 	}
+	var before int64
+	db.QueryRow(`SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size()`).Scan(&before)
+	rebuildStart := time.Now()
+	n, err := readings.Rebuild(ctx, db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("title readings: %d row(s) in %s (dictionary load included)", n, time.Since(rebuildStart).Round(time.Millisecond))
 	if _, err := db.Exec(`ANALYZE`); err != nil {
 		t.Fatal(err)
 	}
@@ -231,7 +246,7 @@ func buildCorpus(t *testing.T, pages, logs, tasks, min, max int) *store.DB {
 	db.QueryRow(`SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size()`).Scan(&size)
 	db.QueryRow(`SELECT avg(length(body)) FROM pages`).Scan(&avgPage)
 	db.QueryRow(`SELECT avg(length(body)) FROM task_logs`).Scan(&avgLog)
-	t.Logf("corpus built in %s: %d pages, %d logs over %d tasks; average body %.0f / %.0f characters; %d MB",
-		time.Since(start).Round(time.Second), pages, logs, tasks, avgPage, avgLog, size>>20)
+	t.Logf("corpus built in %s: %d pages, %d logs over %d tasks; average body %.0f / %.0f characters; %.1f MB (%.1f MB before the readings)",
+		time.Since(start).Round(time.Second), pages, logs, tasks, avgPage, avgLog, float64(size)/(1<<20), float64(before)/(1<<20))
 	return db
 }

@@ -12,7 +12,8 @@ macOS と Linux で動く、ローカル専用の個人向け Wiki + GTD サー�
 ## 特徴
 
 - **高速な全文検索** ページもタスクも瞬時に引ける。SQLite FTS5 と trigram
-  トークナイザを使うので、日本語も英語と同じようにヒットする
+  トークナイザを使うので、日本語も英語と同じようにヒットする。タイトルは
+  ローマ字の読みでも引ける（`kensaku` で「検索の設計」）
 - **`[[wikilinks]]` はタイトルで解決。** ページ名を変更しても旧タイトルが
   エイリアスとして残り、リンクが切れない
 - **Wiki 上の GTD:** inbox、next actions、プロジェクト、org-mode リピータ記法による
@@ -60,9 +61,10 @@ calendar_sync_interval = "30m"            # 同期が on のとき、何分ご�
 ```
 enghi [serve]          常駐サーバを起動する
 enghi export [--dir D] 全件を Markdown にエクスポート (--dir は CLI のみ。API は設定値を使う)
-enghi doctor [--fix]   整合性チェック。--fix で混入した NFD テキストを修復する
+enghi doctor [--fix]   整合性チェック。--fix で混入した NFD テキストとタイトルの読みを修復する
 enghi backup [--list]  DB バックアップ (--dir で出力先を指定)。常駐中は毎日実行する
 enghi files [--prune]  画像やファイルの一覧。--prune で参照のないファイルを削除する
+enghi rebuild-readings ローマ字検索用のタイトルの読みを作り直す (サーバが自動で行う)
 enghi install-agent    サービス設定を書き出す。-load で登録して起動する
 enghi install-skill    Claude Code の Skill を ~/.claude/skills/enghi に書き出す
 enghi version          バージョンを表示する

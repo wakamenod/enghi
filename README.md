@@ -12,7 +12,8 @@ service and you use it from the browser. Nothing leaves the machine.
 ## Features
 
 - **Instant full-text search** over pages and tasks, built on SQLite FTS5 with a
-  trigram tokenizer, so Japanese matches as well as English
+  trigram tokenizer, so Japanese matches as well as English. Titles also match
+  their reading typed in romaji: `kensaku` finds 「検索の設計」
 - **`[[wikilinks]]` resolved by title.** Renaming a page keeps the old title as an
   alias, so links to it stay alive
 - **GTD on top of the wiki:** inbox, next actions, projects, and recurring tasks in
@@ -61,9 +62,10 @@ calendar_sync_interval = "30m"            # how often it runs while the sync is 
 ```
 enghi [serve]          Start resident server
 enghi export [--dir D] Export everything to Markdown (--dir CLI only; API uses config value)
-enghi doctor [--fix]   Integrity check. --fix repairs stray NFD text
+enghi doctor [--fix]   Integrity check. --fix repairs stray NFD text and title readings
 enghi backup [--list]  Database backup (--dir sets destination). Runs daily while resident
 enghi files [--prune]  List images and files. --prune removes unreferenced files
+enghi rebuild-readings Rebuild title readings for romaji search (the server does it on its own)
 enghi install-agent    Write service config. -load registers and starts it
 enghi install-skill    Write the Claude Code skill to ~/.claude/skills/enghi
 enghi version          Print version

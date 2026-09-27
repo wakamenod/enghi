@@ -171,12 +171,13 @@ func init() {
 		"tag.none":       "まだタグがありません",
 
 		// ---- search
-		"search.title":     "検索",
-		"search.results":   "「%s」 %d 件",
-		"search.not_found": "見つかりませんでした",
-		"search.prompt":    "上の検索窓に入力してください（%s でフォーカス）",
-		"search.via_tag":   "（タグ一致）",
-		"search.via_alias": "（別名一致）",
+		"search.title":       "検索",
+		"search.results":     "「%s」 %d 件",
+		"search.not_found":   "見つかりませんでした",
+		"search.prompt":      "上の検索窓に入力してください（%s でフォーカス）",
+		"search.via_tag":     "（タグ一致）",
+		"search.via_alias":   "（別名一致）",
+		"search.via_reading": "（読みで一致）",
 
 		// ---- GTD shared
 		"gtd.title":               "GTD",
