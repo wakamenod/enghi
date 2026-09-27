@@ -405,6 +405,25 @@ func TestHTMLPagesRender(t *testing.T) {
 	}
 }
 
+// The tag column and its toggle appear on the four article screens only. The
+// toggle names the column it controls; app.js and the CSS rely on both ids.
+func TestSideToggleOnArticleScreens(t *testing.T) {
+	h := newServer(t)
+	do(h, req("POST", "/api/pages", `{"title":"Emacs","body":"本文"}`))
+
+	for path, want := range map[string]bool{
+		"/": true, "/wiki": true, "/wiki/emacs": true, "/tags": true, "/search?q=Emacs": true,
+		"/gtd": false, "/guide": false, "/settings": false,
+	} {
+		body := do(h, req("GET", path, "")).Body.String()
+		toggle := strings.Contains(body, `id="side-toggle"`) && strings.Contains(body, `aria-controls="side"`)
+		side := strings.Contains(body, `<aside class="side" id="side">`)
+		if toggle != want || side != want {
+			t.Errorf("GET %s: toggle=%v column=%v, want %v", path, toggle, side, want)
+		}
+	}
+}
+
 // Rendering wikilinks: resolved ones become links, unresolved ones point at
 // the create screen.
 func TestWikilinkRendering(t *testing.T) {

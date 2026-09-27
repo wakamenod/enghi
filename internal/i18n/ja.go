@@ -19,6 +19,7 @@ func init() {
 		"theme.auto":             "OSの設定に従う",
 		"theme.light":            "ライト",
 		"theme.dark":             "ダーク",
+		"side.toggle":            "タグ一覧を開く / 閉じる",
 		"lang.switch":            "言語を切り替える",
 		"common.none":            "—",
 		"common.empty":           "ありません",

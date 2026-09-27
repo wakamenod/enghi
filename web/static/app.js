@@ -971,6 +971,10 @@ function repeatPicker(date, recurrence, endsOn) {
       case 'u':
         if (undoToast) { ev.preventDefault(); runUndo(); }
         break;
+      case 'b':
+        var side = document.getElementById('side-toggle');
+        if (side) { ev.preventDefault(); side.click(); }
+        break;
       // The day page's links carry data-key; elsewhere these keys do nothing.
       // t renames the task under the cursor first, where there is one.
       case '[':
@@ -1020,7 +1024,9 @@ var renderMermaid = (function () {
   }
 
   function load(done) {
-    if (window.mermaid) { done(); return; }
+    // A heading titled "mermaid" gets id="mermaid", and the browser exposes
+    // that element as window.mermaid; only the library itself counts.
+    if (window.mermaid && typeof window.mermaid.render === 'function') { done(); return; }
     if (waiting) { waiting.push(done); return; }
     waiting = [done];
     var s = document.createElement('script');
@@ -1134,6 +1140,36 @@ renderMermaid(document);
       renderMermaid(document);
     });
   }
+})();
+
+// ---------------------------------------------------------------- tag column
+//
+// The tag column on article screens opens and closes; b does the same. The
+// head script in base.html already set data-side from localStorage before
+// painting, so this only keeps aria-expanded in step and stores the choice.
+
+(function () {
+  var KEY = "enghi-side";
+  var btn = document.getElementById("side-toggle");
+  if (!btn) return;
+
+  function isOpen() { return document.documentElement.dataset.side === "open"; }
+
+  function apply(open) {
+    if (open) document.documentElement.dataset.side = "open";
+    else delete document.documentElement.dataset.side;
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+
+  apply(isOpen());
+  btn.addEventListener("click", function () {
+    var open = !isOpen();
+    apply(open);
+    try {
+      if (open) localStorage.setItem(KEY, "open");
+      else localStorage.removeItem(KEY);
+    } catch (e) {}
+  });
 })();
 
 // ---------------------------------------------------------------- quick capture

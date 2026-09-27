@@ -19,6 +19,7 @@ func init() {
 		"theme.auto":             "System",
 		"theme.light":            "Light",
 		"theme.dark":             "Dark",
+		"side.toggle":            "Show or hide the tags",
 		"lang.switch":            "Change language",
 		"common.none":            "—",
 		"common.empty":           "None",
