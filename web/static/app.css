@@ -285,6 +285,23 @@ h1 + .meta { margin-top: calc(-1 * var(--sp-1)); }
   font-size: 13px; line-height: 1.7;
 }
 .prose pre code { background: none; padding: 0; font-size: inherit; }
+/* A ```mermaid block (render.go, app.js renderMermaid): the diagram centered,
+   a wide one scrolling sideways, and the source folded into one quiet line
+   below it. The summary stays a plain word, like the rest of the chrome. */
+.prose figure.mermaid { margin: var(--sp-4) 0; }
+.prose .mermaid-diagram { overflow-x: auto; text-align: center; }
+.prose .mermaid-diagram svg { display: inline-block; height: auto; }
+.prose .mermaid-diagram.mermaid-error {
+  text-align: left; color: var(--warn); font-size: var(--fs-3);
+  padding: var(--sp-2) 0;
+}
+.prose .mermaid-source summary {
+  cursor: pointer; width: max-content;
+  font-size: var(--fs-2); color: var(--fg-faint);
+  margin-top: var(--sp-1);
+}
+.prose .mermaid-source summary:hover { color: var(--fg-muted); }
+.prose .mermaid-source pre { margin-top: var(--sp-2); }
 .prose blockquote {
   margin: var(--sp-4) 0; padding: var(--sp-1) 0 var(--sp-1) var(--sp-4);
   border-left: 3px solid var(--border-strong); color: var(--fg-muted);

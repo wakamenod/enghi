@@ -354,6 +354,7 @@ func init() {
 		"day.copy":            "Copy as Markdown",
 		"day.copied":          "Copied.",
 		"day.copy_manual":     "Copying is not available here. Select the text below and copy it.",
+		"mermaid.error":       "Couldn't draw the diagram: %s",
 		"day.bad_date":        "Give the date as YYYY-MM-DD.",
 		"day.bad_month":       "Give the month as YYYY-MM.",
 		"day.activity":        "%d done, %d log entries",
