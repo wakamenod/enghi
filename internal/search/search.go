@@ -8,6 +8,7 @@ import (
 	"github.com/wakamenod/enghi/internal/store"
 	"github.com/wakamenod/enghi/internal/textnorm"
 	"github.com/wakamenod/enghi/internal/wiki"
+	"github.com/wakamenod/enghi/internal/yomi"
 )
 
 // Result is one search hit. Every kind is mixed into a single list, each with
@@ -20,10 +21,10 @@ type Result struct {
 	Title     string  `json:"title"`
 	Snippet   string  `json:"snippet,omitempty"`
 	UpdatedAt string  `json:"updated_at,omitempty"`
-	Via       string  `json:"via"` // tag / title / alias / body - which path matched
+	Via       string  `json:"via"` // tag / title / alias / body / reading - which path matched
 	Score     float64 `json:"score,omitempty"`
 
-	bucket int // 0:tag 1:title 2:alias 3:body
+	bucket int // 0:tag 1:title 2:alias 3:body 4:reading
 	korder int // stable order between kinds
 }
 
@@ -38,7 +39,16 @@ const (
 	bucketTitle
 	bucketAlias
 	bucketBody
+	// bucketReading is last, so a query that is both an English word and valid
+	// romaji (api -> あぴ) keeps every earlier result in its place. A romaji
+	// query rarely hits anything else, so its reading hits still lead the list
+	// (DESIGN 3.8).
+	bucketReading
 )
+
+// minReadingKana is the shortest converted query the reading path takes. One
+// kana matches nearly every reading.
+const minReadingKana = 2
 
 // Search searches across everything. An empty kind means every kind.
 func (s *Service) Search(ctx context.Context, q string, kinds []string, limit, offset int) ([]Result, error) {
@@ -70,9 +80,26 @@ func (s *Service) Search(ctx context.Context, q string, kinds []string, limit, o
 		fetch = 300
 	}
 
+	// The reading path goes first: when it hits, the page path skips its
+	// truncation fallback, which for a romaji query only adds noise
+	// (kensaku -> kens) (DESIGN 3.8).
+	var byReading []Result
+	if kana, ok := yomi.ToKana(q); ok && RuneLen(kana) >= minReadingKana {
+		for _, t := range store.ReadingTables {
+			if !want(t.Kind) {
+				continue
+			}
+			rs, err := s.searchReadings(ctx, t, kana, fetch)
+			if err != nil {
+				return nil, err
+			}
+			byReading = append(byReading, rs...)
+		}
+	}
+
 	var all []Result
 	if want("page") {
-		rs, err := s.searchPages(ctx, q, fetch)
+		rs, err := s.searchPages(ctx, q, fetch, len(byReading) == 0)
 		if err != nil {
 			return nil, err
 		}
@@ -106,6 +133,7 @@ func (s *Service) Search(ctx context.Context, q string, kinds []string, limit, o
 		}
 		all = append(all, rs...)
 	}
+	all = append(all, byReading...)
 
 	// Stable sort by bucket, then kind, then the original order (SQL's ranking).
 	// bm25 is not comparable across tables, so scores never decide the mix.
@@ -139,8 +167,8 @@ func (s *Service) Search(ctx context.Context, q string, kinds []string, limit, o
 }
 
 // searchPages implements the fallback ladder of 3.4 and the merge rules of
-// 3.4 / 3.6.
-func (s *Service) searchPages(ctx context.Context, q string, fetch int) ([]Result, error) {
+// 3.4 / 3.6. truncate is false when the reading path already hit (3.8).
+func (s *Service) searchPages(ctx context.Context, q string, fetch int, truncate bool) ([]Result, error) {
 	var out []Result
 
 	// (1) Tags are not in the FTS index. They are matched exactly or by prefix
@@ -159,7 +187,7 @@ func (s *Service) searchPages(ctx context.Context, q string, fetch int) ([]Resul
 			return nil, err
 		}
 		// With no hits, retry with the query trimmed from the end (two steps).
-		if len(core) == 0 {
+		if len(core) == 0 && truncate {
 			for _, t := range Truncations(q) {
 				core, err = s.pagesFTS(ctx, t, fetch)
 				if err != nil {
@@ -355,6 +383,49 @@ func (s *Service) pagesByTagMatch(ctx context.Context, q string, fetch int) ([]R
 		r.Kind, r.korder, r.bucket, r.Via = "page", 0, bucketTag, "tag"
 		// As above: the label lives in i18n, keyed off Via.
 		r.Snippet = tag
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// searchReadings matches a romaji query, converted to kana, against the title
+// readings of one kind (DESIGN 3.8): a substring of either the reading or the
+// pronunciation, newest first. The readings are short, so a LIKE over all of
+// them stays within a few milliseconds at 30k rows (measured).
+func (s *Service) searchReadings(ctx context.Context, t store.ReadingTable, kana string, fetch int) ([]Result, error) {
+	slug, korder := "''", 0
+	switch t.Kind {
+	case "page":
+		slug = "s.slug"
+	case "project":
+		korder = 1
+	case "task":
+		korder = 2
+	}
+	pat := LikeEscape(kana)
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT s.id, `+slug+`, s.title, s.updated_at, r.reading, r.pronunciation
+		   FROM `+t.Readings+` r JOIN `+t.Source+` s ON s.id = r.`+t.Key+`
+		  WHERE r.reading LIKE '%' || ? || '%' ESCAPE '\'
+		     OR r.pronunciation LIKE '%' || ? || '%' ESCAPE '\'
+		  ORDER BY s.updated_at DESC LIMIT ?`, pat, pat, fetch)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Result
+	for rows.Next() {
+		var r Result
+		var reading, pron string
+		if err := rows.Scan(&r.ID, &r.Slug, &r.Title, &r.UpdatedAt, &reading, &pron); err != nil {
+			return nil, err
+		}
+		r.Kind, r.korder, r.bucket, r.Via = t.Kind, korder, bucketReading, "reading"
+		// The reading that matched, as the value; the label comes from i18n
+		if !strings.Contains(reading, kana) {
+			reading = pron
+		}
+		r.Snippet = excerpt(reading, kana)
 		out = append(out, r)
 	}
 	return out, rows.Err()

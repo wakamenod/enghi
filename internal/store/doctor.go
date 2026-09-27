@@ -174,5 +174,26 @@ func Doctor(ctx context.Context, db *DB) ([]Problem, error) {
 			Detail: fmt.Sprintf("%d page(s) have no titles_fts row (two-character search will not match)", missing)})
 	}
 
+	// Missing and stale readings (romaji search misses those titles). The server
+	// rebuilds them on its own within seconds, so it leaves these out of its
+	// start-up report; `enghi doctor --fix` rebuilds them too.
+	for _, t := range ReadingTables {
+		var missing, stale int
+		if err := db.QueryRowContext(ctx,
+			`SELECT count(*) FILTER (WHERE r.`+t.Key+` IS NULL),
+			        count(*) FILTER (WHERE r.source_title <> s.title COLLATE BINARY)
+			   FROM `+t.Source+` s LEFT JOIN `+t.Readings+` r ON r.`+t.Key+` = s.id`).Scan(&missing, &stale); err != nil {
+			return nil, err
+		}
+		if missing > 0 {
+			problems = append(problems, Problem{Kind: "readings_missing",
+				Detail: fmt.Sprintf("%d %s(s) have no row in %s (romaji search will not match them)", missing, t.Kind, t.Readings)})
+		}
+		if stale > 0 {
+			problems = append(problems, Problem{Kind: "readings_stale",
+				Detail: fmt.Sprintf("%d %s(s) have a reading made from an old title in %s", stale, t.Kind, t.Readings)})
+		}
+	}
+
 	return problems, nil
 }

@@ -12,7 +12,8 @@
       {{else if eq .Kind "log"}}<a href="/gtd/clarify/{{.TaskID}}#log-{{.ID}}">{{.Title}}</a>
       {{else}}{{.Title}}{{end}}
       {{if eq .Via "tag"}}<span class="meta">{{t "search.via_tag"}}</span>
-      {{else if eq .Via "alias"}}<span class="meta">{{t "search.via_alias"}}</span>{{end}}
+      {{else if eq .Via "alias"}}<span class="meta">{{t "search.via_alias"}}</span>
+      {{else if eq .Via "reading"}}<span class="meta">{{t "search.via_reading"}}</span>{{end}}
       {{if .Snippet}}<span class="meta">{{snippet .Snippet}}</span>{{end}}
       <span class="when">{{shortTime .UpdatedAt}}</span>
     </li>

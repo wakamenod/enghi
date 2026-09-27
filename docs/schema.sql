@@ -391,6 +391,32 @@ CREATE TRIGGER task_logs_au AFTER UPDATE ON task_logs BEGIN
   INSERT INTO task_logs_fts(rowid, body) VALUES (new.id, new.body);
 END;
 
+-- Title readings for romaji search (DESIGN 3.8; 0008): kensaku finds
+-- 「検索の設計」. reading is the dictionary's reading (キョウハ), pronunciation
+-- its pronunciation (キョーワ), both hiragana without 「ー」; either may match.
+-- **Not written with the title.** The dictionary costs about 93 MB, so the
+-- server rebuilds these afterwards in a child process (internal/readings): rows
+-- that are missing, and rows whose source_title is no longer the title.
+-- Deletes cascade. No index: a LIKE over short strings is fast enough.
+CREATE TABLE page_readings (
+  page_id       INTEGER PRIMARY KEY REFERENCES pages(id) ON DELETE CASCADE,
+  source_title  TEXT    NOT NULL,   -- the title the reading was made from
+  reading       TEXT    NOT NULL,
+  pronunciation TEXT    NOT NULL
+);
+CREATE TABLE task_readings (
+  task_id       INTEGER PRIMARY KEY REFERENCES tasks(id) ON DELETE CASCADE,
+  source_title  TEXT    NOT NULL,
+  reading       TEXT    NOT NULL,
+  pronunciation TEXT    NOT NULL
+);
+CREATE TABLE project_readings (
+  project_id    INTEGER PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+  source_title  TEXT    NOT NULL,
+  reading       TEXT    NOT NULL,
+  pronunciation TEXT    NOT NULL
+);
+
 -- ============================================================
 -- Representative queries
 -- ============================================================

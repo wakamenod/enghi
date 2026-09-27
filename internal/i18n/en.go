@@ -171,12 +171,13 @@ func init() {
 		"tag.none":       "No tags yet",
 
 		// ---- search
-		"search.title":     "Search",
-		"search.results":   "\"%s\" — %d result(s)",
-		"search.not_found": "No results found",
-		"search.prompt":    "Search above (press %s to focus)",
-		"search.via_tag":   "(tag match)",
-		"search.via_alias": "(alias match)",
+		"search.title":       "Search",
+		"search.results":     "\"%s\" — %d result(s)",
+		"search.not_found":   "No results found",
+		"search.prompt":      "Search above (press %s to focus)",
+		"search.via_tag":     "(tag match)",
+		"search.via_alias":   "(alias match)",
+		"search.via_reading": "(reading match)",
 
 		// ---- GTD shared
 		"gtd.title":               "GTD",

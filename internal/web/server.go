@@ -45,6 +45,10 @@ type Server struct {
 	// Version is the running build, shown on the settings screen and in
 	// /api/status. Set it after New; it lives in package main.
 	Version string
+	// OnWrite, when set, is called after every successful request that can
+	// write (anything but GET and HEAD), UI forms and /api alike. main uses it
+	// to rebuild the title readings (DESIGN 3.8); it must not block.
+	OnWrite func()
 }
 
 // New assembles the server. files is the store for images and the like, a
@@ -109,7 +113,24 @@ func parseTemplates(lang i18n.Lang) (*template.Template, error) {
 
 // Handler returns the handler wrapped in the three security layers of
 // section 4.4.
-func (s *Server) Handler() http.Handler { return logErrors(s.secure(s.mux)) }
+func (s *Server) Handler() http.Handler { return logErrors(s.secure(s.afterWrites(s.mux))) }
+
+// afterWrites calls OnWrite after a request that can write and succeeded.
+// Hooking the method rather than each handler keeps a new write path from
+// being forgotten; a POST that wrote nothing costs one cheap check.
+func (s *Server) afterWrites(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.OnWrite == nil || r.Method == http.MethodGet || r.Method == http.MethodHead {
+			next.ServeHTTP(w, r)
+			return
+		}
+		rec := &statusRecorder{ResponseWriter: w}
+		next.ServeHTTP(rec, r)
+		if rec.status < 400 {
+			s.OnWrite()
+		}
+	})
+}
 
 // Hub is the focus channel, also used for notifications from the CLI.
 func (s *Server) Hub() *Hub { return s.hub }
