@@ -10,6 +10,7 @@ import (
 	enghi "github.com/wakamenod/enghi"
 	"github.com/wakamenod/enghi/internal/i18n"
 	"github.com/wakamenod/enghi/internal/settings"
+	"github.com/wakamenod/enghi/internal/wiki"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
@@ -40,7 +41,7 @@ var guideTopics = []string{"gtd", "enghi"}
 // input; it is our own document, embedded at build time.** Never add it to the
 // renderer used for article bodies (wiki.Renderer).
 var guideMD = goldmark.New(
-	goldmark.WithExtensions(extension.GFM),
+	goldmark.WithExtensions(extension.GFM, wiki.CodeHighlighting()),
 	goldmark.WithParserOptions(parser.WithAutoHeadingID(), parser.WithHeadingAttribute()),
 	goldmark.WithRendererOptions(html.WithHardWraps(), html.WithUnsafe()),
 )
