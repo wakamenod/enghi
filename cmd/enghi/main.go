@@ -7,6 +7,7 @@
 //	enghi export [--dir]  export everything as Markdown
 //	enghi doctor          consistency checks (DESIGN 2.5)
 //	enghi backup          back up the database (also taken daily while resident)
+//	enghi rebuild-readings rebuild the title readings for romaji search
 //	enghi install-agent   write the service definition (launchd / systemd)
 //	enghi install-skill   write the Claude Code skill
 //	enghi version         print the version
@@ -20,8 +21,11 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
@@ -29,6 +33,7 @@ import (
 	"github.com/wakamenod/enghi/internal/config"
 	"github.com/wakamenod/enghi/internal/export"
 	filestore "github.com/wakamenod/enghi/internal/files"
+	"github.com/wakamenod/enghi/internal/readings"
 	"github.com/wakamenod/enghi/internal/store"
 	"github.com/wakamenod/enghi/internal/web"
 )
@@ -59,6 +64,8 @@ func main() {
 		err = cmdBackup(args)
 	case "files":
 		err = cmdFiles(args)
+	case "rebuild-readings":
+		err = cmdRebuildReadings(args)
 	case "install-agent":
 		err = cmdInstallAgent(args)
 	case "install-skill":
@@ -83,8 +90,11 @@ func usage() {
   enghi [serve]          start the resident server
   enghi export [--dir D] export everything as Markdown
   enghi doctor [--fix]   consistency checks; --fix repairs text normalization
+                         and title readings
   enghi backup [--dir D] back up the database
   enghi files [--prune]  list stored images; --prune removes unreferenced ones
+  enghi rebuild-readings rebuild title readings for romaji search (the server
+                         does this on its own)
   enghi install-agent    write the service definition (launchd / systemd)
   enghi install-skill    write the Claude Code skill to ~/.claude/skills/enghi
   enghi version          print the version
@@ -143,7 +153,7 @@ func cmdServe(args []string) error {
 	// cannot express, so it needs a path that checks it from outside.
 	if problems, err := store.Doctor(context.Background(), db); err != nil {
 		log.Printf("warning: consistency check failed: %v", err)
-	} else if len(problems) > 0 {
+	} else if problems = withoutReadings(problems); len(problems) > 0 {
 		log.Printf("warning: %d consistency problem(s); run `enghi doctor` for details", len(problems))
 		for i, p := range problems {
 			if i >= 5 {
@@ -159,6 +169,33 @@ func cmdServe(args []string) error {
 		return err
 	}
 	srv.Version = versionString()
+
+	// Title readings for romaji search (DESIGN 3.8): rebuilt once now and a
+	// moment after writes, never in the write itself and never blocking the
+	// start-up. The rebuild runs in a child process: the dictionary takes about
+	// 93 MB that a Go process never gives back, and the child's goes away when
+	// it exits.
+	//
+	// The child is this very binary: the path is resolved now, and the child
+	// refuses to run as another version. An upgrade in place would otherwise
+	// start a newer enghi, whose migrations would run under this server.
+	exe, err := os.Executable()
+	if err == nil {
+		exe, err = filepath.EvalSymlinks(exe)
+	}
+	if err != nil {
+		return err
+	}
+	readCtx, stopReadings := context.WithCancel(context.Background())
+	defer stopReadings()
+	worker := readings.NewWorker(db, func(ctx context.Context) error {
+		cmd := exec.CommandContext(ctx, exe, "rebuild-readings",
+			"-db", cfg.DBPath, "-server-version", versionString())
+		cmd.Stdout, cmd.Stderr = os.Stderr, os.Stderr
+		return cmd.Run()
+	})
+	srv.OnWrite = worker.Kick
+	go worker.Loop(readCtx)
 
 	// Take a backup once a day while resident.
 	// The trigger is "there is no file for today" rather than a fixed time, so a
@@ -372,7 +409,7 @@ func cmdFiles(args []string) error {
 func cmdDoctor(args []string) error {
 	fs := flag.NewFlagSet("doctor", flag.ExitOnError)
 	configPath := fs.String("config", "", "path to the configuration file")
-	fix := fs.Bool("fix", false, "repair what can be repaired (text normalization)")
+	fix := fs.Bool("fix", false, "repair what can be repaired (text normalization, title readings)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -388,6 +425,10 @@ func cmdDoctor(args []string) error {
 			return err
 		}
 		fmt.Printf("normalized %d row(s)\n", n)
+		if n, err = readings.Rebuild(context.Background(), db); err != nil {
+			return err
+		}
+		fmt.Printf("rebuilt %d title reading(s)\n", n)
 	}
 
 	problems, err := store.Doctor(context.Background(), db)
@@ -402,4 +443,54 @@ func cmdDoctor(args []string) error {
 		fmt.Println(p)
 	}
 	return fmt.Errorf("found %d problem(s)", len(problems))
+}
+
+// withoutReadings drops the missing and stale title readings from the start-up
+// report: the server rebuilds them itself a moment later, and right after the
+// upgrade that adds them every title would be reported.
+func withoutReadings(ps []store.Problem) []store.Problem {
+	out := ps[:0]
+	for _, p := range ps {
+		if !strings.HasPrefix(p.Kind, "readings_") {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// cmdRebuildReadings makes the missing and stale title readings (DESIGN 3.8).
+// The server runs it as a child process with -db, so the dictionary's memory
+// leaves with the process.
+func cmdRebuildReadings(args []string) error {
+	fs := flag.NewFlagSet("rebuild-readings", flag.ExitOnError)
+	configPath := fs.String("config", "", "path to the configuration file")
+	dbPath := fs.String("db", "", "database (overrides db_path from the config)")
+	serverVersion := fs.String("server-version", "", "refuse to run unless this is the version (set by the server)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *serverVersion != "" && *serverVersion != versionString() {
+		return fmt.Errorf("enghi was replaced by %s while %s is running; restart the server to rebuild title readings",
+			versionString(), *serverVersion)
+	}
+	path := *dbPath
+	if path == "" {
+		cfg, err := config.Load(*configPath)
+		if err != nil {
+			return err
+		}
+		path = cfg.DBPath
+	}
+	db, err := store.Open(path)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	start := time.Now()
+	n, err := readings.Rebuild(context.Background(), db)
+	if err != nil {
+		return err
+	}
+	log.Printf("title readings: rebuilt %d row(s) in %s", n, time.Since(start).Round(time.Millisecond))
+	return nil
 }
