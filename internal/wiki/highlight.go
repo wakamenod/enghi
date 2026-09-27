@@ -20,8 +20,22 @@ func newCodeRenderer() renderer.NodeRenderer {
 			chromahtml.WithClasses(true),
 			chromahtml.PreventSurroundingPre(true),
 		),
+		highlighting.WithCodeBlockOptions(ignoreFenceAttributes),
 		highlighting.WithWrapperRenderer(codeWrapper),
 	)
+}
+
+// ignoreFenceAttributes undoes the Hugo-style fence attributes the highlighter
+// reads (```go {linenos=table hl_lines=[1]}). Line numbers put a <div><table>
+// inside our <pre><code>, which is invalid HTML and has no styles, so such a
+// fence renders as ordinary highlighted code instead. These options come after
+// the ones taken from the attributes, so they win.
+func ignoreFenceAttributes(highlighting.CodeBlockContext) []chromahtml.Option {
+	return []chromahtml.Option{
+		chromahtml.WithLineNumbers(false),
+		chromahtml.LineNumbersInTable(false),
+		chromahtml.HighlightLines(nil),
+	}
 }
 
 // codeWrapper keeps the markup of goldmark's stock renderer, with "chroma" on

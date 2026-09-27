@@ -106,8 +106,19 @@ func TestRenderHighlight(t *testing.T) {
 			t.Errorf("%s: not highlighted: %s", lang, got)
 		}
 	}
+	// Fence attributes (line numbers, highlighted lines) are ignored: the block
+	// is plain highlighted code in the usual wrapper, with no table inside.
+	got, err := r.Render("```go {linenos=table hl_lines=[1]}\nfunc a() {}\nfunc b() {}\n```")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `<pre class="chroma"><code class="language-go"><span class="kd">func</span>`
+	if !strings.HasPrefix(got, want) || strings.Contains(got, "<table") ||
+		strings.Contains(got, "<div") || strings.Contains(got, `class="hl"`) {
+		t.Errorf("fence attributes changed the markup:\n%s", got)
+	}
 	// The source is escaped whether or not it is highlighted.
-	got, _ := r.Render("```html\n<script>alert(1)</script>\n```")
+	got, _ = r.Render("```html\n<script>alert(1)</script>\n```")
 	if strings.Contains(got, "<script>") {
 		t.Errorf("the source was not escaped:\n%s", got)
 	}
