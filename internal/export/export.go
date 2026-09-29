@@ -258,7 +258,7 @@ func exportProjects(ctx context.Context, db *store.DB) (string, error) {
 	var b strings.Builder
 	b.WriteString("# Projects\n\n")
 	rows, err := db.QueryContext(ctx,
-		`SELECT p.id, p.title, p.outcome, p.status, COALESCE(a.name, ''), COALESCE(p.review_on, '')
+		`SELECT p.id, p.title, p.outcome, p.status, COALESCE(a.name, ''), COALESCE(p.review_on, ''), p.url
 		   FROM projects p LEFT JOIN areas a ON a.id = p.area_id
 		  ORDER BY p.status, p.sort_order, p.id`)
 	if err != nil {
@@ -267,8 +267,8 @@ func exportProjects(ctx context.Context, db *store.DB) (string, error) {
 	defer rows.Close()
 	for rows.Next() {
 		var id int64
-		var title, outcome, status, area, review string
-		if err := rows.Scan(&id, &title, &outcome, &status, &area, &review); err != nil {
+		var title, outcome, status, area, review, link string
+		if err := rows.Scan(&id, &title, &outcome, &status, &area, &review, &link); err != nil {
 			return "", err
 		}
 		fmt.Fprintf(&b, "## %s\n\n", title)
@@ -281,6 +281,9 @@ func exportProjects(ctx context.Context, db *store.DB) (string, error) {
 		}
 		if review != "" {
 			fmt.Fprintf(&b, "- review_on: %s\n", review)
+		}
+		if link != "" {
+			fmt.Fprintf(&b, "- url: %s\n", link)
 		}
 		b.WriteString("\n")
 		if err := writeTasksOfProject(ctx, db, &b, id); err != nil {

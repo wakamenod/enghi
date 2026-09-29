@@ -102,6 +102,7 @@ A project is any desired outcome requiring two or more actions. For details, see
 
 - **Title**: A short identifier ("Office move").
 - **Outcome**: A single sentence describing what done looks like ("Moved into new office and operations have resumed"). This is optional, but **defining it makes your next actions obvious.** Projects without an outcome are flagged during your Weekly Review.
+- **URL**: A web page that goes with the project, such as its repository or tracking issue. Set it under Settings on the project page. A project with a URL shows 🔗 in lists; click it, or select the project and press `o`, to open the page in a new tab. Only `http://` and `https://` are accepted.
 - **Project Support Material**: Links a single wiki article to the project for notes and research. Link any additional articles by typing `[[Article name]]` in the text.
 
 ### Stalled Project Detection {#stalled}
@@ -275,7 +276,7 @@ A code block that starts with ```` ```mermaid ```` is shown as a [Mermaid](https
 | `Enter` | Open the selected item; on a task, choose where to move it (so does clicking its title) |
 | `u` | Undo the last move, while its notice is shown at the bottom of the screen |
 | `p` | Start or pause work on the selected task |
-| `o` | Open the selected task's URL in a new tab |
+| `o` | Open the selected task's or project's URL in a new tab |
 | `e` | Edit the article |
 | `b` | Article screens: show or hide the tag column on the left |
 | `[` / `]` | Work record: previous / next day |

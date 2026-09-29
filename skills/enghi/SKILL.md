@@ -192,7 +192,7 @@ exception):
 | `POST /api/tasks/<id>/complete` | Complete a task, body `{}` |
 | `POST /api/tasks/<id>/file` | File an inbox item as a wiki page: `{title, body, tags}` |
 | `POST /api/tasks` | New task: `{title, note, url, state}`. To put it in a project, `PATCH` it with `project_id` afterwards |
-| `POST /api/projects` / `PATCH /api/projects/<id>` | `{title, outcome, status}` |
+| `POST /api/projects` / `PATCH /api/projects/<id>` | `{title, outcome, url, status}`. `url` is http(s) only; `""` clears it |
 | `POST /api/files?name=<name>` | Upload an image or PDF: raw bytes, `Content-Type` set to its media type. Returns `markdown` to paste into a body; see "Attach an image or a file" |
 | `POST /api/tasks/<id>/logs` | Append to the work log: `{body}` for a note, `{kind: "start"}` / `{kind: "pause"}` with an optional `body` comment |
 | `PATCH /api/task-logs/<id>` | Rewrite an entry: `{body, version}` |

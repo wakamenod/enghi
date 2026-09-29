@@ -234,6 +234,7 @@ func init() {
 		"project.support":         "Project Support Material",
 		"project.related":         "関連する記事",
 		"project.settings":        "設定",
+		"project.url":             "URL — リポジトリ、Issue、共有ドキュメントなど",
 		"project.status":          "状態",
 		"project.review_label":    "再検討日 — Someday にするときに入れます。その日が来ると再検討候補として出ます",
 		"project.support_label":   "Project Support Material の記事タイトル",

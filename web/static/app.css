@@ -579,7 +579,7 @@ section.panel:has(> .empty:last-child) > h2 { margin-bottom: var(--sp-1); }
 
 /* ---- forms ---- */
 
-input[type=text], textarea, select {
+input[type=text], input[type=url], textarea, select {
   font-family: var(--sans); font-size: var(--fs-4); color: var(--fg);
   background: var(--bg-raised); border: 1px solid var(--border);
   border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3); width: 100%;

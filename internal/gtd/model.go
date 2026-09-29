@@ -27,6 +27,7 @@ type Project struct {
 	// Outcome **describes the finished state**. GTD treats it as required; the
 	// field is optional but the UI asks for it.
 	Outcome      string `json:"outcome"`
+	URL          string `json:"url,omitempty"`
 	Status       string `json:"status"` // active / someday / done / dropped
 	AreaID       *int64 `json:"area_id,omitempty"`
 	AreaName     string `json:"area_name,omitempty"`

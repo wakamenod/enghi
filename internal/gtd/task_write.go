@@ -77,7 +77,7 @@ func splitURL(title string) (string, string) {
 	return rest, link
 }
 
-// normalizeURL checks a task's URL. Only http(s): the `o' key hands it to the
+// normalizeURL checks a task's or a project's URL. Only http(s): the `o' key hands it to the
 // browser, and a javascript: URL there would run in this app.
 func normalizeURL(s string) (string, error) {
 	s = strings.TrimSpace(s)
