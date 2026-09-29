@@ -435,6 +435,19 @@ ul.rows .when {
 }
 .tag:hover { background: var(--bg-hover); color: var(--fg); }
 .tag.warn { color: var(--warn); background: color-mix(in oklab, var(--warn) 12%, transparent); }
+/* In a row, a tag has a width limit and ends in an ellipsis past it, instead of
+   shrinking. A tag and the time do not wrap, so a long project name used to
+   take the row and leave the title a character per line */
+ul.rows li > .tag { flex-shrink: 0; max-width: 16em; overflow: hidden; text-overflow: ellipsis; }
+/* A task in progress carries its start and elapsed time, too long to share a
+   line with the title and project in a dashboard column. The time goes on a
+   second line, under the title. Two auto tracks share the width by content:
+   a short title leaves the room to the project, a long one takes it back */
+ul.rows.working li {
+  display: grid; grid-template-columns: auto auto; justify-content: start;
+  gap: var(--sp-1) var(--sp-3); align-items: baseline;
+}
+ul.rows.working .when { grid-column: 1 / -1; margin-left: 0; }
 
 .badge {
   font-family: var(--mono); font-size: var(--fs-1); letter-spacing: 0.04em;
@@ -482,7 +495,10 @@ textarea.short { min-height: 220px; }
 
 /* ---- grid ---- */
 
-.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--sp-7); }
+/* minmax(0, 1fr), not 1fr: a 1fr track never shrinks below its content, so one
+   long row that will not wrap widens its column and squeezes the other one down
+   to a few characters */
+.cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--sp-7); }
 /* The divider sits in the **middle** of the gap. Cancelling the padding with an
    equal negative margin pulls the line against the right edge of the left
    column, where counts and inputs end up touching it. */
@@ -491,7 +507,7 @@ textarea.short { min-height: 220px; }
   margin-left: calc(-1 * var(--sp-5));
 }
 @media (max-width: 720px) {
-  .cols { grid-template-columns: 1fr; gap: var(--sp-5) 0; }
+  .cols { grid-template-columns: minmax(0, 1fr); gap: var(--sp-5) 0; }
   .cols > * + * { padding-left: 0; border-left: none; margin-left: 0; padding-top: var(--sp-5);
                   border-top: 1px solid var(--border); }
 }
