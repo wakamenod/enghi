@@ -235,6 +235,7 @@ func init() {
 		"project.related":         "Related articles",
 		"project.settings":        "Settings",
 		"project.status":          "Status",
+		"project.url":             "URL — a repository, issue or shared document",
 		"project.review_label":    "Review date — resurfaces Someday/Maybe projects when due",
 		"project.support_label":   "Article title for Project Support Material",
 		"project.none":            "No projects yet",

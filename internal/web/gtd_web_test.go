@@ -467,6 +467,67 @@ func TestTaskRowsCarryMoveData(t *testing.T) {
 	}
 }
 
+// A project's URL shows on its page and on list rows, which carry data-url for
+// the `o' key. The settings form saves and clears it.
+func TestProjectURL(t *testing.T) {
+	h := newServer(t)
+	mustJSON(t, h, "POST", "/api/projects", `{"title":"オフィス移転","url":"https://example.com/p?a=1&b=2"}`)
+
+	body := do(h, req("GET", "/gtd/projects", "")).Body.String()
+	for _, want := range []string{
+		`<li data-url="https://example.com/p?a=1&amp;b=2">`,
+		`<a class="tag" href="https://example.com/p?a=1&amp;b=2" target="_blank" rel="noopener noreferrer"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the project row lacks %s", want)
+		}
+	}
+	body = do(h, req("GET", "/gtd/project/1", "")).Body.String()
+	if want := `<input type="url" id="url" name="url" value="https://example.com/p?a=1&amp;b=2"`; !strings.Contains(body, want) {
+		t.Errorf("the project page lacks %s", want)
+	}
+
+	if w := do(h, req("PATCH", "/api/projects/1", `{"url":"javascript:alert(1)"}`)); w.Code != http.StatusBadRequest {
+		t.Errorf("PATCH url=javascript: → %d, want 400", w.Code)
+	}
+
+	form := func(body string) int {
+		r := httptest.NewRequest("POST", "/ui/projects/1", strings.NewReader(body+"&return_to=/gtd/project/1"))
+		r.Host = "127.0.0.1:7777"
+		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		r.Header.Set("Sec-Fetch-Site", "same-origin")
+		return do(h, r).Code
+	}
+	url := func() any {
+		var got struct {
+			Project map[string]any `json:"project"`
+		}
+		w := do(h, req("GET", "/api/projects/1", ""))
+		if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+			t.Fatalf("GET /api/projects/1: %v", err)
+		}
+		return got.Project["url"]
+	}
+	if got := form("url=https%3A%2F%2Fexample.com%2F1"); got != http.StatusSeeOther {
+		t.Fatalf("url → %d", got)
+	}
+	if got := url(); got != "https://example.com/1" {
+		t.Errorf("after url: %v", got)
+	}
+	if got := form("url=javascript%3Aalert(1)"); got != http.StatusBadRequest {
+		t.Errorf("url=javascript: → %d, want 400", got)
+	}
+	if got := form("url="); got != http.StatusSeeOther {
+		t.Fatalf("url= → %d", got)
+	}
+	if got := url(); got != nil {
+		t.Errorf("after clearing url: %v", got)
+	}
+	if body := do(h, req("GET", "/gtd/projects", "")).Body.String(); strings.Contains(body, "data-url") {
+		t.Error("a project without a URL still carries data-url")
+	}
+}
+
 // The move modal submits ordinary form posts to POST /ui/tasks/{id}.
 func TestMoveTaskByFormPost(t *testing.T) {
 	h := newServer(t)

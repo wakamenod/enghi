@@ -153,7 +153,9 @@ CREATE TABLE projects (
   version       INTEGER NOT NULL DEFAULT 1,
   completed_at  TEXT,
   created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
-  updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+  updated_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+  -- a link that goes with the project, http(s) only; `o' on a list opens it (0009)
+  url           TEXT    NOT NULL DEFAULT ''
 );
 CREATE INDEX idx_projects_status ON projects(status, sort_order);
 CREATE INDEX idx_projects_area   ON projects(area_id);

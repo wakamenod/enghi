@@ -439,7 +439,7 @@ function repeatPicker(date, recurrence, endsOn) {
 //   j / k        ... move within a list; Enter opens
 //   u            ... undo the last move, while its toast is up
 //   p            ... start or pause work on the task under the cursor
-//   o            ... open the URL of the task under the cursor in a new tab
+//   o            ... open the URL of the task or project under the cursor in a new tab
 
 (function () {
   var pendingG = false;
@@ -520,7 +520,7 @@ function repeatPicker(date, recurrence, endsOn) {
       waitingFor: d.waitingFor || '', scheduledOn: d.scheduledOn || '',
       recurrence: d.recurrence || '', recurrenceEndsOn: d.recurrenceEndsOn || '',
       delegatedAt: d.delegatedAt || '', version: d.version || '',
-      working: d.working === 'true', url: d.url || '',
+      working: d.working === 'true',
     };
   }
 
@@ -671,13 +671,6 @@ function repeatPicker(date, recurrence, endsOn) {
       return true;
     }
     if (ASKS[key]) { openMove(task, ASKS[key]); return true; }
-    // Opening the link works on a closed task too. The server only stores
-    // http(s); checking again keeps any other scheme out of window.open.
-    if (key === 'o') {
-      if (!/^https?:\/\//i.test(task.url)) return false;
-      window.open(task.url, '_blank', 'noopener');
-      return true;
-    }
     // A closed task (the day page lists them) cannot be started, and completing
     // it again would move its completion to now; moving it is still fine
     if (CLOSED.indexOf(task.state) >= 0 && (key === 'p' || PATHS[key])) return false;
@@ -698,6 +691,17 @@ function repeatPicker(date, recurrence, endsOn) {
       return true;
     }
     return false;
+  }
+
+  // Task and project rows both carry data-url; this works on a closed task too.
+  // The server only stores http(s); checking again keeps any other scheme out
+  // of window.open.
+  function openLink() {
+    var li = cursorRow();
+    var url = li ? li.getAttribute('data-url') || '' : '';
+    if (!/^https?:\/\//i.test(url)) return false;
+    window.open(url, '_blank', 'noopener');
+    return true;
   }
 
   function openCursor() {
@@ -991,6 +995,9 @@ function repeatPicker(date, recurrence, endsOn) {
         break;
       default:
         if (taskKey(ev.key)) ev.preventDefault();
+        break;
+      case 'o':
+        if (openLink()) ev.preventDefault();
         break;
       case 'Enter':
         if (openCursor()) ev.preventDefault();

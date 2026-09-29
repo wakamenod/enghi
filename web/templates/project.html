@@ -6,6 +6,7 @@
   {{$p.Status}}
   {{if and .Set.Areas $p.AreaName}} · <a href="/gtd/area/{{$p.AreaID}}">{{$p.AreaName}}</a>{{end}}
   {{if $p.ReviewOn}} · {{t "project.review_on" $p.ReviewOn}}{{end}}
+  {{if $p.URL}} · <a href="{{$p.URL}}" target="_blank" rel="noopener noreferrer">🔗 {{$p.URL}}</a>{{end}}
 </div>
 
 {{if $d.Stalled}}
@@ -59,6 +60,8 @@
     <input type="text" id="title" name="title" value="{{$p.Title}}">
     <label for="outcome">{{t "project.outcome_label"}}</label>
     <input type="text" id="outcome" name="outcome" value="{{$p.Outcome}}">
+    <label for="url">{{t "project.url"}}</label>
+    <input type="url" id="url" name="url" value="{{$p.URL}}" placeholder="https://">
     <label for="status">{{t "project.status"}}</label>
     <select id="status" name="status">
       {{range $s := (list "active" "someday" "done" "dropped")}}

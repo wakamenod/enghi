@@ -11,8 +11,9 @@
 {{if $d.Projects}}
 <ul class="rows">
   {{range $d.Projects}}
-  <li>
+  <li{{if .URL}} data-url="{{.URL}}"{{end}}>
     <a href="/gtd/project/{{.ID}}">{{.Title}}</a>
+    {{if .URL}}<a class="tag" href="{{.URL}}" target="_blank" rel="noopener noreferrer" title="{{.URL}}">🔗</a>{{end}}
     {{if index $d.Stalled .ID}}<span class="tag warn">{{t "project.stalled_badge"}}</span>{{end}}
     {{if and $.Set.Areas .AreaName}}<span class="tag">{{.AreaName}}</span>{{end}}
     {{if ne .Status "active"}}<span class="tag">{{.Status}}</span>{{end}}

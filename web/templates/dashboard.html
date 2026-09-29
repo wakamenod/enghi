@@ -111,7 +111,8 @@
           {{if $d.GTD.StalledProjects}}
           <ul class="rows">
             {{range $d.GTD.StalledProjects}}
-            <li><a href="/gtd/project/{{.ID}}">{{.Title}}</a>
+            <li{{if .URL}} data-url="{{.URL}}"{{end}}><a href="/gtd/project/{{.ID}}">{{.Title}}</a>
+                {{if .URL}}<a class="tag" href="{{.URL}}" target="_blank" rel="noopener noreferrer" title="{{.URL}}">🔗</a>{{end}}
                 <span class="when">{{t "gtd.unprocessed" .OpenTasks}}</span></li>
             {{end}}
           </ul>

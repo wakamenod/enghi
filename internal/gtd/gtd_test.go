@@ -102,6 +102,34 @@ func TestPatchURL(t *testing.T) {
 	}
 }
 
+// A project's URL is checked the same way as a task's. Leaving it out of a
+// patch keeps it; an empty string clears it.
+func TestProjectURL(t *testing.T) {
+	s, _, _ := newSvc(t)
+	ctx := context.Background()
+	p, err := s.CreateProject(ctx, gtd.ProjectInput{Title: "移転", URL: str(" https://example.com/board ")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.URL != "https://example.com/board" {
+		t.Fatalf("url = %q", p.URL)
+	}
+	if _, err := s.CreateProject(ctx, gtd.ProjectInput{Title: "x", URL: str("ftp://example.com")}); err == nil {
+		t.Error("an ftp URL was accepted on create")
+	}
+	if p, err = s.PatchProject(ctx, p.ID, gtd.ProjectInput{Outcome: "移転完了"}); err != nil || p.URL != "https://example.com/board" {
+		t.Fatalf("a patch without url changed it: %q, %v", p.URL, err)
+	}
+	for _, bad := range []string{"javascript:alert(1)", "example.com", "https://"} {
+		if _, err := s.PatchProject(ctx, p.ID, gtd.ProjectInput{URL: str(bad)}); err == nil {
+			t.Errorf("url %q was accepted", bad)
+		}
+	}
+	if p, err = s.PatchProject(ctx, p.ID, gtd.ProjectInput{URL: str("")}); err != nil || p.URL != "" {
+		t.Errorf("url = %q after clearing (%v)", p.URL, err)
+	}
+}
+
 // 2.6: the condition selecting next actions is
 // state='next' OR (state='scheduled' AND scheduled_on <= today)。
 // **a query condition; there is no batch job rewriting state.**

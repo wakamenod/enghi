@@ -497,6 +497,10 @@ func (s *Server) uiPatchProject(w http.ResponseWriter, r *http.Request) {
 		Status:   r.FormValue("status"),
 		ReviewOn: r.FormValue("review_on"),
 	}
+	if r.Form.Has("url") {
+		v := r.FormValue("url")
+		in.URL = &v
+	}
 	if r.Form.Has("area_id") {
 		if v := r.FormValue("area_id"); v == "" {
 			in.ClearArea = true

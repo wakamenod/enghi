@@ -30,7 +30,8 @@
   {{if $d.Stalled}}
   <ul class="rows">
     {{range $d.Stalled}}
-    <li><a href="/gtd/project/{{.ID}}">{{.Title}}</a>
+    <li{{if .URL}} data-url="{{.URL}}"{{end}}><a href="/gtd/project/{{.ID}}">{{.Title}}</a>
+        {{if .URL}}<a class="tag" href="{{.URL}}" target="_blank" rel="noopener noreferrer" title="{{.URL}}">🔗</a>{{end}}
         {{if and $.Set.Areas .AreaName}}<span class="tag">{{.AreaName}}</span>{{end}}
         {{if not .Outcome}}<span class="tag warn">{{t "review.outcome_missing"}}</span>{{end}}
         <span class="when">{{t "gtd.unprocessed" .OpenTasks}}</span></li>
@@ -44,7 +45,8 @@
   {{if $d.SomedayDue}}
   <ul class="rows">
     {{range $d.SomedayDue}}
-    <li><a href="/gtd/project/{{.ID}}">{{.Title}}</a>
+    <li{{if .URL}} data-url="{{.URL}}"{{end}}><a href="/gtd/project/{{.ID}}">{{.Title}}</a>
+        {{if .URL}}<a class="tag" href="{{.URL}}" target="_blank" rel="noopener noreferrer" title="{{.URL}}">🔗</a>{{end}}
         <span class="when">{{t "project.review_on" .ReviewOn}}</span></li>
     {{end}}
   </ul>

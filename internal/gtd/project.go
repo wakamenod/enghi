@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-const projectCols = `p.id, p.title, p.outcome, p.status, p.area_id, p.note_page_id,
+const projectCols = `p.id, p.title, p.outcome, p.url, p.status, p.area_id, p.note_page_id,
 	COALESCE(p.review_on,''), p.sort_order, p.version, COALESCE(p.completed_at,''),
 	p.created_at, p.updated_at, COALESCE(a.name,''), COALESCE(pg.slug,''),
 	(SELECT count(*) FROM tasks t WHERE t.project_id = p.id
@@ -22,7 +22,7 @@ const projectFrom = `FROM projects p
 
 func scanProject(row interface{ Scan(...any) error }) (*Project, error) {
 	var p Project
-	err := row.Scan(&p.ID, &p.Title, &p.Outcome, &p.Status, &p.AreaID, &p.NotePageID,
+	err := row.Scan(&p.ID, &p.Title, &p.Outcome, &p.URL, &p.Status, &p.AreaID, &p.NotePageID,
 		&p.ReviewOn, &p.SortOrder, &p.Version, &p.CompletedAt, &p.CreatedAt, &p.UpdatedAt,
 		&p.AreaName, &p.NotePageSlug, &p.OpenTasks, &p.NextCount)
 	if err != nil {
@@ -91,16 +91,17 @@ func (s *Service) SomedayDueReview(ctx context.Context) ([]*Project, error) {
 
 // ProjectInput is the input for create and update.
 type ProjectInput struct {
-	Title      string `json:"title"`
-	Outcome    string `json:"outcome"`
-	Status     string `json:"status"`
-	AreaID     *int64 `json:"area_id,omitempty"`
-	NotePageID *int64 `json:"note_page_id,omitempty"`
-	ReviewOn   string `json:"review_on,omitempty"`
-	SortOrder  *int   `json:"sort_order,omitempty"`
-	Version    int    `json:"version,omitempty"`
-	ClearArea  bool   `json:"clear_area,omitempty"`
-	ClearNote  bool   `json:"clear_note_page,omitempty"`
+	Title      string  `json:"title"`
+	Outcome    string  `json:"outcome"`
+	URL        *string `json:"url,omitempty"` // nil leaves it alone; "" clears it
+	Status     string  `json:"status"`
+	AreaID     *int64  `json:"area_id,omitempty"`
+	NotePageID *int64  `json:"note_page_id,omitempty"`
+	ReviewOn   string  `json:"review_on,omitempty"`
+	SortOrder  *int    `json:"sort_order,omitempty"`
+	Version    int     `json:"version,omitempty"`
+	ClearArea  bool    `json:"clear_area,omitempty"`
+	ClearNote  bool    `json:"clear_note_page,omitempty"`
 }
 
 var validProjectStatus = map[string]bool{"active": true, "someday": true, "done": true, "dropped": true}
@@ -123,10 +124,17 @@ func (s *Service) CreateProject(ctx context.Context, in ProjectInput) (*Project,
 			return nil, fmt.Errorf("review_on must be YYYY-MM-DD: %q", in.ReviewOn)
 		}
 	}
+	var link string
+	if in.URL != nil {
+		var err error
+		if link, err = normalizeURL(*in.URL); err != nil {
+			return nil, err
+		}
+	}
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO projects(title, outcome, status, area_id, note_page_id, review_on)
-		 VALUES (?, ?, ?, ?, ?, ?)`,
-		title, in.Outcome, status, in.AreaID, in.NotePageID, nullIfEmpty(in.ReviewOn))
+		`INSERT INTO projects(title, outcome, url, status, area_id, note_page_id, review_on)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		title, in.Outcome, link, status, in.AreaID, in.NotePageID, nullIfEmpty(in.ReviewOn))
 	if err != nil {
 		return nil, err
 	}
@@ -152,6 +160,13 @@ func (s *Service) PatchProject(ctx context.Context, id int64, in ProjectInput) (
 		}
 		if in.Outcome != "" {
 			b.Set("outcome", in.Outcome)
+		}
+		if in.URL != nil {
+			link, err := normalizeURL(*in.URL)
+			if err != nil {
+				return err
+			}
+			b.Set("url", link)
 		}
 		if in.Status != "" {
 			if !validProjectStatus[in.Status] {
