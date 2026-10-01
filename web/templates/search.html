@@ -4,18 +4,22 @@
 {{if $d.Query}}
   <div class="meta">{{t "search.results" $d.Query (len $d.Results)}}</div>
   {{if $d.Results}}
-  <ul class="rows">
+  <ul class="rows articles">
   {{range $d.Results}}
     <li>
       <span class="badge {{.Kind}}">{{kindLabel .Kind}}</span>
-      {{if eq .Kind "page"}}<a href="/wiki/{{.Slug}}">{{.Title}}</a>
-      {{else if eq .Kind "log"}}<a href="/gtd/clarify/{{.TaskID}}#log-{{.ID}}">{{.Title}}</a>
-      {{else}}{{.Title}}{{end}}
-      {{if eq .Via "tag"}}<span class="meta">{{t "search.via_tag"}}</span>
-      {{else if eq .Via "alias"}}<span class="meta">{{t "search.via_alias"}}</span>
-      {{else if eq .Via "reading"}}<span class="meta">{{t "search.via_reading"}}</span>{{end}}
-      {{if .Snippet}}<span class="meta">{{snippet .Snippet}}</span>{{end}}
-      <span class="when">{{shortTime .UpdatedAt}}</span>
+      <span class="row-body">
+        {{if eq .Kind "page"}}<a href="/wiki/{{.Slug}}">{{.Title}}</a>
+        {{else if eq .Kind "log"}}<a href="/gtd/clarify/{{.TaskID}}#log-{{.ID}}">{{.Title}}</a>
+        {{else}}<span class="row-title">{{.Title}}</span>{{end}}
+        <span class="row-meta">
+          {{if eq .Via "tag"}}<span class="meta">{{t "search.via_tag"}}</span>
+          {{else if eq .Via "alias"}}<span class="meta">{{t "search.via_alias"}}</span>
+          {{else if eq .Via "reading"}}<span class="meta">{{t "search.via_reading"}}</span>{{end}}
+          {{if .Snippet}}<span class="meta snippet">{{snippet .Snippet}}</span>{{end}}
+          <span class="when">{{shortTime .UpdatedAt}}</span>
+        </span>
+      </span>
     </li>
   {{end}}
   </ul>

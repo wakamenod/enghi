@@ -438,7 +438,7 @@ ul.rows .when {
 /* In a row, a tag has a width limit and ends in an ellipsis past it, instead of
    shrinking. A tag and the time do not wrap, so a long project name used to
    take the row and leave the title a character per line */
-ul.rows li > .tag { flex-shrink: 0; max-width: 16em; overflow: hidden; text-overflow: ellipsis; }
+ul.rows :is(li, .row-meta) > .tag { flex-shrink: 0; max-width: 16em; overflow: hidden; text-overflow: ellipsis; }
 /* A task in progress carries its start and elapsed time, too long to share a
    line with the title and project in a dashboard column. The time goes on a
    second line, under the title. Two auto tracks share the width by content:
@@ -448,6 +448,35 @@ ul.rows.working li {
   gap: var(--sp-1) var(--sp-3); align-items: baseline;
 }
 ul.rows.working .when { grid-column: 1 / -1; margin-left: 0; }
+/* **An article's title comes first.** Tags and the time do not shrink, so on
+   a narrow screen they took the row, squeezed the title into a column a few
+   characters wide and ran off the right edge themselves. Here they sit in
+   span.row-meta, which moves to the next line as a whole when it does not fit
+   beside the title; the title then has the full width. As one group they keep
+   together (a lone tag does not stay behind next to the title), and they still
+   follow the title on a line they share. row-meta grows to the end of its
+   line, so the time's margin-left:auto keeps it at the right edge on either
+   line. A search result has a badge first, which keeps its place: the title
+   and row-meta wrap inside span.row-body beside it. Only article rows; the
+   GTD lists have layouts of their own. */
+ul.rows.articles li { flex-wrap: wrap; row-gap: var(--sp-1); }
+ul.rows.articles .row-body {
+  flex: 1 1 0; min-width: 0;
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-1) var(--sp-3);
+}
+ul.rows.articles .row-meta {
+  flex: 1 1 auto;
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-1) var(--sp-3);
+}
+/* anywhere, unlike break-word, also lowers the min-content width, so a title
+   without spaces (an identifier, a file name) wraps inside the row instead of
+   running out of the panel. A search result with no page to open (a task, a
+   project) has its title in span.row-title. */
+ul.rows.articles :is(li, .row-body) > :is(a, .row-title) { overflow-wrap: anywhere; }
+/* A search snippet is often wider than the line. As an ordinary item in
+   row-meta it took a line of its own and pushed the time to a third line, so it
+   starts from zero and shrinks beside the time instead */
+ul.rows.articles .row-meta > .snippet { flex: 1 1 0; min-width: 0; }
 
 .badge {
   font-family: var(--mono); font-size: var(--fs-1); letter-spacing: 0.04em;

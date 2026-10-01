@@ -10,12 +10,14 @@
 </div>
 
 {{if $d.Pages}}
-<ul class="rows">
+<ul class="rows articles">
 {{range $d.Pages}}
   <li>
     <a href="/wiki/{{.Slug}}">{{.Title}}</a>
-    {{range .Tags}}<a class="tag" href="/tags/{{.}}">{{.}}</a>{{end}}
-    <span class="when">{{shortTime .UpdatedAt}}</span>
+    <span class="row-meta">
+      {{range .Tags}}<a class="tag" href="/tags/{{.}}">{{.}}</a>{{end}}
+      <span class="when">{{shortTime .UpdatedAt}}</span>
+    </span>
   </li>
 {{end}}
 </ul>
