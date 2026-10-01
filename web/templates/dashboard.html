@@ -136,13 +136,15 @@
   <div class="col-block">
     <div class="subhead">{{t "dash.recent_changes"}}</div>
     {{if $d.Wiki.RecentUpdate}}
-      <ul class="rows">
+      <ul class="rows articles">
       {{range $d.Wiki.RecentUpdate}}
         <li>
           <a href="/wiki/{{.Slug}}">{{.Title}}</a>
-          {{if eq .Version 1}}<span class="tag">{{t "dash.new"}}</span>{{end}}
-          {{range .Tags}}<a class="tag" href="/tags/{{.}}">{{.}}</a>{{end}}
-          <span class="when">{{shortTime .UpdatedAt}}</span>
+          <span class="row-meta">
+            {{if eq .Version 1}}<span class="tag">{{t "dash.new"}}</span>{{end}}
+            {{range .Tags}}<a class="tag" href="/tags/{{.}}">{{.}}</a>{{end}}
+            <span class="when">{{shortTime .UpdatedAt}}</span>
+          </span>
         </li>
       {{end}}
       </ul>
@@ -156,7 +158,7 @@
   {{if $d.Wiki.Unresolved}}
   <div class="col-block">
     <div class="subhead">{{t "dash.unresolved"}}</div>
-    <ul class="rows">
+    <ul class="rows articles">
     {{range $d.Wiki.Unresolved}}
       <li><a href="/wiki/new?title={{.Title}}">{{.Title}}</a>
           <span class="when">{{t "dash.referenced_by" .Count}}</span></li>
