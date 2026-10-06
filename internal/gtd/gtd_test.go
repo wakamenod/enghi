@@ -3,6 +3,7 @@ package gtd_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -210,6 +211,47 @@ func TestStalledProjectDetection(t *testing.T) {
 	got, _ = s.StalledProjects(ctx)
 	if len(got) != 0 {
 		t.Fatalf("reported as stalled despite a waiting task: %d", len(got))
+	}
+}
+
+// The API's state=next_actions is the Next Actions list: the same tasks, in
+// the same order, a due scheduled task among them.
+func TestQueryNextActionsMatchesTheList(t *testing.T) {
+	s, _, _ := newSvc(t)
+	ctx := context.Background()
+	plain := capture(t, s, "普通の次の行動")
+	patch(t, s, plain.ID, gtd.TaskPatch{State: str(gtd.StateNext)})
+	urgent := capture(t, s, "優先度が高い")
+	high := 2
+	patch(t, s, urgent.ID, gtd.TaskPatch{State: str(gtd.StateNext), Priority: &high})
+	due := capture(t, s, "締切が近い")
+	patch(t, s, due.ID, gtd.TaskPatch{State: str(gtd.StateNext),
+		DeadlineOn: str(gtd.FormatDate(gtd.Today().AddDate(0, 0, 3)))})
+	sched := capture(t, s, "今日の予定")
+	patch(t, s, sched.ID, gtd.TaskPatch{State: str(gtd.StateScheduled),
+		ScheduledOn: str(gtd.FormatDate(gtd.Today()))})
+
+	list, err := s.NextActions(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.QueryTasks(ctx, gtd.TaskQuery{State: "next_actions"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	order := func(ts []*gtd.Task) []string {
+		var out []string
+		for _, tk := range ts {
+			out = append(out, tk.Title)
+		}
+		return out
+	}
+	want := []string{"優先度が高い", "締切が近い", "普通の次の行動", "今日の予定"}
+	if fmt.Sprint(order(list)) != fmt.Sprint(want) {
+		t.Fatalf("NextActions = %v, want %v", order(list), want)
+	}
+	if fmt.Sprint(order(got)) != fmt.Sprint(want) {
+		t.Errorf("state=next_actions = %v, want %v as the list", order(got), want)
 	}
 }
 

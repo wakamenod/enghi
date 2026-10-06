@@ -100,9 +100,13 @@ func (s *Service) NextActions(ctx context.Context, contextID *int64) ([]*Task, e
 		where += ` AND t.context_id = ?`
 		args = append(args, *contextID)
 	}
-	where += ` ORDER BY t.priority DESC, COALESCE(t.deadline_on,'9999-12-31'), t.sort_order, t.id`
+	where += ` ORDER BY ` + nextActionsOrder
 	return s.tasks(ctx, where, args...)
 }
+
+// nextActionsOrder is the order of the Next Actions list, which the API's
+// state=next_actions keeps too: priority first, then the nearest deadline.
+const nextActionsOrder = `t.priority DESC, COALESCE(t.deadline_on,'9999-12-31'), t.sort_order, t.id`
 
 // Waiting are the items waiting on someone else, with days elapsed.
 func (s *Service) Waiting(ctx context.Context) ([]*Task, error) {
@@ -209,7 +213,11 @@ func (s *Service) QueryTasks(ctx context.Context, q TaskQuery) ([]*Task, error) 
 	if limit <= 0 || limit > 1000 {
 		limit = 200
 	}
-	where += fmt.Sprintf(` ORDER BY t.sort_order, t.id LIMIT %d`, limit)
+	order := `t.sort_order, t.id`
+	if q.State == "next_actions" {
+		order = nextActionsOrder
+	}
+	where += fmt.Sprintf(` ORDER BY %s LIMIT %d`, order, limit)
 	return s.tasks(ctx, where, args...)
 }
 
