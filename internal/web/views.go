@@ -2,6 +2,7 @@ package web
 
 import (
 	"errors"
+	"fmt"
 	"html/template"
 	"net/http"
 	"strings"
@@ -181,6 +182,24 @@ func (s *Server) viewTagList(w http.ResponseWriter, r *http.Request) {
 type searchData struct {
 	Query   string
 	Results []search.Result
+}
+
+// resultURL is the page a search hit opens: a log entry opens on its task's
+// Clarify screen, as a task does.
+func resultURL(r search.Result) string {
+	switch r.Kind {
+	case "page":
+		return "/wiki/" + r.Slug
+	case "task":
+		return fmt.Sprintf("/gtd/clarify/%d", r.ID)
+	case "log":
+		return fmt.Sprintf("/gtd/clarify/%d#log-%d", r.TaskID, r.ID)
+	case "project":
+		return fmt.Sprintf("/gtd/project/%d", r.ID)
+	case "area":
+		return fmt.Sprintf("/gtd/area/%d", r.ID)
+	}
+	return ""
 }
 
 func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {

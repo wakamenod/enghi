@@ -89,6 +89,7 @@ func parseTemplates(lang i18n.Lang) (*template.Template, error) {
 		"join":      strings.Join,
 		"add":       func(a, b int) int { return a + b },
 		"snippet":   search.SnippetHTML,
+		"resultURL": resultURL,
 		"list":      func(vals ...string) []string { return vals },
 		// eqID compares *int64 with int64; the template eq fails at run time when
 		// the types differ.

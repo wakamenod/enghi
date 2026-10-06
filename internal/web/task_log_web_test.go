@@ -228,6 +228,24 @@ func TestSearchFindsLogEntries(t *testing.T) {
 	}
 }
 
+// Task, project and area hits link to their own screens, on the search screen
+// and in the incremental suggestions alike.
+func TestSearchLinksGTDResults(t *testing.T) {
+	h := newServer(t)
+	mustJSON(t, h, "POST", "/api/areas", `{"name":"Moving house"}`)
+	mustJSON(t, h, "POST", "/api/projects", `{"title":"Moving office","outcome":"Moved in"}`)
+	mustJSON(t, h, "POST", "/api/tasks", `{"title":"Moving boxes"}`)
+
+	for _, path := range []string{"/search?q=Moving", "/ui/search?q=Moving"} {
+		body := do(h, req("GET", path, "")).Body.String()
+		for _, want := range []string{`href="/gtd/area/1"`, `href="/gtd/project/1"`, `href="/gtd/clarify/1"`} {
+			if !strings.Contains(body, want) {
+				t.Errorf("GET %s has no %s:\n%s", path, want, body)
+			}
+		}
+	}
+}
+
 // Export writes each task's log under the task, with pasted images written to
 // files/ and linked relatively, as for page bodies.
 func TestExportIncludesWorkLog(t *testing.T) {

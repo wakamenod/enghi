@@ -9,8 +9,7 @@
     <li>
       <span class="badge {{.Kind}}">{{kindLabel .Kind}}</span>
       <span class="row-body">
-        {{if eq .Kind "page"}}<a href="/wiki/{{.Slug}}">{{.Title}}</a>
-        {{else if eq .Kind "log"}}<a href="/gtd/clarify/{{.TaskID}}#log-{{.ID}}">{{.Title}}</a>
+        {{if resultURL .}}<a href="{{resultURL .}}">{{.Title}}</a>
         {{else}}<span class="row-title">{{.Title}}</span>{{end}}
         <span class="row-meta">
           {{if eq .Via "tag"}}<span class="meta">{{t "search.via_tag"}}</span>
