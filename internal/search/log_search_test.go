@@ -31,7 +31,7 @@ func logTask(t *testing.T, g *gtd.Service, title string, notes ...string) (*gtd.
 	}
 	var out []*gtd.TaskLog
 	for _, n := range notes {
-		l, _, err := g.AddLog(ctx, tk.ID, gtd.LogNote, n)
+		l, _, _, err := g.AddLog(ctx, tk.ID, gtd.LogNote, n)
 		if err != nil {
 			t.Fatal(err)
 		}

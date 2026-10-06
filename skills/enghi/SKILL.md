@@ -228,7 +228,9 @@ task already started, or a pause on one that is not, changes nothing and answers
 `created: false`. Completing or dropping a task ends the work by itself — no pause is
 needed. Moving a working task to any other open state (inbox, later, waiting, scheduled,
 someday) writes a pause by itself, with `moved_to` set to the new state; do not add one.
-Moving it to next keeps it working. Editing an entry takes the `version` you read; a `409` works like a page one.
+Moving it to next keeps it working. Only one task is worked on at a time: a start pauses
+the task being worked on and lists it in `paused` (`[{id, title}]`) — tell the user it was
+paused, and do not pause it yourself first. Editing an entry takes the `version` you read; a `409` works like a page one.
 
 ### Clarify the inbox
 

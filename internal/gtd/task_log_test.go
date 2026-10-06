@@ -10,7 +10,7 @@ import (
 
 func addLog(t *testing.T, s *gtd.Service, taskID int64, kind, body string) (*gtd.TaskLog, bool) {
 	t.Helper()
-	l, created, err := s.AddLog(context.Background(), taskID, kind, body)
+	l, created, _, err := s.AddLog(context.Background(), taskID, kind, body)
 	if err != nil {
 		t.Fatalf("AddLog(%s, %q): %v", kind, body, err)
 	}
@@ -38,13 +38,13 @@ func TestLogAddEditDelete(t *testing.T) {
 	}
 	addLog(t, s, tk.ID, gtd.LogNote, "## 分かったこと\n\n- [[設計メモ]]")
 
-	if _, _, err := s.AddLog(ctx, tk.ID, gtd.LogNote, "  \n\t"); err == nil {
+	if _, _, _, err := s.AddLog(ctx, tk.ID, gtd.LogNote, "  \n\t"); err == nil {
 		t.Error("a blank note was accepted")
 	}
-	if _, _, err := s.AddLog(ctx, tk.ID, "done", "x"); err == nil {
+	if _, _, _, err := s.AddLog(ctx, tk.ID, "done", "x"); err == nil {
 		t.Error("an unknown kind was accepted")
 	}
-	if _, _, err := s.AddLog(ctx, 9999, gtd.LogNote, "x"); !errors.Is(err, gtd.ErrNotFound) {
+	if _, _, _, err := s.AddLog(ctx, 9999, gtd.LogNote, "x"); !errors.Is(err, gtd.ErrNotFound) {
 		t.Errorf("AddLog on a missing task: %v, want ErrNotFound", err)
 	}
 
@@ -168,7 +168,6 @@ func TestWorkingIsDerived(t *testing.T) {
 	c := capture(t, s, "触らない")
 	patch(t, s, a.ID, gtd.TaskPatch{State: str(gtd.StateNext)})
 	addLog(t, s, a.ID, gtd.LogStart, "")
-	addLog(t, s, b.ID, gtd.LogStart, "")
 	addLog(t, s, c.ID, gtd.LogNote, "メモだけ")
 
 	next, _ := s.NextActions(ctx, nil)
@@ -188,14 +187,22 @@ func TestWorkingIsDerived(t *testing.T) {
 	if _, err := s.Complete(ctx, a.ID, false); err != nil {
 		t.Fatal(err)
 	}
-	patch(t, s, b.ID, gtd.TaskPatch{State: str(gtd.StateDropped)})
-	if working(t, s, a.ID) || working(t, s, b.ID) {
-		t.Error("a done or dropped task is still working")
+	if working(t, s, a.ID) {
+		t.Error("a done task is still working")
 	}
 	if count() != n {
-		t.Error("closing a task wrote log entries")
+		t.Error("completing a task wrote log entries")
 	}
-	if _, _, err := s.AddLog(ctx, a.ID, gtd.LogStart, ""); err == nil {
+	addLog(t, s, b.ID, gtd.LogStart, "")
+	n = count()
+	patch(t, s, b.ID, gtd.TaskPatch{State: str(gtd.StateDropped)})
+	if working(t, s, b.ID) {
+		t.Error("a dropped task is still working")
+	}
+	if count() != n {
+		t.Error("dropping a task wrote log entries")
+	}
+	if _, _, _, err := s.AddLog(ctx, a.ID, gtd.LogStart, ""); err == nil {
 		t.Error("a done task was started")
 	}
 
@@ -386,5 +393,97 @@ func TestResumeForUndo(t *testing.T) {
 	}
 	if m := marks(t, s, manual.ID); len(m) != 3 || m[2].Kind != gtd.LogStart {
 		t.Errorf("manual: marks = %+v", m)
+	}
+}
+
+// One task is worked on at a time: a start pauses the others, and says which.
+func TestStartPausesOthers(t *testing.T) {
+	s, _, _ := newSvc(t)
+	ctx := context.Background()
+	a := capture(t, s, "先に始めた")
+	b := capture(t, s, "後から始める")
+	addLog(t, s, a.ID, gtd.LogStart, "")
+
+	_, created, paused, err := s.AddLog(ctx, b.ID, gtd.LogStart, "")
+	if err != nil || !created {
+		t.Fatalf("start b: created=%v, %v", created, err)
+	}
+	if len(paused) != 1 || paused[0] != a.ID {
+		t.Errorf("paused = %v, want [%d]", paused, a.ID)
+	}
+	if working(t, s, a.ID) || !working(t, s, b.ID) {
+		t.Errorf("working: a=%v b=%v, want b alone", working(t, s, a.ID), working(t, s, b.ID))
+	}
+	// The pause is neither typed nor caused by a move
+	if m := marks(t, s, a.ID); len(m) != 2 || m[1].Kind != gtd.LogPause || m[1].Body != "" || m[1].MovedTo != "" {
+		t.Errorf("a's marks = %+v, want start then a plain pause", m)
+	}
+
+	// Starting b again changes nothing and pauses nothing
+	if _, created, paused, _ := s.AddLog(ctx, b.ID, gtd.LogStart, ""); created || len(paused) != 0 {
+		t.Errorf("second start: created=%v paused=%v", created, paused)
+	}
+	// A pause or a note leaves the others alone
+	addLog(t, s, a.ID, gtd.LogNote, "メモ")
+	if _, _, paused, _ := s.AddLog(ctx, a.ID, gtd.LogPause, ""); len(paused) != 0 || !working(t, s, b.ID) {
+		t.Errorf("pausing an idle task paused %v", paused)
+	}
+}
+
+// Data from before the rule may hold several working tasks. A start on one of
+// them, though it changes nothing for that task, still leaves it alone.
+func TestStartRestoresOneWorking(t *testing.T) {
+	s, _, db := newSvc(t)
+	ctx := context.Background()
+	a := capture(t, s, "一つ目")
+	b := capture(t, s, "二つ目")
+	for _, id := range []int64{a.ID, b.ID} {
+		if _, err := db.Exec(`INSERT INTO task_logs(task_id, kind) VALUES (?, 'start')`, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, created, paused, err := s.AddLog(ctx, a.ID, gtd.LogStart, "")
+	if err != nil || created {
+		t.Fatalf("start a: created=%v, %v", created, err)
+	}
+	if len(paused) != 1 || paused[0] != b.ID || working(t, s, b.ID) || !working(t, s, a.ID) {
+		t.Errorf("paused = %v; working a=%v b=%v", paused, working(t, s, a.ID), working(t, s, b.ID))
+	}
+}
+
+// A change that makes a task working again pauses the one being worked on:
+// Undo of a move, and reopening a task closed while working.
+func TestWorkingAgainPausesOthers(t *testing.T) {
+	s, _, _ := newSvc(t)
+	ctx := context.Background()
+
+	moved := capture(t, s, "移して戻す")
+	patch(t, s, moved.ID, gtd.TaskPatch{State: str(gtd.StateNext)})
+	addLog(t, s, moved.ID, gtd.LogStart, "")
+	away := patch(t, s, moved.ID, gtd.TaskPatch{State: str(gtd.StateSomeday)})
+	other := capture(t, s, "その間に始めた")
+	addLog(t, s, other.ID, gtd.LogStart, "")
+	patch(t, s, moved.ID, gtd.TaskPatch{State: str(gtd.StateNext), Version: away.Version, Resume: true})
+	if !working(t, s, moved.ID) || working(t, s, other.ID) {
+		t.Errorf("undo: working moved=%v other=%v", working(t, s, moved.ID), working(t, s, other.ID))
+	}
+
+	closed := capture(t, s, "作業中に完了")
+	addLog(t, s, closed.ID, gtd.LogStart, "")
+	if _, err := s.Complete(ctx, closed.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	addLog(t, s, other.ID, gtd.LogStart, "")
+	patch(t, s, closed.ID, gtd.TaskPatch{State: str(gtd.StateNext)})
+	if !working(t, s, closed.ID) || working(t, s, other.ID) {
+		t.Errorf("reopen: working closed=%v other=%v", working(t, s, closed.ID), working(t, s, other.ID))
+	}
+
+	// A change that leaves the task as it was pauses nothing
+	patch(t, s, closed.ID, gtd.TaskPatch{Title: str("名前だけ変える")})
+	addLog(t, s, other.ID, gtd.LogStart, "")
+	patch(t, s, closed.ID, gtd.TaskPatch{Title: str("もう一度変える")})
+	if !working(t, s, other.ID) {
+		t.Error("renaming an idle task paused the working one")
 	}
 }

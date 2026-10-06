@@ -291,6 +291,9 @@ func (s *Service) Patch(ctx context.Context, id int64, p TaskPatch) (*Task, erro
 			if err := resumeWork(ctx, tx, id); err != nil {
 				return err
 			}
+			if err := keepOneWorking(ctx, tx, id, cur.Working); err != nil {
+				return err
+			}
 			out, err = scanTask(tx.QueryRowContext(ctx, `SELECT `+taskCols+` `+taskFrom+` WHERE t.id = ?`, id))
 			return err
 		}
@@ -316,6 +319,9 @@ func (s *Service) Patch(ctx context.Context, id int64, p TaskPatch) (*Task, erro
 			if err := resumeWork(ctx, tx, id); err != nil {
 				return err
 			}
+		}
+		if err := keepOneWorking(ctx, tx, id, cur.Working); err != nil {
+			return err
 		}
 		out, err = scanTask(tx.QueryRowContext(ctx, `SELECT `+taskCols+` `+taskFrom+` WHERE t.id = ?`, id))
 		return err
@@ -364,6 +370,26 @@ func resumeWork(ctx context.Context, tx *sql.Tx, id int64) error {
 		return err
 	}
 	return touchTask(ctx, tx, id)
+}
+
+// keepOneWorking pauses the other working tasks when a change made id working
+// again: Resume, or reopening a closed task, whose last start then counts
+// again. wasWorking is whether id was working before the change; if it was,
+// nothing changed and nothing is written. See AddLog for why.
+func keepOneWorking(ctx context.Context, tx *sql.Tx, id int64, wasWorking bool) error {
+	if wasWorking {
+		return nil
+	}
+	var working bool
+	if err := tx.QueryRowContext(ctx,
+		`SELECT `+workingExpr+` FROM tasks t WHERE t.id = ?`, id).Scan(&working); err != nil {
+		return err
+	}
+	if !working {
+		return nil
+	}
+	_, err := pauseOthers(ctx, tx, id)
+	return err
 }
 
 // validateTask checks that the state and the columns agree.
