@@ -208,6 +208,37 @@ func TestWorkLogAPI(t *testing.T) {
 	}
 }
 
+// A start answers with the tasks it paused, so a client can say so.
+func TestStartAPIListsPaused(t *testing.T) {
+	h := newServer(t)
+	mustJSON(t, h, "POST", "/api/tasks", `{"title":"先に始めた"}`)
+	mustJSON(t, h, "POST", "/api/tasks", `{"title":"切り替え先"}`)
+
+	var add struct {
+		Paused []struct {
+			ID    int64  `json:"id"`
+			Title string `json:"title"`
+		} `json:"paused"`
+	}
+	w := do(h, req("POST", "/api/tasks/1/logs", `{"kind":"start"}`))
+	decode(t, w, &add)
+	if add.Paused == nil || len(add.Paused) != 0 {
+		t.Errorf("first start: paused = %s, want []", w.Body.String())
+	}
+	w = do(h, req("POST", "/api/tasks/2/logs", `{"kind":"start"}`))
+	decode(t, w, &add)
+	if len(add.Paused) != 1 || add.Paused[0].ID != 1 || add.Paused[0].Title != "先に始めた" {
+		t.Errorf("switching start: %s", w.Body.String())
+	}
+	var task struct {
+		Task map[string]any `json:"task"`
+	}
+	decode(t, do(h, req("GET", "/api/tasks/1", "")), &task)
+	if task.Task["working"] != false {
+		t.Errorf("the paused task is still working")
+	}
+}
+
 // A log hit links to its entry on Clarify, and kind=log narrows the API.
 func TestSearchFindsLogEntries(t *testing.T) {
 	h := newServer(t)

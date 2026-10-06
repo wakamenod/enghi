@@ -207,9 +207,9 @@ func TestWorkingNow(t *testing.T) {
 	s, _, _ := newSvc(t)
 	a := capture(t, s, "作業中")
 	b := capture(t, s, "止めた")
-	addLog(t, s, a.ID, gtd.LogStart, "")
 	addLog(t, s, b.ID, gtd.LogStart, "")
 	addLog(t, s, b.ID, gtd.LogPause, "")
+	addLog(t, s, a.ID, gtd.LogStart, "")
 	got, err := s.Working(context.Background())
 	if err != nil {
 		t.Fatal(err)

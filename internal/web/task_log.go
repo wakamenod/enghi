@@ -96,7 +96,7 @@ func (s *Server) uiWriteLog(w http.ResponseWriter, r *http.Request, kind string)
 		http.NotFound(w, r)
 		return
 	}
-	l, created, err := s.gtd.AddLog(ctxOf(r), id, kind, r.FormValue("body"))
+	l, created, paused, err := s.gtd.AddLog(ctxOf(r), id, kind, r.FormValue("body"))
 	if err != nil {
 		if errors.Is(err, gtd.ErrNotFound) {
 			http.NotFound(w, r)
@@ -109,7 +109,7 @@ func (s *Server) uiWriteLog(w http.ResponseWriter, r *http.Request, kind string)
 	if l != nil {
 		logID = l.ID
 	}
-	if created {
+	if created || len(paused) > 0 {
 		s.hub.Broadcast(Event{Type: "updated", Kind: "task"})
 	}
 	logRedirect(w, r, id, logID)
@@ -187,7 +187,8 @@ func (s *Server) apiListLogs(w http.ResponseWriter, r *http.Request) {
 
 // apiAddLog is POST /api/tasks/{id}/logs {kind?, body}; kind defaults to note.
 // A start or pause that changes nothing answers 200 with created=false and the
-// latest mark (null if there is none); a new entry answers 201.
+// latest mark (null if there is none); a new entry answers 201. paused lists
+// the tasks a start paused, as {id, title}, so the caller can say so.
 func (s *Server) apiAddLog(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r)
 	if err != nil {
@@ -202,7 +203,7 @@ func (s *Server) apiAddLog(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
-	l, created, err := s.gtd.AddLog(ctxOf(r), id, in.Kind, in.Body)
+	l, created, paused, err := s.gtd.AddLog(ctxOf(r), id, in.Kind, in.Body)
 	if err != nil {
 		s.gtdErr(w, err)
 		return
@@ -212,12 +213,23 @@ func (s *Server) apiAddLog(w http.ResponseWriter, r *http.Request) {
 		s.gtdErr(w, err)
 		return
 	}
+	pausedTasks := make([]map[string]any, 0, len(paused))
+	for _, pid := range paused {
+		pt, err := s.gtd.Task(ctxOf(r), pid)
+		if err != nil {
+			s.gtdErr(w, err)
+			return
+		}
+		pausedTasks = append(pausedTasks, map[string]any{"id": pt.ID, "title": pt.Title})
+	}
 	code := http.StatusOK
 	if created {
 		code = http.StatusCreated
+	}
+	if created || len(paused) > 0 {
 		s.hub.Broadcast(Event{Type: "updated", Kind: "task"})
 	}
-	writeJSON(w, code, map[string]any{"log": l, "created": created, "working": t.Working})
+	writeJSON(w, code, map[string]any{"log": l, "created": created, "working": t.Working, "paused": pausedTasks})
 }
 
 // apiEditLog is PATCH /api/task-logs/{id} {body, version}. **version is

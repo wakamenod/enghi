@@ -175,6 +175,8 @@ Every task has a **work log** at the bottom of its clarify screen: timestamped e
 
 Moving a working task anywhere else that is still open—Inbox, Later, Waiting, Scheduled or Someday—pauses it for you. The log records it as "⏸ paused (moved to Someday)." A forgotten Pause no longer leaves the task working forever. Undoing the move takes that pause back, and the task is working again. Moving it to Next leaves the work running.
 
+**You work on one task at a time.** Starting a task pauses the one you were working on, so switching needs no separate Pause. Undoing a move or reopening a completed task that brings work back also pauses whatever else was running.
+
 The log is included in search, labeled "Log"; when several entries of one task match, only its best one is shown. Entries can be edited or deleted, and deleting a Start or Pause takes back a mistaken press. There is no revision history for entries—an edit overwrites.
 
 ## Work Record — What You Did Each Day {#day}

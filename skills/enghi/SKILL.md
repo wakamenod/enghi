@@ -172,7 +172,7 @@ Reading:
 | `GET /api/dashboard` | Today at a glance: `gtd.today`, `gtd.upcoming` (deadlines in the next `gtd.deadline_warning_days` days), `gtd.inbox_count`, `gtd.waiting_overdue`, `gtd.stalled_projects`, `gtd.working` (tasks started and not paused, each with `since`: when the work started). A task with a deadline carries `deadline_days`: days left, negative when overdue |
 | `GET /api/review` | Everything the weekly review needs, in one call (see below) |
 | `GET /api/lists` | How many items each list holds, in one call: `{"inbox", "next", "waiting", "scheduled", "someday", "projects", "areas"}`. `next` counts what `state=next_actions` returns, so a scheduled task that is due counts in both `next` and `scheduled`; `projects` counts active ones |
-| `GET /api/tasks?state=inbox` | Tasks by state, as `{"tasks": [...]}`; `state=next_actions` gives the Next Actions view |
+| `GET /api/tasks?state=inbox` | Tasks by state, as `{"tasks": [...]}`; `state=next_actions` gives the Next Actions view, in its order (priority, then the nearest deadline) |
 | `GET /api/tasks/<id>` | One task and the pages it links to. `working: true` means it has been started and not paused |
 | `GET /api/tasks/<id>/logs` | The task's work log, oldest first, as `{"working": ..., "logs": [...]}` |
 | `GET /api/day?date=YYYY-MM-DD` | One day's work record (today by default); see "The daily report" |
@@ -228,7 +228,9 @@ task already started, or a pause on one that is not, changes nothing and answers
 `created: false`. Completing or dropping a task ends the work by itself — no pause is
 needed. Moving a working task to any other open state (inbox, later, waiting, scheduled,
 someday) writes a pause by itself, with `moved_to` set to the new state; do not add one.
-Moving it to next keeps it working. Editing an entry takes the `version` you read; a `409` works like a page one.
+Moving it to next keeps it working. Only one task is worked on at a time: a start pauses
+the task being worked on and lists it in `paused` (`[{id, title}]`) — tell the user it was
+paused, and do not pause it yourself first. Editing an entry takes the `version` you read; a `409` works like a page one.
 
 ### Clarify the inbox
 

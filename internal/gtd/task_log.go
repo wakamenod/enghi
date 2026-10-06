@@ -121,18 +121,23 @@ func (s *Service) Log(ctx context.Context, id int64) (*TaskLog, error) {
 // the day's page later. A comment sent with such a no-op is still kept, as a
 // note, so no typed text is lost. A closed task (done/dropped/filed) cannot be
 // started.
-func (s *Service) AddLog(ctx context.Context, taskID int64, kind, body string) (entry *TaskLog, created bool, err error) {
+//
+// **One task is worked on at a time.** A start pauses every other working
+// task in the same transaction, and returns their ids as paused. It does so
+// even when this task was already working, so a start always leaves exactly
+// one, whatever the data held before.
+func (s *Service) AddLog(ctx context.Context, taskID int64, kind, body string) (entry *TaskLog, created bool, paused []int64, err error) {
 	if kind == "" {
 		kind = LogNote
 	}
 	switch kind {
 	case LogNote, LogStart, LogPause:
 	default:
-		return nil, false, fmt.Errorf("invalid kind: %q", kind)
+		return nil, false, nil, fmt.Errorf("invalid kind: %q", kind)
 	}
 	body = normalizeLogBody(body)
 	if kind == LogNote && body == "" {
-		return nil, false, errors.New("the log entry is empty")
+		return nil, false, nil, errors.New("the log entry is empty")
 	}
 	err = s.db.Tx(ctx, func(tx *sql.Tx) error {
 		var state string
@@ -146,6 +151,11 @@ func (s *Service) AddLog(ctx context.Context, taskID int64, kind, body string) (
 		}
 		if kind == LogStart && (state == StateDone || state == StateDropped || state == StateFiled) {
 			return fmt.Errorf("cannot start a task that is %s", state)
+		}
+		if kind == LogStart {
+			if paused, err = pauseOthers(ctx, tx, taskID); err != nil {
+				return err
+			}
 		}
 		if (kind == LogStart && working) || (kind == LogPause && !working) {
 			if body != "" {
@@ -179,9 +189,43 @@ func (s *Service) AddLog(ctx context.Context, taskID int64, kind, body string) (
 		return err
 	})
 	if err != nil {
-		return nil, false, err
+		return nil, false, nil, err
 	}
-	return entry, created, nil
+	return entry, created, paused, nil
+}
+
+// pauseOthers pauses every working task but id, and returns their ids. The
+// pauses carry no body and no moved_to: they were neither typed nor caused by
+// a move, but by starting id.
+func pauseOthers(ctx context.Context, tx *sql.Tx, id int64) ([]int64, error) {
+	rows, err := tx.QueryContext(ctx,
+		`SELECT t.id FROM tasks t WHERE t.id != ? AND `+workingExpr+` ORDER BY t.id`, id)
+	if err != nil {
+		return nil, err
+	}
+	var ids []int64
+	for rows.Next() {
+		var other int64
+		if err := rows.Scan(&other); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		ids = append(ids, other)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for _, other := range ids {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO task_logs(task_id, kind) VALUES (?, 'pause')`, other); err != nil {
+			return nil, err
+		}
+		if err := touchTask(ctx, tx, other); err != nil {
+			return nil, err
+		}
+	}
+	return ids, nil
 }
 
 // EditLog replaces an entry's body. **version is required**, as for pages: an
